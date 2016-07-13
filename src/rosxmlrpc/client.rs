@@ -37,7 +37,6 @@ impl Client {
             writer.write(xml::writer::XmlEvent::end_element()).unwrap();
             writer.write(xml::writer::XmlEvent::end_element()).unwrap();
         }
-        println!("{}", String::from_utf8(body.clone()).unwrap());
 
         let mut res = self.http_client
             .post(self.server_uri.as_str())
