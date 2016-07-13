@@ -7,4 +7,9 @@ license = "MIT"
 repository = "https://github.com/adnanademovic/rosrust"
 readme = "README.md"
 
-[dependencies]
+[dependencies.hyper]
+version = "*"
+default-features = false
+
+[dependencies.xml-rs]
+version = "*"
