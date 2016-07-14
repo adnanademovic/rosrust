@@ -3,32 +3,32 @@ extern crate xml;
 
 use std::io::Read;
 
-pub struct Client {
+pub struct Client<'t> {
     http_client: hyper::Client,
-    server_uri: String,
+    server_uri: &'t str,
 }
 
-impl Client {
-    pub fn new(server_uri: String) -> Client {
+impl<'t> Client<'t> {
+    pub fn new(server_uri: &'t str) -> Client<'t> {
         Client {
             http_client: hyper::Client::new(),
             server_uri: server_uri,
         }
     }
 
-    pub fn request(&self, function_name: String, parameters: &Vec<String>) -> Member {
+    pub fn request(&self, function_name: &str, parameters: &Vec<&str>) -> Member {
         let mut body = Vec::<u8>::new();
         {
             let mut writer = xml::EventWriter::new(&mut body);
             writer.write(xml::writer::XmlEvent::start_element("methodCall")).unwrap();
             writer.write(xml::writer::XmlEvent::start_element("methodName")).unwrap();
-            writer.write(xml::writer::XmlEvent::characters(function_name.as_str())).unwrap();
+            writer.write(xml::writer::XmlEvent::characters(function_name)).unwrap();
             writer.write(xml::writer::XmlEvent::end_element()).unwrap();
             writer.write(xml::writer::XmlEvent::start_element("params")).unwrap();
             for param in parameters {
                 writer.write(xml::writer::XmlEvent::start_element("value")).unwrap();
                 writer.write(xml::writer::XmlEvent::start_element("string")).unwrap();
-                writer.write(xml::writer::XmlEvent::characters(param.as_str())).unwrap();
+                writer.write(xml::writer::XmlEvent::characters(param)).unwrap();
                 writer.write(xml::writer::XmlEvent::end_element()).unwrap();
                 writer.write(xml::writer::XmlEvent::end_element()).unwrap();
             }
@@ -37,7 +37,7 @@ impl Client {
         }
 
         let res = self.http_client
-            .post(self.server_uri.as_str())
+            .post(self.server_uri)
             .body(String::from_utf8(body).unwrap().as_str())
             .send()
             .unwrap();
