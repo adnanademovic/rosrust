@@ -1,3 +1,3 @@
 pub use self::client::Client;
 
-mod client;
+pub mod client;
