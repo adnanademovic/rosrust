@@ -16,7 +16,7 @@ impl Client {
         }
     }
 
-    pub fn request(&self, function_name: String, parameters: &Vec<(String, String)>) -> String {
+    pub fn request(&self, function_name: String, parameters: &Vec<String>) -> String {
         let mut body = Vec::<u8>::new();
         {
             let mut writer = xml::EventWriter::new(&mut body);
@@ -26,11 +26,9 @@ impl Client {
             writer.write(xml::writer::XmlEvent::end_element()).unwrap();
             writer.write(xml::writer::XmlEvent::start_element("params")).unwrap();
             for param in parameters {
-                writer.write(xml::writer::XmlEvent::start_element(param.0.as_str())).unwrap();
                 writer.write(xml::writer::XmlEvent::start_element("value")).unwrap();
                 writer.write(xml::writer::XmlEvent::start_element("string")).unwrap();
-                writer.write(xml::writer::XmlEvent::characters(param.1.as_str())).unwrap();
-                writer.write(xml::writer::XmlEvent::end_element()).unwrap();
+                writer.write(xml::writer::XmlEvent::characters(param.as_str())).unwrap();
                 writer.write(xml::writer::XmlEvent::end_element()).unwrap();
                 writer.write(xml::writer::XmlEvent::end_element()).unwrap();
             }
