@@ -3,20 +3,20 @@ extern crate xml;
 
 use std::io::Read;
 
-pub struct Client<'t> {
+pub struct Client {
     http_client: hyper::Client,
-    server_uri: &'t str,
+    server_uri: String,
 }
 
-impl<'t> Client<'t> {
-    pub fn new(server_uri: &'t str) -> Client<'t> {
+impl Client {
+    pub fn new(server_uri: &str) -> Client {
         Client {
             http_client: hyper::Client::new(),
-            server_uri: server_uri,
+            server_uri: server_uri.to_string(),
         }
     }
 
-    pub fn request(&self, function_name: &str, parameters: &Vec<&str>) -> Member {
+    pub fn request(&self, function_name: &str, parameters: &[&str]) -> Member {
         let mut body = Vec::<u8>::new();
         {
             let mut writer = xml::EventWriter::new(&mut body);
@@ -37,8 +37,8 @@ impl<'t> Client<'t> {
         }
 
         let res = self.http_client
-            .post(self.server_uri)
-            .body(String::from_utf8(body).unwrap().as_str())
+            .post(&self.server_uri)
+            .body(&String::from_utf8(body).unwrap())
             .send()
             .unwrap();
 
@@ -64,9 +64,9 @@ fn read_xml_tree<T: Read>(mut parser: &mut xml::EventReader<T>) -> Option<XmlTre
 }
 
 fn parse_xml_tree(tree: &XmlTreeNode) -> Option<Member> {
-    if let Some(tree) = unwrap_xml_layer(&tree, "methodResponse".to_string()) {
-        if let Some(tree) = unwrap_xml_layer(&tree, "params".to_string()) {
-            if let Some(tree) = unwrap_xml_layer(&tree, "param".to_string()) {
+    if let Some(tree) = peel_xml_layer(&tree, "methodResponse") {
+        if let Some(tree) = peel_xml_layer(&tree, "params") {
+            if let Some(tree) = peel_xml_layer(&tree, "param") {
                 return parse_xml_tree_helper(&tree);
             }
         }
@@ -75,7 +75,7 @@ fn parse_xml_tree(tree: &XmlTreeNode) -> Option<Member> {
 }
 
 fn parse_xml_tree_helper(tree: &XmlTreeNode) -> Option<Member> {
-    if let Some(tree) = unwrap_xml_layer(&tree, "value".to_string()) {
+    if let Some(tree) = peel_xml_layer(&tree, "value") {
         if let XmlTreeNode::Node(ref name, ref children) = *tree {
             if children.len() == 1 {
                 let child = &children[0];
@@ -93,7 +93,7 @@ fn parse_xml_tree_helper(tree: &XmlTreeNode) -> Option<Member> {
 
 fn parse_xml_array(tree: &XmlTreeNode) -> Option<Member> {
     if let XmlTreeNode::Node(ref name, ref children) = *tree {
-        if name.eq(&"data".to_string()) {
+        if name.as_str() == "data" {
             return Some(Member::Array(children.iter().filter_map(parse_xml_tree_helper).collect()));
         }
     }
@@ -116,9 +116,9 @@ fn parse_xml_string(tree: &XmlTreeNode) -> Option<Member> {
     None
 }
 
-fn unwrap_xml_layer(tree: &XmlTreeNode, node_name: String) -> Option<&XmlTreeNode> {
+fn peel_xml_layer<'a>(tree: &'a XmlTreeNode, node_name: &str) -> Option<&'a XmlTreeNode> {
     if let XmlTreeNode::Node(ref name, ref children) = *tree {
-        if name.eq(&node_name) && children.len() == 1 {
+        if name.as_str() == node_name && children.len() == 1 {
             return Some(&children[0]);
         }
     }
