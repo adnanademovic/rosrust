@@ -20,10 +20,10 @@ impl Master {
 
     pub fn register_service(&self, service: &str, service_api: &str) -> rosxmlrpc::client::Member {
         self.client.request("registerService",
-                            &vec![self.client_id.as_str(),
-                                  service,
-                                  service_api,
-                                  self.caller_api.as_str()])
+                            &[self.client_id.as_str(),
+                              service,
+                              service_api,
+                              self.caller_api.as_str()])
     }
 
     pub fn unregister_service(&self,
@@ -31,32 +31,26 @@ impl Master {
                               service_api: &str)
                               -> rosxmlrpc::client::Member {
         self.client.request("unregisterService",
-                            &vec![self.client_id.as_str(), service, service_api])
+                            &[self.client_id.as_str(), service, service_api])
     }
 
     pub fn register_subscriber(&self, topic: &str, topic_type: &str) -> rosxmlrpc::client::Member {
         self.client.request("registerSubscriber",
-                            &vec![self.client_id.as_str(),
-                                  topic,
-                                  topic_type,
-                                  self.caller_api.as_str()])
+                            &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
     }
 
     pub fn unregister_subscriber(&self, topic: &str) -> rosxmlrpc::client::Member {
         self.client.request("unregisterSubscriber",
-                            &vec![self.client_id.as_str(), topic, self.caller_api.as_str()])
+                            &[self.client_id.as_str(), topic, self.caller_api.as_str()])
     }
 
     pub fn register_publisher(&self, topic: &str, topic_type: &str) -> rosxmlrpc::client::Member {
         self.client.request("registerPublisher",
-                            &vec![self.client_id.as_str(),
-                                  topic,
-                                  topic_type,
-                                  self.caller_api.as_str()])
+                            &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
     }
 
     pub fn unregister_publisher(&self, topic: &str) -> rosxmlrpc::client::Member {
         self.client.request("unregisterPublisher",
-                            &vec![self.client_id.as_str(), topic, self.caller_api.as_str()])
+                            &[self.client_id.as_str(), topic, self.caller_api.as_str()])
     }
 }
