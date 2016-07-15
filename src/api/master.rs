@@ -10,11 +10,11 @@ pub struct Master {
 impl Master {
     pub fn new(client_id: &str, caller_api: &str) -> Master {
         let master_uri = std::env::var("ROS_MASTER_URI")
-            .unwrap_or("http://localhost:11311/".to_string());
+            .unwrap_or("http://localhost:11311/".to_owned());
         Master {
             client: rosxmlrpc::Client::new(&master_uri),
-            client_id: client_id.to_string(),
-            caller_api: caller_api.to_string(),
+            client_id: client_id.to_owned(),
+            caller_api: caller_api.to_owned(),
         }
     }
 

@@ -12,7 +12,7 @@ impl Client {
     pub fn new(server_uri: &str) -> Client {
         Client {
             http_client: hyper::Client::new(),
-            server_uri: server_uri.to_string(),
+            server_uri: server_uri.to_owned(),
         }
     }
 
