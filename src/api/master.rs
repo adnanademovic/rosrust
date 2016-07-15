@@ -18,39 +18,51 @@ impl Master {
         }
     }
 
-    pub fn register_service(&self, service: &str, service_api: &str) -> rosxmlrpc::client::Member {
-        self.client.request("registerService",
-                            &[self.client_id.as_str(),
-                              service,
-                              service_api,
-                              self.caller_api.as_str()])
+    pub fn register_service(&self,
+                            service: &str,
+                            service_api: &str)
+                            -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("registerService",
+                     &[self.client_id.as_str(), service, service_api, self.caller_api.as_str()])
     }
 
     pub fn unregister_service(&self,
                               service: &str,
                               service_api: &str)
-                              -> rosxmlrpc::client::Member {
-        self.client.request("unregisterService",
-                            &[self.client_id.as_str(), service, service_api])
+                              -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("unregisterService",
+                     &[self.client_id.as_str(), service, service_api])
     }
 
-    pub fn register_subscriber(&self, topic: &str, topic_type: &str) -> rosxmlrpc::client::Member {
-        self.client.request("registerSubscriber",
-                            &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
+    pub fn register_subscriber(&self,
+                               topic: &str,
+                               topic_type: &str)
+                               -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("registerSubscriber",
+                     &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
     }
 
-    pub fn unregister_subscriber(&self, topic: &str) -> rosxmlrpc::client::Member {
-        self.client.request("unregisterSubscriber",
-                            &[self.client_id.as_str(), topic, self.caller_api.as_str()])
+    pub fn unregister_subscriber(&self, topic: &str) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("unregisterSubscriber",
+                     &[self.client_id.as_str(), topic, self.caller_api.as_str()])
     }
 
-    pub fn register_publisher(&self, topic: &str, topic_type: &str) -> rosxmlrpc::client::Member {
-        self.client.request("registerPublisher",
-                            &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
+    pub fn register_publisher(&self,
+                              topic: &str,
+                              topic_type: &str)
+                              -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("registerPublisher",
+                     &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
     }
 
-    pub fn unregister_publisher(&self, topic: &str) -> rosxmlrpc::client::Member {
-        self.client.request("unregisterPublisher",
-                            &[self.client_id.as_str(), topic, self.caller_api.as_str()])
+    pub fn unregister_publisher(&self, topic: &str) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("unregisterPublisher",
+                     &[self.client_id.as_str(), topic, self.caller_api.as_str()])
     }
 }
