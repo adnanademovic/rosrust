@@ -65,4 +65,34 @@ impl Master {
             .request("unregisterPublisher",
                      &[self.client_id.as_str(), topic, self.caller_api.as_str()])
     }
+
+    pub fn lookup_node(&self, node_name: &str) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("lookupNode", &[self.client_id.as_str(), node_name])
+    }
+
+    pub fn get_published_topics(&self, subgraph: &str) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("getPublishedTopics", &[self.client_id.as_str(), subgraph])
+    }
+
+    pub fn get_topic_types(&self) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("getTopicTypes", &[self.client_id.as_str()])
+    }
+
+    pub fn get_system_state(&self) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("getSystemState", &[self.client_id.as_str()])
+    }
+
+    pub fn get_uri(&self) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("getUri", &[self.client_id.as_str()])
+    }
+
+    pub fn lookup_service(&self, service: &str) -> rosxmlrpc::client::ClientResult {
+        self.client
+            .request("lookupService", &[self.client_id.as_str(), service])
+    }
 }
