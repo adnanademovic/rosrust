@@ -48,11 +48,11 @@ impl Client {
     }
 }
 
-fn read_xml_tree<T: Read>(mut parser: &mut xml::EventReader<T>) -> Option<XmlTreeNode> {
+fn read_xml_tree<T: Read>(parser: &mut xml::EventReader<T>) -> Option<XmlTreeNode> {
     match parser.next() {
         Ok(xml::reader::XmlEvent::StartElement { name, .. }) => {
             let mut children = Vec::<XmlTreeNode>::new();
-            while let Some(tree) = read_xml_tree(&mut parser) {
+            while let Some(tree) = read_xml_tree(parser) {
                 children.push(tree);
             }
             Some(XmlTreeNode::Node(name.local_name, children))
@@ -60,15 +60,15 @@ fn read_xml_tree<T: Read>(mut parser: &mut xml::EventReader<T>) -> Option<XmlTre
         Ok(xml::reader::XmlEvent::Characters(value)) => Some(XmlTreeNode::Leaf(value)),
         Ok(xml::reader::XmlEvent::EndElement { .. }) => None,
         Err(..) => None,
-        _ => read_xml_tree(&mut parser),
+        _ => read_xml_tree(parser),
     }
 }
 
 fn parse_xml_tree(tree: &XmlTreeNode) -> Option<Member> {
-    if let Some(tree) = peel_xml_layer(&tree, "methodResponse") {
-        if let Some(tree) = peel_xml_layer(&tree, "params") {
-            if let Some(tree) = peel_xml_layer(&tree, "param") {
-                return parse_xml_tree_helper(&tree);
+    if let Some(tree) = peel_xml_layer(tree, "methodResponse") {
+        if let Some(tree) = peel_xml_layer(tree, "params") {
+            if let Some(tree) = peel_xml_layer(tree, "param") {
+                return parse_xml_tree_helper(tree);
             }
         }
     }
@@ -76,7 +76,7 @@ fn parse_xml_tree(tree: &XmlTreeNode) -> Option<Member> {
 }
 
 fn parse_xml_tree_helper(tree: &XmlTreeNode) -> Option<Member> {
-    if let Some(tree) = peel_xml_layer(&tree, "value") {
+    if let Some(tree) = peel_xml_layer(tree, "value") {
         if let XmlTreeNode::Node(ref name, ref children) = *tree {
             if children.len() == 1 {
                 let child = &children[0];
@@ -102,7 +102,7 @@ fn parse_xml_array(tree: &XmlTreeNode) -> Option<Member> {
 }
 
 fn parse_xml_int(tree: &XmlTreeNode) -> Option<Member> {
-    if let Some(Member::String(text)) = parse_xml_string(&tree) {
+    if let Some(Member::String(text)) = parse_xml_string(tree) {
         if let Ok(value) = text.parse::<i32>() {
             return Some(Member::Int(value));
         }
