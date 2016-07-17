@@ -21,79 +21,78 @@ impl Master {
     pub fn register_service(&self,
                             service: &str,
                             service_api: &str)
-                            -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("registerService",
-                     &[self.client_id.as_str(), service, service_api, self.caller_api.as_str()])
+                            -> MasterResult<(i32, String, i32)> {
+        Ok(try!(self.client.request("registerService",
+                                    &[self.client_id.as_str(),
+                                      service,
+                                      service_api,
+                                      self.caller_api.as_str()])))
     }
 
     pub fn unregister_service(&self,
                               service: &str,
                               service_api: &str)
-                              -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("unregisterService",
-                     &[self.client_id.as_str(), service, service_api])
+                              -> MasterResult<(i32, String, i32)> {
+        Ok(try!(self.client.request("unregisterService",
+                                    &[self.client_id.as_str(), service, service_api])))
     }
 
     pub fn register_subscriber(&self,
                                topic: &str,
                                topic_type: &str)
-                               -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("registerSubscriber",
-                     &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
+                               -> MasterResult<(i32, String, Vec<String>)> {
+        Ok(try!(self.client.request("registerSubscriber",
+                                    &[self.client_id.as_str(),
+                                      topic,
+                                      topic_type,
+                                      self.caller_api.as_str()])))
     }
 
-    pub fn unregister_subscriber(&self, topic: &str) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("unregisterSubscriber",
-                     &[self.client_id.as_str(), topic, self.caller_api.as_str()])
+    pub fn unregister_subscriber(&self, topic: &str) -> MasterResult<(i32, String, i32)> {
+        Ok(try!(self.client.request("unregisterSubscriber",
+                                    &[self.client_id.as_str(), topic, self.caller_api.as_str()])))
     }
 
     pub fn register_publisher(&self,
                               topic: &str,
                               topic_type: &str)
-                              -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("registerPublisher",
-                     &[self.client_id.as_str(), topic, topic_type, self.caller_api.as_str()])
+                              -> MasterResult<(i32, String, Vec<String>)> {
+        Ok(try!(self.client.request("registerPublisher",
+                                    &[self.client_id.as_str(),
+                                      topic,
+                                      topic_type,
+                                      self.caller_api.as_str()])))
     }
 
-    pub fn unregister_publisher(&self, topic: &str) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("unregisterPublisher",
-                     &[self.client_id.as_str(), topic, self.caller_api.as_str()])
+    pub fn unregister_publisher(&self, topic: &str) -> MasterResult<(i32, String, i32)> {
+        Ok(try!(self.client.request("unregisterPublisher",
+                                    &[self.client_id.as_str(), topic, self.caller_api.as_str()])))
     }
 
-    pub fn lookup_node(&self, node_name: &str) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("lookupNode", &[self.client_id.as_str(), node_name])
+    pub fn lookup_node(&self, node_name: &str) -> MasterResult<(i32, String, String)> {
+        Ok(try!(self.client.request("lookupNode", &[self.client_id.as_str(), node_name])))
     }
 
-    pub fn get_published_topics(&self, subgraph: &str) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("getPublishedTopics", &[self.client_id.as_str(), subgraph])
+    pub fn get_published_topics(&self,
+                                subgraph: &str)
+                                -> MasterResult<(i32, String, Vec<(String, String)>)> {
+        Ok(try!(self.client.request("getPublishedTopics", &[self.client_id.as_str(), subgraph])))
     }
 
-    pub fn get_topic_types(&self) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("getTopicTypes", &[self.client_id.as_str()])
+    pub fn get_topic_types(&self) -> MasterResult<(i32, String, Vec<(String, String)>)> {
+        Ok(try!(self.client.request("getTopicTypes", &[self.client_id.as_str()])))
     }
 
-    pub fn get_system_state(&self) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("getSystemState", &[self.client_id.as_str()])
+    pub fn get_system_state(&self) -> MasterResult<(i32, String, Vec<(String, Vec<String>)>)> {
+        Ok(try!(self.client.request("getSystemState", &[self.client_id.as_str()])))
     }
 
-    pub fn get_uri(&self) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("getUri", &[self.client_id.as_str()])
+    pub fn get_uri(&self) -> MasterResult<(i32, String, String)> {
+        Ok(try!(self.client.request("getUri", &[self.client_id.as_str()])))
     }
 
-    pub fn lookup_service(&self, service: &str) -> rosxmlrpc::client::ClientResult {
-        self.client
-            .request("lookupService", &[self.client_id.as_str(), service])
+    pub fn lookup_service(&self, service: &str) -> MasterResult<(i32, String, String)> {
+        Ok(try!(self.client.request("lookupService", &[self.client_id.as_str(), service])))
     }
 }
 
@@ -104,7 +103,7 @@ pub enum Error {
     Format,
 }
 
-type MasterResult<T> = Result<T, Error>;
+pub type MasterResult<T> = Result<T, Error>;
 
 impl From<rosxmlrpc::client::Error> for Error {
     fn from(err: rosxmlrpc::client::Error) -> Error {
