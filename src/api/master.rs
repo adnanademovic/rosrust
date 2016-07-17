@@ -96,3 +96,46 @@ impl Master {
             .request("lookupService", &[self.client_id.as_str(), service])
     }
 }
+
+#[derive(Debug)]
+pub enum Error {
+    XmlRpc(rosxmlrpc::client::Error),
+    Ros(String),
+    Format,
+}
+
+type MasterResult<T> = Result<T, Error>;
+
+impl From<rosxmlrpc::client::Error> for Error {
+    fn from(err: rosxmlrpc::client::Error) -> Error {
+        Error::XmlRpc(err)
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Error::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
+            Error::Ros(ref err) => write!(f, "ROS core error: {}", err),
+            Error::Format => write!(f, "Bad response format"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::XmlRpc(ref err) => err.description(),
+            Error::Ros(ref err) => &err,
+            Error::Format => "Bad response format received, expected [int, string, *]",
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match *self {
+            Error::XmlRpc(ref err) => Some(err),
+            Error::Ros(..) => None,
+            Error::Format => None,
+        }
+    }
+}
