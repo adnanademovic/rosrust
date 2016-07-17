@@ -1,8 +1,11 @@
 extern crate hyper;
+extern crate rustc_serialize;
 extern crate xml;
 
+use self::rustc_serialize::Encodable;
 use std;
 use std::io::Read;
+use super::serde;
 
 pub struct Client {
     http_client: hyper::Client,
@@ -20,21 +23,12 @@ impl Client {
     pub fn request(&self, function_name: &str, parameters: &[&str]) -> ClientResult {
         let mut body = Vec::<u8>::new();
         {
-            let mut writer = xml::EventWriter::new(&mut body);
-            try!(writer.write(xml::writer::XmlEvent::start_element("methodCall")));
-            try!(writer.write(xml::writer::XmlEvent::start_element("methodName")));
-            try!(writer.write(xml::writer::XmlEvent::characters(function_name)));
-            try!(writer.write(xml::writer::XmlEvent::end_element()));
-            try!(writer.write(xml::writer::XmlEvent::start_element("params")));
+            let mut encoder = serde::Encoder::new(&mut body);
+            try!(encoder.start_request(function_name));
             for param in parameters {
-                try!(writer.write(xml::writer::XmlEvent::start_element("value")));
-                try!(writer.write(xml::writer::XmlEvent::start_element("string")));
-                try!(writer.write(xml::writer::XmlEvent::characters(param)));
-                try!(writer.write(xml::writer::XmlEvent::end_element()));
-                try!(writer.write(xml::writer::XmlEvent::end_element()));
+                try!(param.encode(&mut encoder));
             }
-            try!(writer.write(xml::writer::XmlEvent::end_element()));
-            try!(writer.write(xml::writer::XmlEvent::end_element()));
+            try!(encoder.end_request());
         }
 
         let body = try!(String::from_utf8(body));
@@ -141,26 +135,16 @@ pub type ClientResult = Result<Member, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    Io(std::io::Error),
     Http(hyper::error::Error),
     Utf8(std::string::FromUtf8Error),
-    XmlWrite(xml::writer::Error),
+    Serialization(serde::encoder::Error),
     XmlRead(xml::reader::Error),
     Parse,
 }
 
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
-        Error::Io(err)
-    }
-}
-
 impl From<hyper::error::Error> for Error {
     fn from(err: hyper::error::Error) -> Error {
-        match err {
-            hyper::error::Error::Io(err) => Error::Io(err),
-            _ => Error::Http(err),
-        }
+        Error::Http(err)
     }
 }
 
@@ -170,12 +154,9 @@ impl From<std::string::FromUtf8Error> for Error {
     }
 }
 
-impl From<xml::writer::Error> for Error {
-    fn from(err: xml::writer::Error) -> Error {
-        match err {
-            xml::writer::Error::Io(err) => Error::Io(err),
-            _ => Error::XmlWrite(err),
-        }
+impl From<serde::encoder::Error> for Error {
+    fn from(err: serde::encoder::Error) -> Error {
+        Error::Serialization(err)
     }
 }
 
@@ -188,10 +169,9 @@ impl From<xml::reader::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            Error::Io(ref err) => write!(f, "IO error: {}", err),
             Error::Http(ref err) => write!(f, "HTTP error: {}", err),
             Error::Utf8(ref err) => write!(f, "UTF8 error: {}", err),
-            Error::XmlWrite(ref err) => write!(f, "XML writing error: {}", err),
+            Error::Serialization(ref err) => write!(f, "Serialization error: {}", err),
             Error::XmlRead(ref err) => write!(f, "XML reading error: {}", err),
             Error::Parse => write!(f, "XMLRPC response parsing error"),
         }
@@ -201,10 +181,9 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::Io(ref err) => err.description(),
             Error::Http(ref err) => err.description(),
             Error::Utf8(ref err) => err.description(),
-            Error::XmlWrite(..) => "Descriptions not implemented for xml::writer::Error",
+            Error::Serialization(ref err) => err.description(),
             Error::XmlRead(ref err) => err.description(),
             Error::Parse => "Could not parse XMLRPC response",
         }
@@ -212,10 +191,9 @@ impl std::error::Error for Error {
 
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
-            Error::Io(ref err) => Some(err),
             Error::Http(ref err) => Some(err),
             Error::Utf8(ref err) => Some(err),
-            Error::XmlWrite(..) => None,
+            Error::Serialization(ref err) => Some(err),
             Error::XmlRead(ref err) => Some(err),
             Error::Parse => None,
         }
