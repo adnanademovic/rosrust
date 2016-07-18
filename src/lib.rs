@@ -1,5 +1,5 @@
 pub mod api;
-pub mod rosxmlrpc;
+mod rosxmlrpc;
 
 #[cfg(test)]
 mod tests {

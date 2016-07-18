@@ -1,6 +1,6 @@
 [package]
 name = "rosrust"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
 description = "Pure Rust implementation of a ROS client library"
 license = "MIT"
@@ -8,11 +8,9 @@ repository = "https://github.com/adnanademovic/rosrust"
 readme = "README.md"
 
 [dependencies]
-rustc-serialize = "*"
+rustc-serialize = "0.3"
+xml-rs = "0.3"
 
 [dependencies.hyper]
-version = "*"
+version = "0.9"
 default-features = false
-
-[dependencies.xml-rs]
-version = "*"
