@@ -123,9 +123,13 @@ impl rustc_serialize::Decoder for Decoder {
 
     fn read_str(&mut self) -> Result<String, Self::Error> {
         let (key, length) = try!(self.peel_layer());
-        if length == 1 && key == "string" {
-            if let Some(FlatTree::Leaf(value)) = self.tree.next() {
-                return Ok(value);
+        if key == "string" {
+            if length == 1 {
+                if let Some(FlatTree::Leaf(value)) = self.tree.next() {
+                    return Ok(value);
+                }
+            } else if length == 0 {
+                return Ok("".to_owned());
             }
         }
         Err(Error::UnsupportedDataFormat)
