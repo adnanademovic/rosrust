@@ -2,7 +2,7 @@ extern crate rustc_serialize;
 
 use rosxmlrpc;
 use std;
-use self::rustc_serialize::{Decodable, Decoder};
+use self::rustc_serialize::{Decodable, Decoder, Encodable};
 
 pub struct Master {
     client: rosxmlrpc::Client,
@@ -28,6 +28,15 @@ impl Master {
     fn request<T: Decodable>(&self, function_name: &str, parameters: &[&str]) -> MasterResult<T> {
         Master::remove_wrap(self.client
             .request(function_name, parameters))
+    }
+
+    fn request_long<T: Decodable, Targ: Encodable>(&self,
+                                                   function_name: &str,
+                                                   parameters: &[&str],
+                                                   extra_parameter: Targ)
+                                                   -> MasterResult<T> {
+        Master::remove_wrap(self.client
+            .request_long(function_name, parameters, Some(&extra_parameter)))
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
@@ -82,6 +91,40 @@ impl Master {
 
     pub fn lookup_service(&self, service: &str) -> MasterResult<String> {
         self.request("lookupService", &[self.client_id.as_str(), service])
+    }
+
+    pub fn delete_param(&self, key: &str) -> MasterResult<i32> {
+        self.request("deleteParam", &[self.client_id.as_str(), key])
+    }
+
+    pub fn set_param<T: Encodable>(&self, key: &str, value: &T) -> MasterResult<i32> {
+        self.request_long("setParam", &[self.client_id.as_str(), key], value)
+    }
+
+    pub fn get_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
+        self.request("getParam", &[self.client_id.as_str(), key])
+    }
+
+    pub fn search_param(&self, key: &str) -> MasterResult<String> {
+        self.request("searchParam", &[self.client_id.as_str(), key])
+    }
+
+    pub fn subscribe_param<T: Decodable>(&self, caller_api: &str, key: &str) -> MasterResult<T> {
+        self.request("subscribeParam",
+                     &[self.client_id.as_str(), caller_api, key])
+    }
+
+    pub fn unsubscribe_param(&self, caller_api: &str, key: &str) -> MasterResult<i32> {
+        self.request("unsubscribeParam",
+                     &[self.client_id.as_str(), caller_api, key])
+    }
+
+    pub fn has_param(&self, key: &str) -> MasterResult<bool> {
+        self.request("hasParam", &[self.client_id.as_str(), key])
+    }
+
+    pub fn get_param_names(&self) -> MasterResult<Vec<String>> {
+        self.request("getParamNames", &[self.client_id.as_str()])
     }
 }
 

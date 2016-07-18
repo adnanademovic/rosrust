@@ -24,12 +24,23 @@ impl Client {
                                  function_name: &str,
                                  parameters: &[&str])
                                  -> ClientResult<T> {
+        self.request_long::<T, ()>(function_name, parameters, None)
+    }
+
+    pub fn request_long<T: Decodable, Targ: Encodable>(&self,
+                                                       function_name: &str,
+                                                       parameters: &[&str],
+                                                       extra_parameter: Option<&Targ>)
+                                                       -> ClientResult<T> {
         let mut body = Vec::<u8>::new();
         {
             let mut encoder = serde::Encoder::new(&mut body);
             try!(encoder.start_request(function_name));
             for param in parameters {
                 try!(param.encode(&mut encoder));
+            }
+            if let Some(extra_param) = extra_parameter {
+                try!(extra_param.encode(&mut encoder));
             }
             try!(encoder.end_request());
         }
