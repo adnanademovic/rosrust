@@ -72,7 +72,7 @@ impl Master {
         self.request("getTopicTypes", &[self.client_id.as_str()])
     }
 
-    pub fn get_system_state(&self) -> MasterResult<Vec<(String, Vec<String>)>> {
+    pub fn get_system_state(&self) -> MasterResult<Vec<Vec<(String, Vec<String>)>>> {
         self.request("getSystemState", &[self.client_id.as_str()])
     }
 
