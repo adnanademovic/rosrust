@@ -109,14 +109,14 @@ impl Master {
         self.request("searchParam", &[self.client_id.as_str(), key])
     }
 
-    pub fn subscribe_param<T: Decodable>(&self, caller_api: &str, key: &str) -> MasterResult<T> {
+    pub fn subscribe_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
         self.request("subscribeParam",
-                     &[self.client_id.as_str(), caller_api, key])
+                     &[self.client_id.as_str(), self.caller_api.as_str(), key])
     }
 
-    pub fn unsubscribe_param(&self, caller_api: &str, key: &str) -> MasterResult<i32> {
+    pub fn unsubscribe_param(&self, key: &str) -> MasterResult<i32> {
         self.request("unsubscribeParam",
-                     &[self.client_id.as_str(), caller_api, key])
+                     &[self.client_id.as_str(), self.caller_api.as_str(), key])
     }
 
     pub fn has_param(&self, key: &str) -> MasterResult<bool> {
