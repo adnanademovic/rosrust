@@ -128,7 +128,7 @@ impl Master {
     }
 }
 
-pub type Error = rosxmlrpc::client::Error;
+pub type Error = rosxmlrpc::error::Error;
 
 pub type MasterResult<T> = Result<T, Error>;
 
