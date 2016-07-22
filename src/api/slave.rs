@@ -11,7 +11,11 @@ pub struct Slave {
 
 impl Slave {
     pub fn new(server_uri: &str) -> Result<Slave, Error> {
-        let server = try!(rosxmlrpc::Server::new(server_uri, SlaveHandler {}));
+        let server = try!(rosxmlrpc::Server::new(server_uri,
+                                                 SlaveHandler {
+                                                     subscriptions: vec![],
+                                                     publications: vec![],
+                                                 }));
         Ok(Slave { server: server })
     }
 
@@ -21,7 +25,8 @@ impl Slave {
 }
 
 struct SlaveHandler {
-
+    subscriptions: Vec<(String, String)>,
+    publications: Vec<(String, String)>,
 }
 
 type SerdeResult<T> = Result<T, Error>;
@@ -50,6 +55,28 @@ impl SlaveHandler {
             Err(Error::Protocol("Emtpy strings given".to_owned()))
         }
     }
+
+    fn get_publications(&self,
+                        req: &mut rosxmlrpc::serde::Decoder)
+                        -> SerdeResult<&[(String, String)]> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        if caller_id != "" {
+            Ok(&self.publications)
+        } else {
+            Err(Error::Protocol("Emtpy strings given".to_owned()))
+        }
+    }
+
+    fn get_subscriptions(&self,
+                         req: &mut rosxmlrpc::serde::Decoder)
+                         -> SerdeResult<&[(String, String)]> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        if caller_id != "" {
+            Ok(&self.subscriptions)
+        } else {
+            Err(Error::Protocol("Emtpy strings given".to_owned()))
+        }
+    }
 }
 
 impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
@@ -64,8 +91,16 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
             "getMasterUri" => unimplemented!(),
             "shutdown" => unimplemented!(),
             "getPid" => unimplemented!(),
-            "getSubscriptions" => unimplemented!(),
-            "getPublications" => unimplemented!(),
+            "getSubscriptions" => {
+                SlaveHandler::encode_response(self.get_subscriptions(req),
+                                              "List of subscriptions",
+                                              res);
+            }
+            "getPublications" => {
+                SlaveHandler::encode_response(self.get_publications(req),
+                                              "List of publications",
+                                              res);
+            }
             "paramUpdate" => {
                 SlaveHandler::encode_response(self.param_update(req), "Parameter updated", res);
             }
