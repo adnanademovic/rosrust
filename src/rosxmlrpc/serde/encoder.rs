@@ -27,6 +27,20 @@ impl<T: std::io::Write> Encoder<T> {
         Ok(())
     }
 
+    pub fn start_response(&mut self) -> Result<(), Error> {
+        try!(self.writer.write(xml::writer::XmlEvent::start_element("methodResponse")));
+        try!(self.writer.write(xml::writer::XmlEvent::start_element("params")));
+        try!(self.writer.write(xml::writer::XmlEvent::start_element("param")));
+        Ok(())
+    }
+
+    pub fn end_response(&mut self) -> Result<(), Error> {
+        try!(self.writer.write(xml::writer::XmlEvent::end_element()));
+        try!(self.writer.write(xml::writer::XmlEvent::end_element()));
+        try!(self.writer.write(xml::writer::XmlEvent::end_element()));
+        Ok(())
+    }
+
     fn encoder_emit_array<F>(&mut self, f: F) -> Result<(), Error>
         where F: FnOnce(&mut Self) -> Result<(), Error>
     {

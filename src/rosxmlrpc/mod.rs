@@ -1,4 +1,7 @@
 pub use self::client::Client;
+pub use self::server::Server;
 
 pub mod client;
-mod serde;
+pub mod error;
+pub mod serde;
+pub mod server;

@@ -12,7 +12,7 @@ impl Decoder {
         Decoder { tree: Tree::new(body).map(flatten_tree).unwrap_or(vec![].into_iter()) }
     }
 
-    fn peel_named_layer(&mut self, name: &str) -> Result<(), Error> {
+    pub fn peel_named_layer(&mut self, name: &str) -> Result<(), Error> {
         if let Some(FlatTree::Node(key, length)) = self.tree.next() {
             if key == name && length == 1 {
                 return Ok(());
@@ -37,6 +37,27 @@ impl Decoder {
         try!(self.peel_named_layer("params"));
         try!(self.peel_named_layer("param"));
         Ok(())
+    }
+
+    pub fn peel_request_body(&mut self) -> Result<(String, usize), Error> {
+        if let Some(FlatTree::Node(key, length)) = self.tree.next() {
+            if key == "methodCall" && length == 2 {
+                try!(self.peel_named_layer("methodName"));
+                if let Some(FlatTree::Leaf(method_name)) = self.tree.next() {
+                    if let Some(FlatTree::Node(key, children)) = self.tree.next() {
+                        if key == "params" {
+                            return Ok((method_name, children));
+                        }
+                    }
+                }
+            }
+        }
+        Err(Error::UnsupportedDataFormat)
+    }
+
+    pub fn decode_request_parameter<T: rustc_serialize::Decodable>(&mut self) -> Result<T, Error> {
+        try!(self.peel_named_layer("param"));
+        T::decode(self)
     }
 }
 
