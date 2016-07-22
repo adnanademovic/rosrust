@@ -10,9 +10,9 @@ pub struct Slave {
 }
 
 impl Slave {
-    pub fn new(server_uri: &str) -> Slave {
-        let server = rosxmlrpc::Server::new(server_uri, SlaveHandler {}).unwrap();
-        Slave { server: server }
+    pub fn new(server_uri: &str) -> Result<Slave, Error> {
+        let server = try!(rosxmlrpc::Server::new(server_uri, SlaveHandler {}));
+        Ok(Slave { server: server })
     }
 
     pub fn uri(&self) -> &str {
@@ -29,12 +29,14 @@ type SerdeResult<T> = Result<T, Error>;
 impl SlaveHandler {
     fn encode_response<T: Encodable>(response: SerdeResult<T>,
                                      message: &str,
-                                     res: &mut rosxmlrpc::serde::Encoder<&mut Vec<u8>>)
-                                     -> () {
+                                     res: &mut rosxmlrpc::serde::Encoder<&mut Vec<u8>>) {
         match response {
-            Ok(value) => (1i32, message, value).encode(res).unwrap(),
-            Err(err) => (-1i32, err.description(), 0).encode(res).unwrap(),
-        }
+                Ok(value) => (1i32, message, value).encode(res),
+                Err(err) => (-1i32, err.description(), 0).encode(res),
+            }
+            .unwrap_or_else(|err| {
+                println!("Encoding error: {}", err);
+            });
     }
 
     fn param_update(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
@@ -56,7 +58,6 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
               _: usize,
               req: &mut rosxmlrpc::serde::Decoder,
               res: &mut rosxmlrpc::serde::Encoder<&mut Vec<u8>>) {
-        println!("METHOD CALL: {}", method_name);
         match method_name {
             "getBusStats" => unimplemented!(),
             "getBusInfo" => unimplemented!(),
@@ -66,7 +67,7 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
             "getSubscriptions" => unimplemented!(),
             "getPublications" => unimplemented!(),
             "paramUpdate" => {
-                SlaveHandler::encode_response(self.param_update(req), "Parameter updated", res)
+                SlaveHandler::encode_response(self.param_update(req), "Parameter updated", res);
             }
             "publisherUpdate" => unimplemented!(),
             "requestTopic" => unimplemented!(),
@@ -79,6 +80,8 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
 pub enum Error {
     Deserialization(rosxmlrpc::serde::decoder::Error),
     Protocol(String),
+    Serialization(rosxmlrpc::serde::encoder::Error),
+    XmlRpc(rosxmlrpc::error::Error),
 }
 
 impl From<rosxmlrpc::serde::decoder::Error> for Error {
@@ -87,11 +90,25 @@ impl From<rosxmlrpc::serde::decoder::Error> for Error {
     }
 }
 
+impl From<rosxmlrpc::serde::encoder::Error> for Error {
+    fn from(err: rosxmlrpc::serde::encoder::Error) -> Error {
+        Error::Serialization(err)
+    }
+}
+
+impl From<rosxmlrpc::error::Error> for Error {
+    fn from(err: rosxmlrpc::error::Error) -> Error {
+        Error::XmlRpc(err)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             Error::Deserialization(ref err) => write!(f, "Deserialization error: {}", err),
             Error::Protocol(ref err) => write!(f, "Protocol error: {}", err),
+            Error::Serialization(ref err) => write!(f, "Serialization error: {}", err),
+            Error::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
         }
     }
 }
@@ -101,6 +118,8 @@ impl std::error::Error for Error {
         match *self {
             Error::Deserialization(ref err) => err.description(),
             Error::Protocol(ref err) => &err,
+            Error::Serialization(ref err) => err.description(),
+            Error::XmlRpc(ref err) => err.description(),
         }
     }
 
@@ -108,6 +127,8 @@ impl std::error::Error for Error {
         match *self {
             Error::Deserialization(ref err) => Some(err),
             Error::Protocol(..) => None,
+            Error::Serialization(ref err) => Some(err),
+            Error::XmlRpc(ref err) => Some(err),
         }
     }
 }
