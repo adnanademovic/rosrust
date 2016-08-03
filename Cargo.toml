@@ -10,6 +10,7 @@ readme = "README.md"
 [dependencies]
 rustc-serialize = "0.3"
 xml-rs = "0.3"
+libc = "0.2"
 
 [dependencies.hyper]
 version = "0.9"

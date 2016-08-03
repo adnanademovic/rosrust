@@ -1,9 +1,11 @@
+extern crate libc;
 extern crate rustc_serialize;
 
 use rosxmlrpc;
 use self::rustc_serialize::Encodable;
 use std;
 use std::error::Error as ErrorTrait;
+use self::libc::getpid;
 
 pub struct Slave {
     server: rosxmlrpc::Server,
@@ -56,6 +58,15 @@ impl SlaveHandler {
         }
     }
 
+    fn get_pid(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        if caller_id != "" {
+            Ok(unsafe { getpid() })
+        } else {
+            Err(Error::Protocol("Empty strings given".to_owned()))
+        }
+    }
+
     fn get_publications(&self,
                         req: &mut rosxmlrpc::serde::Decoder)
                         -> SerdeResult<&[(String, String)]> {
@@ -63,7 +74,7 @@ impl SlaveHandler {
         if caller_id != "" {
             Ok(&self.publications)
         } else {
-            Err(Error::Protocol("Emtpy strings given".to_owned()))
+            Err(Error::Protocol("Empty strings given".to_owned()))
         }
     }
 
@@ -74,7 +85,7 @@ impl SlaveHandler {
         if caller_id != "" {
             Ok(&self.subscriptions)
         } else {
-            Err(Error::Protocol("Emtpy strings given".to_owned()))
+            Err(Error::Protocol("Empty strings given".to_owned()))
         }
     }
 }
@@ -85,12 +96,15 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
               _: usize,
               req: &mut rosxmlrpc::serde::Decoder,
               res: &mut rosxmlrpc::serde::Encoder<&mut Vec<u8>>) {
+        println!("CALLED METHOD: {}", method_name);
         match method_name {
             "getBusStats" => unimplemented!(),
             "getBusInfo" => unimplemented!(),
             "getMasterUri" => unimplemented!(),
             "shutdown" => unimplemented!(),
-            "getPid" => unimplemented!(),
+            "getPid" => {
+                SlaveHandler::encode_response(self.get_pid(req), "PID", res);
+            }
             "getSubscriptions" => {
                 SlaveHandler::encode_response(self.get_subscriptions(req),
                                               "List of subscriptions",
