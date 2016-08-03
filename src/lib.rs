@@ -1,3 +1,8 @@
+extern crate hyper;
+extern crate libc;
+extern crate rustc_serialize;
+extern crate xml;
+
 pub mod api;
 mod rosxmlrpc;
 

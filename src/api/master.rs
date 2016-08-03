@@ -2,7 +2,7 @@ extern crate rustc_serialize;
 
 use rosxmlrpc;
 use std;
-use self::rustc_serialize::{Decodable, Decoder, Encodable};
+use rustc_serialize::{Decodable, Decoder, Encodable};
 
 pub struct Master {
     client: rosxmlrpc::Client,

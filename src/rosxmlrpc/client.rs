@@ -1,8 +1,7 @@
 extern crate hyper;
 extern crate rustc_serialize;
-extern crate xml;
 
-use self::rustc_serialize::{Encodable, Decodable};
+use rustc_serialize::{Encodable, Decodable};
 use super::serde;
 use super::error;
 

@@ -2,13 +2,13 @@ extern crate libc;
 extern crate rustc_serialize;
 
 use rosxmlrpc;
-use self::rustc_serialize::Encodable;
+use rustc_serialize::Encodable;
 use std;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::error::Error as ErrorTrait;
-use self::libc::getpid;
+use libc::getpid;
 
 pub struct Slave {
     server: rosxmlrpc::Server,

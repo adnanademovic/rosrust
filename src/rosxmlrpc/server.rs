@@ -1,7 +1,6 @@
 extern crate hyper;
-extern crate rustc_serialize;
 
-use self::hyper::server::{Request, Response, Handler};
+use hyper::server::{Request, Response, Handler};
 use super::serde;
 use super::error::Error;
 
@@ -23,7 +22,7 @@ impl Server {
         })
     }
 
-    pub fn shutdown(&mut self) -> Result<(), self::hyper::Error> {
+    pub fn shutdown(&mut self) -> Result<(), hyper::Error> {
         self.listener.close()
     }
 }
