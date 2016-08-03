@@ -115,37 +115,50 @@ impl Slave {
         }
     }
 
+    fn handle_call(&mut self, method_name: &str, req: &mut rosxmlrpc::serde::Decoder) {
+        println!("HANDLING METHOD: {}", method_name);
+        match method_name {
+            "getBusStats" => unimplemented!(),
+            "getBusInfo" => unimplemented!(),
+            "getMasterUri" => unimplemented!(),
+            "shutdown" => {
+                let data = self.shutdown(req);
+                self.encode_response(data, "Shutdown");
+            }
+            "getPid" => {
+                self.encode_response(self.get_pid(req), "PID");
+            }
+            "getSubscriptions" => {
+                self.encode_response(self.get_subscriptions(req), "List of subscriptions");
+            }
+            "getPublications" => {
+                self.encode_response(self.get_publications(req), "List of publications");
+            }
+            "paramUpdate" => {
+                self.encode_response(self.param_update(req), "Parameter updated");
+            }
+            "publisherUpdate" => unimplemented!(),
+            "requestTopic" => unimplemented!(),
+            _ => {}
+        }
+    }
+
     pub fn handle_calls(&mut self) {
         loop {
+            let recv = self.req.lock().unwrap().recv();
+            match recv {
+                Err(_) => return,
+                Ok((method_name, mut req)) => self.handle_call(&method_name, &mut req),
+            }
+        }
+    }
+
+    pub fn handle_call_queue(&mut self) -> mpsc::TryRecvError {
+        loop {
             let recv = self.req.lock().unwrap().try_recv();
-            if let Ok((method_name, mut req)) = recv {
-                println!("HANDLING METHOD: {}", method_name);
-                match method_name.as_str() {
-                    "getBusStats" => unimplemented!(),
-                    "getBusInfo" => unimplemented!(),
-                    "getMasterUri" => unimplemented!(),
-                    "shutdown" => {
-                        let data = self.shutdown(&mut req);
-                        self.encode_response(data, "Shutdown");
-                    }
-                    "getPid" => {
-                        self.encode_response(self.get_pid(&mut req), "PID");
-                    }
-                    "getSubscriptions" => {
-                        self.encode_response(self.get_subscriptions(&mut req),
-                                             "List of subscriptions");
-                    }
-                    "getPublications" => {
-                        self.encode_response(self.get_publications(&mut req),
-                                             "List of publications");
-                    }
-                    "paramUpdate" => {
-                        self.encode_response(self.param_update(&mut req), "Parameter updated");
-                    }
-                    "publisherUpdate" => unimplemented!(),
-                    "requestTopic" => unimplemented!(),
-                    _ => {}
-                }
+            match recv {
+                Err(err) => return err,
+                Ok((method_name, mut req)) => self.handle_call(&method_name, &mut req),
             }
         }
     }
