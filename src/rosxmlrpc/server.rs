@@ -1,5 +1,4 @@
-extern crate hyper;
-
+use hyper;
 use hyper::server::{Request, Response, Handler};
 use super::serde;
 use super::error::Error;

@@ -1,5 +1,4 @@
-extern crate hyper;
-
+use hyper;
 use std;
 use super::serde;
 

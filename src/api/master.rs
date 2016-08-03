@@ -1,5 +1,3 @@
-extern crate rustc_serialize;
-
 use rosxmlrpc;
 use std;
 use rustc_serialize::{Decodable, Decoder, Encodable};

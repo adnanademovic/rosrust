@@ -1,6 +1,5 @@
-extern crate xml;
-extern crate rustc_serialize;
-
+use xml;
+use rustc_serialize;
 use std;
 
 pub struct Encoder<T: std::io::Write> {

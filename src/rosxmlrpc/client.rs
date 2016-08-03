@@ -1,6 +1,4 @@
-extern crate hyper;
-extern crate rustc_serialize;
-
+use hyper;
 use rustc_serialize::{Encodable, Decodable};
 use super::serde;
 use super::error;
