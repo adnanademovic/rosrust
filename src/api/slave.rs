@@ -47,19 +47,22 @@ impl Slave {
         return &self.server.uri;
     }
 
-    fn encode_response<T: Encodable>(&self, response: SerdeResult<T>, message: &str) {
+    fn encode_response<T: Encodable>(&self,
+                                     response: SerdeResult<T>,
+                                     message: &str)
+                                     -> SerdeResult<()> {
         let mut body = Vec::<u8>::new();
         {
             let mut res = rosxmlrpc::serde::Encoder::new(&mut body);
-            res.start_response().unwrap();
-            match response {
-                    Ok(value) => (1i32, message, value).encode(&mut res),
-                    Err(err) => (-1i32, err.description(), 0).encode(&mut res),
-                }
-                .unwrap();
-            res.end_response().unwrap();
+            try!(res.start_response());
+            try!(match response {
+                Ok(value) => (1i32, message, value).encode(&mut res),
+                Err(err) => (-1i32, err.description(), 0).encode(&mut res),
+            });
+            try!(res.end_response());
         }
         self.res.lock().unwrap().send(body).unwrap();
+        Ok(())
     }
 
     fn param_update(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
@@ -86,8 +89,10 @@ impl Slave {
     fn shutdown(&mut self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
         let caller_id = try!(req.decode_request_parameter::<String>());
         if caller_id != "" {
-            self.server.shutdown().unwrap();
-            Ok(0)
+            match self.server.shutdown() {
+                Ok(()) => Ok(0),
+                Err(_) => Err(Error::Critical("Failed to shutdown server".to_owned())),
+            }
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
         }
@@ -115,7 +120,10 @@ impl Slave {
         }
     }
 
-    fn handle_call(&mut self, method_name: &str, req: &mut rosxmlrpc::serde::Decoder) {
+    fn handle_call(&mut self,
+                   method_name: &str,
+                   req: &mut rosxmlrpc::serde::Decoder)
+                   -> SerdeResult<()> {
         println!("HANDLING METHOD: {}", method_name);
         match method_name {
             "getBusStats" => unimplemented!(),
@@ -123,42 +131,54 @@ impl Slave {
             "getMasterUri" => unimplemented!(),
             "shutdown" => {
                 let data = self.shutdown(req);
-                self.encode_response(data, "Shutdown");
+                self.encode_response(data, "Shutdown")
             }
-            "getPid" => {
-                self.encode_response(self.get_pid(req), "PID");
-            }
+            "getPid" => self.encode_response(self.get_pid(req), "PID"),
             "getSubscriptions" => {
-                self.encode_response(self.get_subscriptions(req), "List of subscriptions");
+                self.encode_response(self.get_subscriptions(req), "List of subscriptions")
             }
             "getPublications" => {
-                self.encode_response(self.get_publications(req), "List of publications");
+                self.encode_response(self.get_publications(req), "List of publications")
             }
-            "paramUpdate" => {
-                self.encode_response(self.param_update(req), "Parameter updated");
-            }
+            "paramUpdate" => self.encode_response(self.param_update(req), "Parameter updated"),
             "publisherUpdate" => unimplemented!(),
             "requestTopic" => unimplemented!(),
-            _ => {}
+            name => {
+                self.encode_response::<i32>(Err(Error::Protocol(format!("Unimplemented method: \
+                                                                         {}",
+                                                                        name))),
+                                            "")
+            }
         }
     }
 
-    pub fn handle_calls(&mut self) {
+    pub fn handle_calls(&mut self) -> Result<(), String> {
         loop {
             let recv = self.req.lock().unwrap().recv();
             match recv {
-                Err(_) => return,
-                Ok((method_name, mut req)) => self.handle_call(&method_name, &mut req),
+                Err(_) => return Ok(()),
+                Ok((method_name, mut req)) => {
+                    if let Err(err) = self.handle_call(&method_name, &mut req) {
+                        match err {
+                            Error::Critical(msg) => {
+                                return Err(msg);
+                            }
+                            _ => {
+                                println!("{}", err);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    pub fn handle_call_queue(&mut self) -> mpsc::TryRecvError {
+    pub fn handle_call_queue(&mut self) -> Result<mpsc::TryRecvError, Error> {
         loop {
             let recv = self.req.lock().unwrap().try_recv();
             match recv {
-                Err(err) => return err,
-                Ok((method_name, mut req)) => self.handle_call(&method_name, &mut req),
+                Err(err) => return Ok(err),
+                Ok((method_name, mut req)) => try!(self.handle_call(&method_name, &mut req)),
             }
         }
     }
@@ -176,6 +196,7 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
 pub enum Error {
     Deserialization(rosxmlrpc::serde::decoder::Error),
     Protocol(String),
+    Critical(String),
     Serialization(rosxmlrpc::serde::encoder::Error),
     XmlRpc(rosxmlrpc::error::Error),
 }
@@ -203,6 +224,7 @@ impl std::fmt::Display for Error {
         match *self {
             Error::Deserialization(ref err) => write!(f, "Deserialization error: {}", err),
             Error::Protocol(ref err) => write!(f, "Protocol error: {}", err),
+            Error::Critical(ref err) => write!(f, "Critical error: {}", err),
             Error::Serialization(ref err) => write!(f, "Serialization error: {}", err),
             Error::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
         }
@@ -214,6 +236,7 @@ impl std::error::Error for Error {
         match *self {
             Error::Deserialization(ref err) => err.description(),
             Error::Protocol(ref err) => &err,
+            Error::Critical(ref err) => &err,
             Error::Serialization(ref err) => err.description(),
             Error::XmlRpc(ref err) => err.description(),
         }
@@ -223,6 +246,7 @@ impl std::error::Error for Error {
         match *self {
             Error::Deserialization(ref err) => Some(err),
             Error::Protocol(..) => None,
+            Error::Critical(..) => None,
             Error::Serialization(ref err) => Some(err),
             Error::XmlRpc(ref err) => Some(err),
         }
