@@ -14,8 +14,9 @@ pub struct Slave {
     server: rosxmlrpc::Server,
     req: Mutex<Receiver<(String, rosxmlrpc::serde::Decoder)>>,
     res: Mutex<Sender<Vec<u8>>>,
-    subscriptions: Vec<(String, String)>,
-    publications: Vec<(String, String)>,
+    pub subscriptions: Vec<(String, String)>,
+    pub publications: Vec<(String, String)>,
+    pub master_uri: String,
 }
 
 struct SlaveHandler {
@@ -38,6 +39,7 @@ impl Slave {
             server: server,
             subscriptions: vec![],
             publications: vec![],
+            master_uri: "".to_owned(),
             req: Mutex::new(rx_req),
             res: Mutex::new(tx_res),
         })
@@ -45,6 +47,32 @@ impl Slave {
 
     pub fn uri(&self) -> &str {
         return &self.server.uri;
+    }
+
+    fn get_bus_stats(&self,
+                     req: &mut rosxmlrpc::serde::Decoder)
+                     -> SerdeResult<(&[(String, String, (String, i32, i32, bool))],
+                                     &[(String, (String, i32, i32, bool))],
+                                     (i32, i32, i32))> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        if caller_id != "" {
+            // TODO: implement actual stats displaying
+            Ok((&[], &[], (0, 0, 0)))
+        } else {
+            Err(Error::Protocol("Empty strings given".to_owned()))
+        }
+    }
+
+    fn get_bus_info(&self,
+                    req: &mut rosxmlrpc::serde::Decoder)
+                    -> SerdeResult<&[(String, String, String, String, String, bool)]> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        if caller_id != "" {
+            // TODO: implement actual info displaying
+            Ok(&[])
+        } else {
+            Err(Error::Protocol("Empty strings given".to_owned()))
+        }
     }
 
     fn encode_response<T: Encodable>(&self,
@@ -70,6 +98,7 @@ impl Slave {
         let key = try!(req.decode_request_parameter::<String>());
         let value = try!(req.decode_request_parameter::<String>());
         if caller_id != "" && key != "" && value != "" {
+            // TODO: implement handling of parameter updates
             println!("{} {} {}", caller_id, key, value);
             Ok(0)
         } else {
@@ -120,15 +149,51 @@ impl Slave {
         }
     }
 
+    fn publisher_update(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        let topic = try!(req.decode_request_parameter::<String>());
+        let publishers = try!(req.decode_request_parameter::<Vec<String>>());
+        if caller_id != "" && topic != "" && publishers.iter().all(|ref x| x.as_str() != "") {
+            // TODO: Currently this method is just a stub.
+            //       We need to implement some actual response to this event.
+            Ok(0)
+        } else {
+            Err(Error::Protocol("Empty strings given".to_owned()))
+        }
+    }
+
+    fn get_master_uri(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<&str> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        if caller_id != "" {
+            Ok(&self.master_uri)
+        } else {
+            Err(Error::Protocol("Empty strings given".to_owned()))
+        }
+    }
+
+    fn request_topic(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<&[String]> {
+        let caller_id = try!(req.decode_request_parameter::<String>());
+        let topic = try!(req.decode_request_parameter::<String>());
+        let protocols = try!(req.decode_request_parameter::<Vec<String>>());
+        if caller_id != "" && topic != "" && !protocols.is_empty() &&
+           protocols.iter().all(|ref x| !x.is_empty()) {
+            // TODO: We don't actually implement any protocols (yet).
+            //       The response will always be empty for now.
+            Ok(&[])
+        } else {
+            Err(Error::Protocol("Empty parameters given".to_owned()))
+        }
+    }
+
     fn handle_call(&mut self,
                    method_name: &str,
                    req: &mut rosxmlrpc::serde::Decoder)
                    -> SerdeResult<()> {
         println!("HANDLING METHOD: {}", method_name);
         match method_name {
-            "getBusStats" => unimplemented!(),
-            "getBusInfo" => unimplemented!(),
-            "getMasterUri" => unimplemented!(),
+            "getBusStats" => self.encode_response(self.get_bus_stats(req), "Bus stats"),
+            "getBusInfo" => self.encode_response(self.get_bus_info(req), "Bus stats"),
+            "getMasterUri" => self.encode_response(self.get_master_uri(req), "Master URI"),
             "shutdown" => {
                 let data = self.shutdown(req);
                 self.encode_response(data, "Shutdown")
@@ -141,8 +206,10 @@ impl Slave {
                 self.encode_response(self.get_publications(req), "List of publications")
             }
             "paramUpdate" => self.encode_response(self.param_update(req), "Parameter updated"),
-            "publisherUpdate" => unimplemented!(),
-            "requestTopic" => unimplemented!(),
+            "publisherUpdate" => {
+                self.encode_response(self.publisher_update(req), "Publishers updated")
+            }
+            "requestTopic" => self.encode_response(self.request_topic(req), "Chosen protocol"),
             name => {
                 self.encode_response::<i32>(Err(Error::Protocol(format!("Unimplemented method: \
                                                                          {}",
