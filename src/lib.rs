@@ -3,6 +3,8 @@ extern crate libc;
 extern crate rustc_serialize;
 extern crate xml;
 
+pub use api::Ros;
+
 pub mod api;
 mod rosxmlrpc;
 

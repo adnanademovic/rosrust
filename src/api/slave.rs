@@ -13,7 +13,7 @@ pub struct Slave {
     res: Mutex<Sender<Vec<u8>>>,
     pub subscriptions: Vec<(String, String)>,
     pub publications: Vec<(String, String)>,
-    pub master_uri: String,
+    master_uri: String,
 }
 
 struct SlaveHandler {
@@ -24,7 +24,7 @@ struct SlaveHandler {
 type SerdeResult<T> = Result<T, Error>;
 
 impl Slave {
-    pub fn new(server_uri: &str) -> Result<Slave, Error> {
+    pub fn new(master_uri: &str, server_uri: &str) -> Result<Slave, Error> {
         let (tx_req, rx_req) = mpsc::channel();
         let (tx_res, rx_res) = mpsc::channel();
         let server = try!(rosxmlrpc::Server::new(server_uri,
@@ -36,7 +36,7 @@ impl Slave {
             server: server,
             subscriptions: vec![],
             publications: vec![],
-            master_uri: "".to_owned(),
+            master_uri: master_uri.to_owned(),
             req: Mutex::new(rx_req),
             res: Mutex::new(tx_res),
         })

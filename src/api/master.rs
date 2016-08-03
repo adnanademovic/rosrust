@@ -1,5 +1,4 @@
 use rosxmlrpc;
-use std;
 use rustc_serialize::{Decodable, Decoder, Encodable};
 
 pub struct Master {
@@ -9,9 +8,7 @@ pub struct Master {
 }
 
 impl Master {
-    pub fn new(client_id: &str, caller_api: &str) -> Master {
-        let master_uri = std::env::var("ROS_MASTER_URI")
-            .unwrap_or("http://localhost:11311/".to_owned());
+    pub fn new(master_uri: &str, client_id: &str, caller_api: &str) -> Master {
         Master {
             client: rosxmlrpc::Client::new(&master_uri),
             client_id: client_id.to_owned(),
