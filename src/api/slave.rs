@@ -56,9 +56,7 @@ impl Slave {
                     Ok(value) => (1i32, message, value).encode(&mut res),
                     Err(err) => (-1i32, err.description(), 0).encode(&mut res),
                 }
-                .unwrap_or_else(|err| {
-                    println!("Encoding error: {}", err);
-                });
+                .unwrap();
             res.end_response().unwrap();
         }
         self.res.lock().unwrap().send(body).unwrap();
