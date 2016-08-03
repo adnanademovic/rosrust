@@ -5,7 +5,6 @@ use self::hyper::server::{Request, Response, Handler};
 use super::serde;
 use super::error::Error;
 
-#[allow(dead_code)]
 pub struct Server {
     listener: hyper::server::Listening,
     pub uri: String,
@@ -23,14 +22,14 @@ impl Server {
             uri: uri,
         })
     }
+
+    pub fn shutdown(&mut self) -> Result<(), self::hyper::Error> {
+        self.listener.close()
+    }
 }
 
 pub trait XmlRpcServer {
-    fn handle(&self,
-              method_name: &str,
-              parameter_count: usize,
-              req: &mut serde::Decoder,
-              res: &mut serde::Encoder<&mut Vec<u8>>);
+    fn handle(&self, method_name: &str, parameter_count: usize, req: serde::Decoder) -> Vec<u8>;
 }
 
 struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
@@ -43,18 +42,10 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
     }
 
     fn process(&self, req: Request, res: Response) -> Result<(), Error> {
-        let mut body = Vec::<u8>::new();
         let mut request = serde::Decoder::new(req);
+        let (method_name, parameter_count) = try!(request.peel_request_body());
 
-        {
-            let mut response = serde::Encoder::new(&mut body);
-            let (method_name, parameter_count) = try!(request.peel_request_body());
-            try!(response.start_response());
-            self.handler.handle(&method_name, parameter_count, &mut request, &mut response);
-            try!(response.end_response());
-        }
-
-        try!(res.send(&body));
+        try!(res.send(&self.handler.handle(&method_name, parameter_count, request)));
         Ok(())
     }
 }
