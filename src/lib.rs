@@ -5,7 +5,7 @@ extern crate xml;
 
 pub use api::Ros;
 
-pub mod api;
+mod api;
 mod rosxmlrpc;
 
 #[cfg(test)]
