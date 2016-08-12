@@ -1,11 +1,11 @@
 use rosxmlrpc;
 use rustc_serialize::Encodable;
-use std;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::error::Error as ErrorTrait;
 use libc::getpid;
+use super::error::ServerError as Error;
 
 pub struct Slave {
     server: rosxmlrpc::Server,
@@ -253,66 +253,5 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
         println!("CALLED METHOD: {}", method_name);
         self.req.lock().unwrap().send((method_name.to_owned(), req)).unwrap();
         self.res.lock().unwrap().recv().unwrap()
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Deserialization(rosxmlrpc::serde::decoder::Error),
-    Protocol(String),
-    Critical(String),
-    Serialization(rosxmlrpc::serde::encoder::Error),
-    XmlRpc(rosxmlrpc::error::Error),
-}
-
-impl From<rosxmlrpc::serde::decoder::Error> for Error {
-    fn from(err: rosxmlrpc::serde::decoder::Error) -> Error {
-        Error::Deserialization(err)
-    }
-}
-
-impl From<rosxmlrpc::serde::encoder::Error> for Error {
-    fn from(err: rosxmlrpc::serde::encoder::Error) -> Error {
-        Error::Serialization(err)
-    }
-}
-
-impl From<rosxmlrpc::error::Error> for Error {
-    fn from(err: rosxmlrpc::error::Error) -> Error {
-        Error::XmlRpc(err)
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Error::Deserialization(ref err) => write!(f, "Deserialization error: {}", err),
-            Error::Protocol(ref err) => write!(f, "Protocol error: {}", err),
-            Error::Critical(ref err) => write!(f, "Critical error: {}", err),
-            Error::Serialization(ref err) => write!(f, "Serialization error: {}", err),
-            Error::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::Deserialization(ref err) => err.description(),
-            Error::Protocol(ref err) => &err,
-            Error::Critical(ref err) => &err,
-            Error::Serialization(ref err) => err.description(),
-            Error::XmlRpc(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            Error::Deserialization(ref err) => Some(err),
-            Error::Protocol(..) => None,
-            Error::Critical(..) => None,
-            Error::Serialization(ref err) => Some(err),
-            Error::XmlRpc(ref err) => Some(err),
-        }
     }
 }

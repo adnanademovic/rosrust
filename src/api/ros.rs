@@ -2,7 +2,7 @@ use rustc_serialize::{Encodable, Decodable};
 use std;
 use super::master::Master;
 use super::slave::Slave;
-use super::slave;
+use super::error::ServerError;
 use rosxmlrpc::error::Error;
 
 pub struct Ros {
@@ -11,7 +11,7 @@ pub struct Ros {
 }
 
 impl Ros {
-    pub fn new(hostname: &str, name: &str) -> Result<Ros, super::slave::Error> {
+    pub fn new(hostname: &str, name: &str) -> Result<Ros, ServerError> {
         let master_uri = std::env::var("ROS_MASTER_URI")
             .unwrap_or("http://localhost:11311/".to_owned());
         let slave = try!(Slave::new(&master_uri, &format!("{}:0", hostname)));
@@ -42,7 +42,7 @@ impl Ros {
         self.master.get_param_names()
     }
 
-    pub fn spin(&mut self) -> Result<(), slave::Error> {
+    pub fn spin(&mut self) -> Result<(), ServerError> {
         self.slave.handle_call_queue().and(Ok(()))
     }
 }
