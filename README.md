@@ -14,6 +14,8 @@ The implementation will start by supporting minimal features. The optional featu
 Currently implemented features:
 * ROS Master API
 * Basic ROS Parameter Server API
+* Stubs and several methods of ROS Slave API
+* Interface for getting/setting parameters with known type
 
 The package will be available on [cargo](https://crates.io/) once any features have been added.
 
