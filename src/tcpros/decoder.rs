@@ -16,7 +16,7 @@ impl Decoder {
         }
     }
 
-    fn pop_length(&mut self) -> Result<u32, Error> {
+    pub fn pop_length(&mut self) -> Result<u32, Error> {
         let mut reader = std::io::Cursor::new(try!(self.read_bytes(4)));
         Ok(try!(reader.read_u32::<LittleEndian>()))
     }
