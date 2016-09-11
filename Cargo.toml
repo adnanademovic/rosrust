@@ -8,6 +8,7 @@ repository = "https://github.com/adnanademovic/rosrust"
 readme = "README.md"
 
 [dependencies]
+byteorder = "0.5"
 rustc-serialize = "0.3"
 xml-rs = "0.3"
 libc = "0.2"

@@ -1,3 +1,4 @@
+extern crate byteorder;
 extern crate hyper;
 extern crate libc;
 extern crate rustc_serialize;
@@ -7,6 +8,7 @@ pub use api::Ros;
 
 mod api;
 mod rosxmlrpc;
+pub mod tcpros;
 
 #[cfg(test)]
 mod tests {
