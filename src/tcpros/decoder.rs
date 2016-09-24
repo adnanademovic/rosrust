@@ -3,15 +3,19 @@ use rustc_serialize;
 use std;
 use super::error::Error;
 
-pub struct Decoder {
-    input: std::vec::IntoIter<u8>,
+pub struct Decoder<T>
+    where T: std::iter::Iterator<Item = Result<u8, std::io::Error>>
+{
+    input: T,
     bytes_read: usize,
 }
 
-impl Decoder {
-    pub fn new(data: Vec<u8>) -> Decoder {
+impl<T> Decoder<T>
+    where T: std::iter::Iterator<Item = Result<u8, std::io::Error>>
+{
+    pub fn new(data: T) -> Decoder<T> {
         Decoder {
-            input: data.into_iter(),
+            input: data,
             bytes_read: 0,
         }
     }
@@ -24,7 +28,7 @@ impl Decoder {
     fn read_bytes(&mut self, count: u32) -> Result<Vec<u8>, Error> {
         let mut buffer = vec![];
         for _ in 0..count {
-            buffer.push(try!(self.input.next().ok_or(Error::Truncated)));
+            buffer.push(try!(try!(self.input.next().ok_or(Error::Truncated))));
             self.bytes_read += 1;
         }
         Ok(buffer)
@@ -35,7 +39,9 @@ macro_rules! match_length {
     ($s:expr, $x:expr) => (if $x != try!($s.pop_length()) {return Err(Error::Mismatch)});
 }
 
-impl rustc_serialize::Decoder for Decoder {
+impl<N> rustc_serialize::Decoder for Decoder<N>
+    where N: std::iter::Iterator<Item = Result<u8, std::io::Error>>
+{
     type Error = Error;
 
     fn read_nil(&mut self) -> Result<(), Self::Error> {

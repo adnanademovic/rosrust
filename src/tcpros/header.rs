@@ -1,12 +1,17 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
+use std;
 use super::{Decoder, Encoder};
 use super::error::Error;
 
+fn number_to_result(n: &u8) -> Result<u8, std::io::Error> {
+    Ok(*n)
+}
+
 pub fn decode(data: Vec<u8>) -> Result<HashMap<String, String>, Error> {
     let vector_length = data.len();
-    let mut decoder = Decoder::new(data);
+    let mut decoder = Decoder::new(data.iter().map(number_to_result));
     let length = try!(decoder.pop_length()) as usize;
     if length + 4 != vector_length {
         return Err(Error::Truncated);
