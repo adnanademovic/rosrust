@@ -27,7 +27,7 @@ impl std::fmt::Display for Error {
             Error::UnsupportedData => write!(f, "Data type not supported by TCPROS"),
             Error::Mismatch => write!(f, "Data doesn't match the structure we're parsing"),
             Error::Truncated => write!(f, "Abrupt end of input data"),
-            Error::Io(ref err) => write!(f, "IO error while reading TCPROS message: {}", err),
+            Error::Io(ref err) => write!(f, "IO error within TCPROS: {}", err),
             Error::Other(ref err) => write!(f, "TCPROS Decoding error: {}", err),
         }
     }
