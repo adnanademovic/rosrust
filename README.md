@@ -16,6 +16,7 @@ Currently implemented features:
 * Basic ROS Parameter Server API
 * Stubs and several methods of ROS Slave API
 * Interface for getting/setting parameters with known type
+* TCPROS publisher/subscriber basics
 
 The package will be available on [cargo](https://crates.io/) once any features have been added.
 
