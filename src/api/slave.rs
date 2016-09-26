@@ -1,5 +1,6 @@
 use rosxmlrpc;
 use rustc_serialize::Encodable;
+use std::collections::HashMap;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -7,11 +8,17 @@ use std::error::Error as ErrorTrait;
 use libc::getpid;
 use super::error::ServerError as Error;
 
+struct Subscription {
+    topic: String,
+    msg_type: String,
+    channel: Sender<String>,
+}
+
 pub struct Slave {
     server: rosxmlrpc::Server,
     req: Mutex<Receiver<(String, rosxmlrpc::serde::Decoder)>>,
     res: Mutex<Sender<Vec<u8>>>,
-    pub subscriptions: Vec<(String, String)>,
+    subscriptions: HashMap<String, Subscription>,
     pub publications: Vec<(String, String)>,
     master_uri: String,
 }
@@ -34,7 +41,7 @@ impl Slave {
                                                  }));
         Ok(Slave {
             server: server,
-            subscriptions: vec![],
+            subscriptions: HashMap::new(),
             publications: vec![],
             master_uri: master_uri.to_owned(),
             req: Mutex::new(rx_req),
@@ -135,12 +142,34 @@ impl Slave {
         }
     }
 
+    pub fn add_subscription(&mut self, topic: &str, msg_type: &str) -> Option<Receiver<String>> {
+        let (tx, rx) = mpsc::channel();
+        if self.subscriptions.contains_key(topic) {
+            None
+        } else {
+            self.subscriptions.insert(topic.to_owned(),
+                                      Subscription {
+                                          topic: topic.to_owned(),
+                                          msg_type: msg_type.to_owned(),
+                                          channel: tx,
+                                      });
+            Some(rx)
+        }
+    }
+
+    pub fn remove_subscription(&mut self, topic: &str) {
+        self.subscriptions.remove(topic);
+    }
+
     fn get_subscriptions(&self,
                          req: &mut rosxmlrpc::serde::Decoder)
-                         -> SerdeResult<&[(String, String)]> {
+                         -> SerdeResult<Vec<(String, String)>> {
         let caller_id = try!(req.decode_request_parameter::<String>());
         if caller_id != "" {
-            Ok(&self.subscriptions)
+            Ok(self.subscriptions
+                .values()
+                .map(|ref v| return (v.topic.clone(), v.msg_type.clone()))
+                .collect())
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
         }
@@ -151,8 +180,13 @@ impl Slave {
         let topic = try!(req.decode_request_parameter::<String>());
         let publishers = try!(req.decode_request_parameter::<Vec<String>>());
         if caller_id != "" && topic != "" && publishers.iter().all(|ref x| x.as_str() != "") {
-            // TODO: Currently this method is just a stub.
-            //       We need to implement some actual response to this event.
+            if let Some(subscription) = self.subscriptions.get(&topic) {
+                for publisher in publishers {
+                    try!(subscription.channel
+                        .send(publisher)
+                        .or(Err(Error::Protocol("Unable to accept publisher".to_owned()))))
+                }
+            }
             Ok(0)
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
