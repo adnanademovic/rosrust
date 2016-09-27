@@ -13,6 +13,7 @@ use tcpros;
 pub struct Ros {
     pub master: Master,
     pub slave: Slave,
+    hostname: String,
     name: String,
 }
 
@@ -25,6 +26,7 @@ impl Ros {
         Ok(Ros {
             master: master,
             slave: slave,
+            hostname: hostname.to_owned(),
             name: name.to_owned(),
         })
     }
@@ -82,6 +84,33 @@ impl Ros {
             }
         } else {
             panic!("Handle this path");
+        }
+    }
+
+    pub fn publish<T>(&mut self, topic: &str) -> Result<mpsc::Sender<T>, ServerError>
+        where T: RosMessage + Encodable + Clone + Send + 'static
+    {
+        if self.slave.is_publishing_to(topic) {
+            return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
+        }
+        let mut publisher =
+            try!(tcpros::publisher::Publisher::<T>::new(format!("{}:0", self.hostname).as_str(),
+                                                        topic));
+        self.slave.add_publication(topic, &T::msg_type(), &publisher.ip, publisher.port);
+        match self.master.register_publisher(topic, &T::msg_type()) {
+            Ok(_) => {
+                let (tx, rx) = mpsc::channel::<T>();
+                thread::spawn(move || {
+                    while let Ok(val) = rx.recv() {
+                        publisher.send(val);
+                    }
+                });
+                Ok(tx)
+            }
+            Err(err) => {
+                self.slave.remove_publication(topic);
+                Err(ServerError::XmlRpc(err))
+            }
         }
     }
 }

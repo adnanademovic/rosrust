@@ -58,6 +58,47 @@ impl Decoder {
         try!(self.peel_named_layer("param"));
         T::decode(self)
     }
+
+    pub fn decode_request_parameter_node(&mut self) -> Result<XmlRpcValue, Error> {
+        try!(self.peel_named_layer("param"));
+        self.decode_node()
+    }
+
+    pub fn decode_node(&mut self) -> Result<XmlRpcValue, Error> {
+        let (key, length) = try!(self.peel_layer());
+        if key == "string" && length == 0 {
+            return Ok(XmlRpcValue::String("".to_owned()));
+        }
+        if length != 1 {
+            return Err(Error::UnsupportedDataFormat);
+        }
+        if key == "array" {
+            if let Some(FlatTree::Node(key, length)) = self.tree.next() {
+                if key != "data" {
+                    return Err(Error::UnsupportedDataFormat);
+                }
+                let mut children = vec![];
+                for _ in 0..length {
+                    children.push(try!(self.decode_node()))
+                }
+                Ok(XmlRpcValue::Array(children))
+            } else {
+                return Err(Error::UnsupportedDataFormat);
+            }
+        } else {
+            let value = match self.tree.next() {
+                Some(FlatTree::Leaf(value)) => value,
+                _ => return Err(Error::UnsupportedDataFormat),
+            };
+            match key.as_str() {
+                "i4" | "int" => Ok(XmlRpcValue::Int(try!(value.parse()))),
+                "boolean" => Ok(XmlRpcValue::Bool(try!(value.parse::<i32>()) != 0)),
+                "string" => Ok(XmlRpcValue::String(value)),
+                "double" => Ok(XmlRpcValue::Double(try!(value.parse()))),
+                _ => Err(Error::UnsupportedDataFormat),
+            }
+        }
+    }
 }
 
 impl rustc_serialize::Decoder for Decoder {
@@ -342,6 +383,15 @@ fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Node,
         xml::reader::XmlEvent::EndElement { name } => Ok(Node::Close(name.local_name)),
         _ => next_node(reader),
     }
+}
+
+#[derive(Debug)]
+pub enum XmlRpcValue {
+    Int(i32),
+    Bool(bool),
+    String(String),
+    Double(f64),
+    Array(Vec<XmlRpcValue>),
 }
 
 #[derive(Debug)]

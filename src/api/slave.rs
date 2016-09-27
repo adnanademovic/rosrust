@@ -1,3 +1,4 @@
+use rosxmlrpc::serde::decoder::XmlRpcValue;
 use rosxmlrpc;
 use rustc_serialize::Encodable;
 use std::collections::HashMap;
@@ -14,12 +15,19 @@ struct Subscription {
     channel: Sender<String>,
 }
 
+struct Publication {
+    topic: String,
+    msg_type: String,
+    ip: String,
+    port: u16,
+}
+
 pub struct Slave {
     server: rosxmlrpc::Server,
     req: Mutex<Receiver<(String, rosxmlrpc::serde::Decoder)>>,
     res: Mutex<Sender<Vec<u8>>>,
     subscriptions: HashMap<String, Subscription>,
-    pub publications: Vec<(String, String)>,
+    publications: HashMap<String, Publication>,
     master_uri: String,
 }
 
@@ -42,7 +50,7 @@ impl Slave {
         Ok(Slave {
             server: server,
             subscriptions: HashMap::new(),
-            publications: vec![],
+            publications: HashMap::new(),
             master_uri: master_uri.to_owned(),
             req: Mutex::new(rx_req),
             res: Mutex::new(tx_res),
@@ -131,12 +139,38 @@ impl Slave {
         }
     }
 
+    pub fn add_publication(&mut self, topic: &str, msg_type: &str, ip: &str, port: u16) -> bool {
+        if self.is_publishing_to(topic) {
+            false
+        } else {
+            self.publications.insert(topic.to_owned(),
+                                     Publication {
+                                         topic: topic.to_owned(),
+                                         msg_type: msg_type.to_owned(),
+                                         ip: ip.to_owned(),
+                                         port: port,
+                                     });
+            true
+        }
+    }
+
+    pub fn remove_publication(&mut self, topic: &str) {
+        self.subscriptions.remove(topic);
+    }
+
+    pub fn is_publishing_to(&mut self, topic: &str) -> bool {
+        self.publications.contains_key(topic)
+    }
+
     fn get_publications(&self,
                         req: &mut rosxmlrpc::serde::Decoder)
-                        -> SerdeResult<&[(String, String)]> {
+                        -> SerdeResult<Vec<(String, String)>> {
         let caller_id = try!(req.decode_request_parameter::<String>());
         if caller_id != "" {
-            Ok(&self.publications)
+            Ok(self.publications
+                .values()
+                .map(|ref v| return (v.topic.clone(), v.msg_type.clone()))
+                .collect())
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
         }
@@ -202,15 +236,35 @@ impl Slave {
         }
     }
 
-    fn request_topic(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<&[String]> {
+    fn request_topic(&self,
+                     req: &mut rosxmlrpc::serde::Decoder)
+                     -> SerdeResult<(String, String, i32)> {
         let caller_id = try!(req.decode_request_parameter::<String>());
         let topic = try!(req.decode_request_parameter::<String>());
-        let protocols = try!(req.decode_request_parameter::<Vec<String>>());
-        if caller_id != "" && topic != "" && !protocols.is_empty() &&
-           protocols.iter().all(|ref x| !x.is_empty()) {
-            // TODO: We don't actually implement any protocols (yet).
-            //       The response will always be empty for now.
-            Ok(&[])
+        let protocols = try!(req.decode_request_parameter_node());
+        let publisher = try!(self.publications
+            .get(&topic)
+            .ok_or(Error::Protocol("Requested topic not published by node".to_owned())));
+        if caller_id != "" && topic != "" {
+            if let XmlRpcValue::Array(protocols) = protocols {
+                let mut has_tcpros = false;
+                for protocol in protocols {
+                    if let XmlRpcValue::Array(protocol) = protocol {
+                        if let Some(&XmlRpcValue::String(ref name)) = protocol.get(0) {
+                            has_tcpros |= name == "TCPROS";
+                        }
+                    }
+                }
+                if has_tcpros {
+                    Ok(("TCPROS".to_owned(), publisher.ip.clone(), publisher.port as i32))
+                } else {
+                    Err(Error::Protocol("No matching protocols available".to_owned()))
+                }
+            } else {
+                Err(Error::Protocol("Protocols need to be provided as [ [String, \
+                                     XmlRpcLegalValue] ]"
+                    .to_owned()))
+            }
         } else {
             Err(Error::Protocol("Empty parameters given".to_owned()))
         }

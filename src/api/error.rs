@@ -1,5 +1,6 @@
 use std;
 use rosxmlrpc;
+use tcpros;
 
 #[derive(Debug)]
 pub enum ServerError {
@@ -8,6 +9,7 @@ pub enum ServerError {
     Critical(String),
     Serialization(rosxmlrpc::serde::encoder::Error),
     XmlRpc(rosxmlrpc::error::Error),
+    Tcpros(tcpros::error::Error),
 }
 
 impl From<rosxmlrpc::serde::decoder::Error> for ServerError {
@@ -28,6 +30,12 @@ impl From<rosxmlrpc::error::Error> for ServerError {
     }
 }
 
+impl From<tcpros::error::Error> for ServerError {
+    fn from(err: tcpros::error::Error) -> ServerError {
+        ServerError::Tcpros(err)
+    }
+}
+
 impl std::fmt::Display for ServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -36,6 +44,7 @@ impl std::fmt::Display for ServerError {
             ServerError::Critical(ref err) => write!(f, "Critical error: {}", err),
             ServerError::Serialization(ref err) => write!(f, "Serialization error: {}", err),
             ServerError::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
+            ServerError::Tcpros(ref err) => write!(f, "TCPROS error: {}", err),
         }
     }
 }
@@ -48,6 +57,7 @@ impl std::error::Error for ServerError {
             ServerError::Critical(ref err) => &err,
             ServerError::Serialization(ref err) => err.description(),
             ServerError::XmlRpc(ref err) => err.description(),
+            ServerError::Tcpros(ref err) => err.description(),
         }
     }
 
@@ -58,6 +68,7 @@ impl std::error::Error for ServerError {
             ServerError::Critical(..) => None,
             ServerError::Serialization(ref err) => Some(err),
             ServerError::XmlRpc(ref err) => Some(err),
+            ServerError::Tcpros(ref err) => Some(err),
         }
     }
 }
