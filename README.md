@@ -18,8 +18,7 @@ Currently implemented features:
 * Interface for getting/setting parameters with known type
 * TCPROS publisher/subscriber basics
 * Very unstable ROS publisher/subscriber
-
-The package will be available on [cargo](https://crates.io/) once any features have been added.
+* Bindings for messages
 
 Integration with [catkin](http://www.ros.org/wiki/catkin) will be handled once a satisfying set of features has been implemented.
 
