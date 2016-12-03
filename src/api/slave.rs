@@ -254,7 +254,7 @@ impl Slave {
                      -> SerdeResult<(String, String, i32)> {
         let protocols = req.pop()
             .ok_or(Error::Protocol(String::from("Missing parameter")))?
-            .value;
+            .value();
         let topic = String::decode(&mut req.pop()
             .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         let caller_id = String::decode(&mut req.pop()

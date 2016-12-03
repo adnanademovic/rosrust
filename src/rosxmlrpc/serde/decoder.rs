@@ -4,8 +4,8 @@ use std::error::Error as ErrorTrait;
 use super::value;
 
 pub struct Decoder {
-    pub value: value::XmlRpcValue,
-    pub chain: std::vec::IntoIter<(value::XmlRpcValue, usize)>,
+    value: value::XmlRpcValue,
+    chain: std::vec::IntoIter<(value::XmlRpcValue, usize)>,
 }
 
 impl Decoder {
@@ -27,6 +27,10 @@ impl Decoder {
     pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>, value::DecodeError> {
         let value = value::XmlRpcResponse::new(body)?;
         Ok(value.extract_parameters().into_iter().map(Decoder::new).collect())
+    }
+
+    pub fn value(self) -> value::XmlRpcValue {
+        self.value
     }
 }
 
@@ -444,5 +448,42 @@ mod tests {
                        },
                    },
                    ExampleRequestStruct::decode(&mut parameters[1]).unwrap());
+    }
+
+    #[test]
+    fn decoders_value_field_matches_data() {
+        let data = r#"<?xml version="1.0"?>
+<methodCall>
+  <methodName>mytype.mymethod</methodName>
+  <params>
+    <param>
+      <value><i4>33</i4></value>
+    </param>
+    <param>
+      <value><array><data>
+        <value><i4>41</i4></value>
+        <value><boolean>1</boolean></value>
+        <value><array><data>
+          <value><string>Hello</string></value>
+          <value><double>0.5</double></value>
+        </data></array></value>
+      </data></array></value>
+    </param>
+  </params>
+</methodCall>"#;
+        let mut cursor = std::io::Cursor::new(data.as_bytes());
+        let (method, mut parameters) = Decoder::new_request(&mut cursor).unwrap();
+        assert_eq!("mytype.mymethod", method);
+        assert_eq!(2, parameters.len());
+        assert_eq!(XmlRpcValue::Array(vec![
+            XmlRpcValue::Int(41),
+            XmlRpcValue::Bool(true),
+            XmlRpcValue::Array(vec![
+                XmlRpcValue::String(String::from("Hello")),
+                XmlRpcValue::Double(0.5),
+            ]),
+        ]),
+                   parameters.pop().unwrap().value());
+        assert_eq!(XmlRpcValue::Int(33), parameters.pop().unwrap().value());
     }
 }
