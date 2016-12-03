@@ -93,16 +93,15 @@ impl Slave {
                                      response: SerdeResult<T>,
                                      message: &str)
                                      -> SerdeResult<()> {
+        let mut res = rosxmlrpc::serde::Encoder::new();
+        try!(match response {
+            Ok(value) => (1i32, message, value).encode(&mut res),
+            Err(err) => (-1i32, err.description(), 0).encode(&mut res),
+        });
+
         let mut body = Vec::<u8>::new();
-        {
-            let mut res = rosxmlrpc::serde::Encoder::new(&mut body);
-            try!(res.start_response());
-            try!(match response {
-                Ok(value) => (1i32, message, value).encode(&mut res),
-                Err(err) => (-1i32, err.description(), 0).encode(&mut res),
-            });
-            try!(res.end_response());
-        }
+        res.write_response(&mut body)?;
+
         self.res.lock().unwrap().send(body).unwrap();
         Ok(())
     }

@@ -13,13 +13,13 @@ pub enum XmlRpcValue {
 
 #[derive(Debug)]
 pub struct XmlRpcRequest {
-    method: String,
-    parameters: Vec<XmlRpcValue>,
+    pub method: String,
+    pub parameters: Vec<XmlRpcValue>,
 }
 
 #[derive(Debug)]
 pub struct XmlRpcResponse {
-    parameters: Vec<XmlRpcValue>,
+    pub parameters: Vec<XmlRpcValue>,
 }
 
 impl std::fmt::Display for XmlRpcValue {
@@ -91,14 +91,6 @@ impl XmlRpcRequest {
         }
         Err(DecodeError::BadXmlStructure)
     }
-
-    pub fn method(&self) -> String {
-        self.method.clone()
-    }
-
-    pub fn extract_parameters(self) -> Vec<XmlRpcValue> {
-        self.parameters
-    }
 }
 
 impl XmlRpcResponse {
@@ -115,10 +107,6 @@ impl XmlRpcResponse {
             });
         }
         return Err(DecodeError::BadXmlStructure);
-    }
-
-    pub fn extract_parameters(self) -> Vec<XmlRpcValue> {
-        self.parameters
     }
 }
 

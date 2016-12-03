@@ -28,24 +28,22 @@ impl Client {
                                                        parameters: &[&str],
                                                        extra_parameter: Option<&Targ>)
                                                        -> ClientResult<T> {
-        let mut body = Vec::<u8>::new();
-        {
-            let mut encoder = serde::Encoder::new(&mut body);
-            try!(encoder.start_request(function_name));
-            for param in parameters {
-                try!(param.encode(&mut encoder));
-            }
-            if let Some(extra_param) = extra_parameter {
-                try!(extra_param.encode(&mut encoder));
-            }
-            try!(encoder.end_request());
+        let mut encoder = serde::Encoder::new();
+        for param in parameters {
+            param.encode(&mut encoder)?;
+        }
+        if let Some(extra_param) = extra_parameter {
+            extra_param.encode(&mut encoder)?;
         }
 
-        let body = try!(String::from_utf8(body));
-        let res = try!(self.http_client
+        let mut body = Vec::<u8>::new();
+        encoder.write_request(function_name, &mut body)?;
+
+        let body = String::from_utf8(body)?;
+        let res = self.http_client
             .post(&self.server_uri)
             .body(&body)
-            .send());
+            .send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
 

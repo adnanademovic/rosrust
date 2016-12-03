@@ -21,12 +21,12 @@ impl Decoder {
     pub fn new_request<T: std::io::Read>(body: T)
                                          -> Result<(String, Vec<Decoder>), value::DecodeError> {
         let value = value::XmlRpcRequest::new(body)?;
-        Ok((value.method(), value.extract_parameters().into_iter().map(Decoder::new).collect()))
+        Ok((value.method, value.parameters.into_iter().map(Decoder::new).collect()))
     }
 
     pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>, value::DecodeError> {
         let value = value::XmlRpcResponse::new(body)?;
-        Ok(value.extract_parameters().into_iter().map(Decoder::new).collect())
+        Ok(value.parameters.into_iter().map(Decoder::new).collect())
     }
 
     pub fn value(self) -> value::XmlRpcValue {
