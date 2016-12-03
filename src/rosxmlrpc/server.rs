@@ -27,7 +27,7 @@ impl Server {
 }
 
 pub trait XmlRpcServer {
-    fn handle(&self, method_name: &str, parameter_count: usize, req: serde::Decoder) -> Vec<u8>;
+    fn handle(&self, method_name: &str, params: Vec<serde::Decoder>) -> Vec<u8>;
 }
 
 struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
@@ -40,10 +40,9 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
     }
 
     fn process(&self, req: Request, res: Response) -> Result<(), Error> {
-        let mut request = serde::Decoder::new(req);
-        let (method_name, parameter_count) = try!(request.peel_request_body());
+        let (method_name, parameters) = serde::Decoder::new_request(req)?;
 
-        try!(res.send(&self.handler.handle(&method_name, parameter_count, request)));
+        try!(res.send(&self.handler.handle(&method_name, parameters)));
         Ok(())
     }
 }

@@ -2,7 +2,7 @@ use std;
 use std::error::Error;
 use xml;
 
-#[derive(Debug,PartialEq)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum XmlRpcValue {
     Int(i32),
     Bool(bool),
@@ -91,6 +91,14 @@ impl XmlRpcRequest {
         }
         Err(DecodeError::BadXmlStructure)
     }
+
+    pub fn method(&self) -> String {
+        self.method.clone()
+    }
+
+    pub fn extract_parameters(self) -> Vec<XmlRpcValue> {
+        self.parameters
+    }
 }
 
 impl XmlRpcResponse {
@@ -107,6 +115,10 @@ impl XmlRpcResponse {
             });
         }
         return Err(DecodeError::BadXmlStructure);
+    }
+
+    pub fn extract_parameters(self) -> Vec<XmlRpcValue> {
+        self.parameters
     }
 }
 

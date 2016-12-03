@@ -1,6 +1,6 @@
-use rosxmlrpc::serde::decoder::XmlRpcValue;
 use rosxmlrpc;
-use rustc_serialize::Encodable;
+use rosxmlrpc::XmlRpcValue;
+use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
@@ -24,7 +24,7 @@ struct Publication {
 
 pub struct Slave {
     server: rosxmlrpc::Server,
-    req: Mutex<Receiver<(String, rosxmlrpc::serde::Decoder)>>,
+    req: Mutex<Receiver<(String, Vec<rosxmlrpc::serde::Decoder>)>>,
     res: Mutex<Sender<Vec<u8>>>,
     subscriptions: HashMap<String, Subscription>,
     publications: HashMap<String, Publication>,
@@ -32,7 +32,7 @@ pub struct Slave {
 }
 
 struct SlaveHandler {
-    req: Mutex<Sender<(String, rosxmlrpc::serde::Decoder)>>,
+    req: Mutex<Sender<(String, Vec<rosxmlrpc::serde::Decoder>)>>,
     res: Mutex<Receiver<Vec<u8>>>,
 }
 
@@ -62,11 +62,12 @@ impl Slave {
     }
 
     fn get_bus_stats(&self,
-                     req: &mut rosxmlrpc::serde::Decoder)
+                     req: &mut Vec<rosxmlrpc::serde::Decoder>)
                      -> SerdeResult<(&[(String, String, (String, i32, i32, bool))],
                                      &[(String, (String, i32, i32, bool))],
                                      (i32, i32, i32))> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             // TODO: implement actual stats displaying
             Ok((&[], &[], (0, 0, 0)))
@@ -76,9 +77,10 @@ impl Slave {
     }
 
     fn get_bus_info(&self,
-                    req: &mut rosxmlrpc::serde::Decoder)
+                    req: &mut Vec<rosxmlrpc::serde::Decoder>)
                     -> SerdeResult<&[(String, String, String, String, String, bool)]> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             // TODO: implement actual info displaying
             Ok(&[])
@@ -105,10 +107,13 @@ impl Slave {
         Ok(())
     }
 
-    fn param_update(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
-        let key = try!(req.decode_request_parameter::<String>());
-        let value = try!(req.decode_request_parameter::<String>());
+    fn param_update(&self, req: &mut Vec<rosxmlrpc::serde::Decoder>) -> SerdeResult<i32> {
+        let value = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
+        let key = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" && key != "" && value != "" {
             // TODO: implement handling of parameter updates
             println!("{} {} {}", caller_id, key, value);
@@ -118,8 +123,9 @@ impl Slave {
         }
     }
 
-    fn get_pid(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+    fn get_pid(&self, req: &mut Vec<rosxmlrpc::serde::Decoder>) -> SerdeResult<i32> {
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             Ok(unsafe { getpid() })
         } else {
@@ -127,8 +133,9 @@ impl Slave {
         }
     }
 
-    fn shutdown(&mut self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+    fn shutdown(&mut self, req: &mut Vec<rosxmlrpc::serde::Decoder>) -> SerdeResult<i32> {
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             match self.server.shutdown() {
                 Ok(()) => Ok(0),
@@ -163,9 +170,10 @@ impl Slave {
     }
 
     fn get_publications(&self,
-                        req: &mut rosxmlrpc::serde::Decoder)
+                        req: &mut Vec<rosxmlrpc::serde::Decoder>)
                         -> SerdeResult<Vec<(String, String)>> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             Ok(self.publications
                 .values()
@@ -196,9 +204,10 @@ impl Slave {
     }
 
     fn get_subscriptions(&self,
-                         req: &mut rosxmlrpc::serde::Decoder)
+                         req: &mut Vec<rosxmlrpc::serde::Decoder>)
                          -> SerdeResult<Vec<(String, String)>> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             Ok(self.subscriptions
                 .values()
@@ -209,10 +218,13 @@ impl Slave {
         }
     }
 
-    fn publisher_update(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<i32> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
-        let topic = try!(req.decode_request_parameter::<String>());
-        let publishers = try!(req.decode_request_parameter::<Vec<String>>());
+    fn publisher_update(&self, req: &mut Vec<rosxmlrpc::serde::Decoder>) -> SerdeResult<i32> {
+        let publishers = Vec::<String>::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
+        let topic = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" && topic != "" && publishers.iter().all(|ref x| x.as_str() != "") {
             if let Some(subscription) = self.subscriptions.get(&topic) {
                 for publisher in publishers {
@@ -227,8 +239,9 @@ impl Slave {
         }
     }
 
-    fn get_master_uri(&self, req: &mut rosxmlrpc::serde::Decoder) -> SerdeResult<&str> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
+    fn get_master_uri(&self, req: &mut Vec<rosxmlrpc::serde::Decoder>) -> SerdeResult<&str> {
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         if caller_id != "" {
             Ok(&self.master_uri)
         } else {
@@ -237,11 +250,15 @@ impl Slave {
     }
 
     fn request_topic(&self,
-                     req: &mut rosxmlrpc::serde::Decoder)
+                     req: &mut Vec<rosxmlrpc::serde::Decoder>)
                      -> SerdeResult<(String, String, i32)> {
-        let caller_id = try!(req.decode_request_parameter::<String>());
-        let topic = try!(req.decode_request_parameter::<String>());
-        let protocols = try!(req.decode_request_parameter_node());
+        let protocols = req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?
+            .value;
+        let topic = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
+        let caller_id = String::decode(&mut req.pop()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         let publisher = try!(self.publications
             .get(&topic)
             .ok_or(Error::Protocol("Requested topic not published by node".to_owned())));
@@ -272,7 +289,7 @@ impl Slave {
 
     fn handle_call(&mut self,
                    method_name: &str,
-                   req: &mut rosxmlrpc::serde::Decoder)
+                   req: &mut Vec<rosxmlrpc::serde::Decoder>)
                    -> SerdeResult<()> {
         println!("HANDLING METHOD: {}", method_name);
         match method_name {
@@ -337,7 +354,7 @@ impl Slave {
 }
 
 impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
-    fn handle(&self, method_name: &str, _: usize, req: rosxmlrpc::serde::Decoder) -> Vec<u8> {
+    fn handle(&self, method_name: &str, req: Vec<rosxmlrpc::serde::Decoder>) -> Vec<u8> {
         println!("CALLED METHOD: {}", method_name);
         self.req.lock().unwrap().send((method_name.to_owned(), req)).unwrap();
         self.res.lock().unwrap().recv().unwrap()

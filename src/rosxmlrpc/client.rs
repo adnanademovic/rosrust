@@ -47,10 +47,10 @@ impl Client {
             .body(&body)
             .send());
 
-        let mut res = serde::Decoder::new(res);
-        try!(res.peel_response_body());
+        let mut res = serde::Decoder::new_response(res)?;
 
-        Ok(try!(T::decode(&mut res)))
+        Ok(T::decode(&mut res.pop()
+            .ok_or(error::Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?)?)
     }
 }
 
