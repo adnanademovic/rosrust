@@ -12,8 +12,8 @@ impl Server {
     pub fn new<T>(server_uri: &str, responder: T) -> Result<Server, Error>
         where T: 'static + XmlRpcServer + Send + Sync
     {
-        let listener = try!(try!(hyper::Server::http(server_uri))
-            .handle(XmlRpcHandler::new(responder)));
+        let listener = hyper::Server::http(server_uri)?
+            .handle(XmlRpcHandler::new(responder))?;
         let uri = format!("http://{}/", listener.socket);
         Ok(Server {
             listener: listener,
@@ -41,8 +41,7 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 
     fn process(&self, req: Request, res: Response) -> Result<(), Error> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
-
-        try!(res.send(&self.handler.handle(&method_name, parameters)));
+        res.send(&self.handler.handle(&method_name, parameters))?;
         Ok(())
     }
 }

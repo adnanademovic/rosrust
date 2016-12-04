@@ -1,7 +1,7 @@
 use hyper;
 use rustc_serialize::{Encodable, Decodable};
+use super::error::Error;
 use super::serde;
-use super::error;
 
 pub struct Client {
     http_client: hyper::Client,
@@ -16,28 +16,9 @@ impl Client {
         }
     }
 
-    pub fn request<T: Decodable>(&self,
-                                 function_name: &str,
-                                 parameters: &[&str])
-                                 -> ClientResult<T> {
-        self.request_long::<T, ()>(function_name, parameters, None)
-    }
-
-    pub fn request_long<T: Decodable, Targ: Encodable>(&self,
-                                                       function_name: &str,
-                                                       parameters: &[&str],
-                                                       extra_parameter: Option<&Targ>)
-                                                       -> ClientResult<T> {
-        let mut encoder = serde::Encoder::new();
-        for param in parameters {
-            param.encode(&mut encoder)?;
-        }
-        if let Some(extra_param) = extra_parameter {
-            extra_param.encode(&mut encoder)?;
-        }
-
+    pub fn request<T: Decodable>(&self, request: Request) -> ClientResult<T> {
         let mut body = Vec::<u8>::new();
-        encoder.write_request(function_name, &mut body)?;
+        request.encoder.write_request(&request.name, &mut body)?;
 
         let body = String::from_utf8(body)?;
         let res = self.http_client
@@ -48,8 +29,26 @@ impl Client {
         let mut res = serde::Decoder::new_response(res)?;
 
         Ok(T::decode(&mut res.pop()
-            .ok_or(error::Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?)?)
+            .ok_or(Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?)?)
     }
 }
 
-pub type ClientResult<T> = Result<T, error::Error>;
+pub struct Request {
+    name: String,
+    encoder: serde::Encoder,
+}
+
+impl Request {
+    pub fn new(function_name: &str) -> Request {
+        Request {
+            name: String::from(function_name),
+            encoder: serde::Encoder::new(),
+        }
+    }
+
+    pub fn add<T: Encodable>(&mut self, parameter: &T) -> Result<(), serde::encoder::Error> {
+        parameter.encode(&mut self.encoder)
+    }
+}
+
+pub type ClientResult<T> = Result<T, Error>;

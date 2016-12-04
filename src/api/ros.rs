@@ -137,8 +137,11 @@ fn request_topic(publisher_uri: &str,
                  caller_id: &str,
                  topic: &str)
                  -> Result<(String, String, i32), rosxmlrpc::error::Error> {
-    let protocols = try!(rosxmlrpc::Client::new(publisher_uri)
-            .request_long::<(i32, String, (String, String, i32)), Vec<Vec<&str>>>(
-                "requestTopic", &[caller_id, topic], Some(&vec![vec!["TCPROS"]])));
+    let mut request = rosxmlrpc::client::Request::new("requestTopic");
+    request.add(&caller_id)?;
+    request.add(&topic)?;
+    request.add(&[["TCPROS"]])?;
+    let client = rosxmlrpc::Client::new(publisher_uri);
+    let protocols = client.request::<(i32, String, (String, String, i32))>(request)?;
     Ok(protocols.2)
 }

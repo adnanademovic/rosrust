@@ -21,17 +21,12 @@ impl Master {
     }
 
     fn request<T: Decodable>(&self, function_name: &str, parameters: &[&str]) -> MasterResult<T> {
+        let mut request = rosxmlrpc::client::Request::new(function_name);
+        for parameter in parameters {
+            request.add(parameter)?;
+        }
         Master::remove_wrap(self.client
-            .request(function_name, parameters))
-    }
-
-    fn request_long<T: Decodable, Targ: Encodable>(&self,
-                                                   function_name: &str,
-                                                   parameters: &[&str],
-                                                   extra_parameter: Targ)
-                                                   -> MasterResult<T> {
-        Master::remove_wrap(self.client
-            .request_long(function_name, parameters, Some(&extra_parameter)))
+            .request(request))
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
@@ -93,7 +88,12 @@ impl Master {
     }
 
     pub fn set_param<T: Encodable>(&self, key: &str, value: &T) -> MasterResult<i32> {
-        self.request_long("setParam", &[self.client_id.as_str(), key], value)
+        let mut request = rosxmlrpc::client::Request::new("setParam");
+        request.add(&self.client_id)?;
+        request.add(&key)?;
+        request.add(value)?;
+        Master::remove_wrap(self.client
+            .request(request))
     }
 
     pub fn get_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
