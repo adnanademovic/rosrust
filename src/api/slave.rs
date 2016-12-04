@@ -42,11 +42,11 @@ impl Slave {
     pub fn new(master_uri: &str, server_uri: &str) -> Result<Slave, Error> {
         let (tx_req, rx_req) = mpsc::channel();
         let (tx_res, rx_res) = mpsc::channel();
-        let server = try!(rosxmlrpc::Server::new(server_uri,
-                                                 SlaveHandler {
-                                                     req: Mutex::new(tx_req),
-                                                     res: Mutex::new(rx_res),
-                                                 }));
+        let server = rosxmlrpc::Server::new(server_uri,
+                                            SlaveHandler {
+                                                req: Mutex::new(tx_req),
+                                                res: Mutex::new(rx_res),
+                                            })?;
         Ok(Slave {
             server: server,
             subscriptions: HashMap::new(),
@@ -94,10 +94,10 @@ impl Slave {
                                      message: &str)
                                      -> SerdeResult<()> {
         let mut res = rosxmlrpc::serde::Encoder::new();
-        try!(match response {
+        match response {
             Ok(value) => (1i32, message, value).encode(&mut res),
             Err(err) => (-1i32, err.description(), 0).encode(&mut res),
-        });
+        }?;
 
         let mut body = Vec::<u8>::new();
         res.write_response(&mut body)?;
@@ -227,9 +227,9 @@ impl Slave {
         if caller_id != "" && topic != "" && publishers.iter().all(|ref x| x.as_str() != "") {
             if let Some(subscription) = self.subscriptions.get(&topic) {
                 for publisher in publishers {
-                    try!(subscription.channel
+                    subscription.channel
                         .send(publisher)
-                        .or(Err(Error::Protocol("Unable to accept publisher".to_owned()))))
+                        .or(Err(Error::Protocol("Unable to accept publisher".to_owned())))?
                 }
             }
             Ok(0)
@@ -258,9 +258,9 @@ impl Slave {
             .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
         let caller_id = String::decode(&mut req.pop()
             .ok_or(Error::Protocol(String::from("Missing parameter")))?)?;
-        let publisher = try!(self.publications
+        let publisher = self.publications
             .get(&topic)
-            .ok_or(Error::Protocol("Requested topic not published by node".to_owned())));
+            .ok_or(Error::Protocol("Requested topic not published by node".to_owned()))?;
         if caller_id != "" && topic != "" {
             if let XmlRpcValue::Array(protocols) = protocols {
                 let mut has_tcpros = false;
@@ -346,7 +346,7 @@ impl Slave {
             let recv = self.req.lock().unwrap().try_recv();
             match recv {
                 Err(err) => return Ok(err),
-                Ok((method_name, mut req)) => try!(self.handle_call(&method_name, &mut req)),
+                Ok((method_name, mut req)) => self.handle_call(&method_name, &mut req)?,
             }
         }
     }

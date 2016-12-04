@@ -25,8 +25,7 @@ impl Master {
         for parameter in parameters {
             request.add(parameter)?;
         }
-        Master::remove_wrap(self.client
-            .request(request))
+        Master::remove_wrap(self.client.request(request))
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
@@ -92,8 +91,7 @@ impl Master {
         request.add(&self.client_id)?;
         request.add(&key)?;
         request.add(value)?;
-        Master::remove_wrap(self.client
-            .request(request))
+        Master::remove_wrap(self.client.request(request))
     }
 
     pub fn get_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
@@ -133,11 +131,11 @@ pub struct ResponseData<T>(T);
 impl<T: Decodable> Decodable for ResponseData<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<ResponseData<T>, D::Error> {
         d.read_struct("ResponseData", 3, |d| {
-            let code = try!(d.read_struct_field("status_code", 0, |d| d.read_i32()));
-            let message = try!(d.read_struct_field("status_message", 1, |d| d.read_str()));
+            let code = d.read_struct_field("status_code", 0, |d| d.read_i32())?;
+            let message = d.read_struct_field("status_message", 1, |d| d.read_str())?;
             match code {
                 0 | -1 => Err(d.error(&message)),
-                1 => Ok(ResponseData(try!(d.read_struct_field("data", 2, |d| T::decode(d))))),
+                1 => Ok(ResponseData(d.read_struct_field("data", 2, |d| T::decode(d))?)),
                 _ => Err(d.error("Invalid response code returned by ROS")),
             }
         })

@@ -21,7 +21,7 @@ impl Ros {
     pub fn new(hostname: &str, name: &str) -> Result<Ros, ServerError> {
         let master_uri = std::env::var("ROS_MASTER_URI")
             .unwrap_or("http://localhost:11311/".to_owned());
-        let slave = try!(Slave::new(&master_uri, &format!("{}:0", hostname)));
+        let slave = Slave::new(&master_uri, &format!("{}:0", hostname))?;
         let master = Master::new(&master_uri, name, &slave.uri());
         Ok(Ros {
             master: master,
@@ -94,8 +94,7 @@ impl Ros {
             return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
         }
         let mut publisher =
-            try!(tcpros::publisher::Publisher::<T>::new(format!("{}:0", self.hostname).as_str(),
-                                                        topic));
+            tcpros::publisher::Publisher::<T>::new(format!("{}:0", self.hostname).as_str(), topic)?;
         self.slave.add_publication(topic, &T::msg_type(), &publisher.ip, publisher.port);
         match self.master.register_publisher(topic, &T::msg_type()) {
             Ok(_) => {
