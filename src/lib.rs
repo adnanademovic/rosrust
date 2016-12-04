@@ -2,7 +2,7 @@ extern crate byteorder;
 extern crate hyper;
 #[macro_use]
 extern crate lazy_static;
-extern crate libc;
+extern crate nix;
 extern crate regex;
 extern crate rustc_serialize;
 extern crate xml;

@@ -1,3 +1,4 @@
+use nix;
 use std;
 use rosxmlrpc;
 use tcpros;
@@ -12,6 +13,8 @@ pub enum ServerError {
     XmlRpc(rosxmlrpc::error::Error),
     Tcpros(tcpros::error::Error),
     Io(std::io::Error),
+    Nix(nix::Error),
+    FromUTF8(std::string::FromUtf8Error),
 }
 
 impl From<rosxmlrpc::serde::value::DecodeError> for ServerError {
@@ -50,6 +53,18 @@ impl From<std::io::Error> for ServerError {
     }
 }
 
+impl From<nix::Error> for ServerError {
+    fn from(err: nix::Error) -> ServerError {
+        ServerError::Nix(err)
+    }
+}
+
+impl From<std::string::FromUtf8Error> for ServerError {
+    fn from(err: std::string::FromUtf8Error) -> ServerError {
+        ServerError::FromUTF8(err)
+    }
+}
+
 impl std::fmt::Display for ServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -61,6 +76,8 @@ impl std::fmt::Display for ServerError {
             ServerError::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
             ServerError::Tcpros(ref err) => write!(f, "TCPROS error: {}", err),
             ServerError::Io(ref err) => write!(f, "IO error: {}", err),
+            ServerError::Nix(ref err) => write!(f, "NIX error: {}", err),
+            ServerError::FromUTF8(ref err) => write!(f, "From UTF-8 error: {}", err),
         }
     }
 }
@@ -76,6 +93,8 @@ impl std::error::Error for ServerError {
             ServerError::XmlRpc(ref err) => err.description(),
             ServerError::Tcpros(ref err) => err.description(),
             ServerError::Io(ref err) => err.description(),
+            ServerError::Nix(ref err) => err.description(),
+            ServerError::FromUTF8(ref err) => err.description(),
         }
     }
 
@@ -89,6 +108,8 @@ impl std::error::Error for ServerError {
             ServerError::XmlRpc(ref err) => Some(err),
             ServerError::Tcpros(ref err) => Some(err),
             ServerError::Io(ref err) => Some(err),
+            ServerError::Nix(ref err) => Some(err),
+            ServerError::FromUTF8(ref err) => Some(err),
         }
     }
 }

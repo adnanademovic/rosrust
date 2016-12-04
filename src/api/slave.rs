@@ -6,7 +6,7 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::error::Error as ErrorTrait;
-use libc::getpid;
+use nix::unistd::getpid;
 use super::error::ServerError as Error;
 
 struct Subscription {
@@ -117,7 +117,7 @@ impl Slave {
     fn get_pid(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
-            Ok(unsafe { getpid() })
+            Ok(getpid())
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
         }

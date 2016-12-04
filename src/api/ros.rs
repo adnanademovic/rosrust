@@ -2,6 +2,7 @@ use rustc_serialize::{Encodable, Decodable};
 use std::sync::mpsc;
 use std::thread;
 use std;
+use nix::unistd::gethostname;
 use super::master::Master;
 use super::slave::Slave;
 use super::error::ServerError;
@@ -18,15 +19,18 @@ pub struct Ros {
 }
 
 impl Ros {
-    pub fn new(hostname: &str, name: &str) -> Result<Ros, ServerError> {
+    pub fn new(name: &str) -> Result<Ros, ServerError> {
         let master_uri = std::env::var("ROS_MASTER_URI")
             .unwrap_or("http://localhost:11311/".to_owned());
+        let mut hostname = vec![];
+        gethostname(&mut hostname)?;
+        let hostname = String::from_utf8(hostname)?;
         let slave = Slave::new(&master_uri, &format!("{}:0", hostname))?;
         let master = Master::new(&master_uri, name, &slave.uri());
         Ok(Ros {
             master: master,
             slave: slave,
-            hostname: hostname.to_owned(),
+            hostname: hostname,
             name: name.to_owned(),
         })
     }
