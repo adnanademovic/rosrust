@@ -1,5 +1,7 @@
 use hyper;
 use hyper::server::{Request, Response, Handler};
+use rustc_serialize::Decodable;
+use std;
 use super::serde;
 use super::error::Error;
 
@@ -26,8 +28,11 @@ impl Server {
     }
 }
 
+pub type ResponseIterator = std::iter::Map<std::vec::IntoIter<serde::decoder::Decoder>,
+                                           fn(serde::decoder::Decoder) -> Parameter>;
+
 pub trait XmlRpcServer {
-    fn handle(&self, method_name: &str, params: Vec<serde::Decoder>) -> Vec<u8>;
+    fn handle(&self, method_name: &str, params: ResponseIterator) -> Vec<u8>;
 }
 
 struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
@@ -41,7 +46,7 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 
     fn process(&self, req: Request, res: Response) -> Result<(), Error> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
-        res.send(&self.handler.handle(&method_name, parameters))?;
+        res.send(&self.handler.handle(&method_name, parameters.into_iter().map(Parameter::new)))?;
         Ok(())
     }
 }
@@ -51,5 +56,23 @@ impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
         if let Err(err) = self.process(req, res) {
             println!("Server handler error: {}", err);
         }
+    }
+}
+
+pub struct Parameter {
+    decoder: serde::Decoder,
+}
+
+impl Parameter {
+    pub fn new(decoder: serde::Decoder) -> Parameter {
+        Parameter { decoder: decoder }
+    }
+
+    pub fn read<T: Decodable>(mut self) -> Result<T, serde::decoder::Error> {
+        T::decode(&mut self.decoder)
+    }
+
+    pub fn value(self) -> serde::XmlRpcValue {
+        self.decoder.value()
     }
 }
