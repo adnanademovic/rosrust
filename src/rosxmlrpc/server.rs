@@ -1,6 +1,6 @@
 use hyper;
 use hyper::server::{Request, Response, Handler};
-use rustc_serialize::Decodable;
+use rustc_serialize::{Decodable, Encodable};
 use std;
 use super::serde;
 use super::error::Error;
@@ -28,11 +28,11 @@ impl Server {
     }
 }
 
-pub type ResponseIterator = std::iter::Map<std::vec::IntoIter<serde::decoder::Decoder>,
-                                           fn(serde::decoder::Decoder) -> Parameter>;
+pub type ParameterIterator = std::iter::Map<std::vec::IntoIter<serde::decoder::Decoder>,
+                                            fn(serde::decoder::Decoder) -> Parameter>;
 
 pub trait XmlRpcServer {
-    fn handle(&self, method_name: &str, params: ResponseIterator) -> Vec<u8>;
+    fn handle(&self, method_name: &str, params: ParameterIterator) -> Answer;
 }
 
 struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
@@ -46,7 +46,9 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 
     fn process(&self, req: Request, res: Response) -> Result<(), Error> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
-        res.send(&self.handler.handle(&method_name, parameters.into_iter().map(Parameter::new)))?;
+        res.send(&self.handler
+                .handle(&method_name, parameters.into_iter().map(Parameter::new))
+                .write_response()?)?;
         Ok(())
     }
 }
@@ -59,12 +61,31 @@ impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
     }
 }
 
+pub struct Answer {
+    encoder: serde::Encoder,
+}
+
+impl Answer {
+    pub fn new() -> Answer {
+        Answer { encoder: serde::Encoder::new() }
+    }
+
+    pub fn add<T: Encodable>(&mut self, data: &T) -> Result<(), serde::encoder::Error> {
+        data.encode(&mut self.encoder)
+    }
+
+    fn write_response(self) -> Result<Vec<u8>, std::io::Error> {
+        let mut data = vec![];
+        self.encoder.write_response(&mut data).and(Ok(data))
+    }
+}
+
 pub struct Parameter {
     decoder: serde::Decoder,
 }
 
 impl Parameter {
-    pub fn new(decoder: serde::Decoder) -> Parameter {
+    fn new(decoder: serde::Decoder) -> Parameter {
         Parameter { decoder: decoder }
     }
 

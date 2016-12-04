@@ -24,16 +24,16 @@ struct Publication {
 
 pub struct Slave {
     server: rosxmlrpc::Server,
-    req: Mutex<Receiver<(String, rosxmlrpc::server::ResponseIterator)>>,
-    res: Mutex<Sender<Vec<u8>>>,
+    req: Mutex<Receiver<(String, rosxmlrpc::server::ParameterIterator)>>,
+    res: Mutex<Sender<rosxmlrpc::server::Answer>>,
     subscriptions: HashMap<String, Subscription>,
     publications: HashMap<String, Publication>,
     master_uri: String,
 }
 
 struct SlaveHandler {
-    req: Mutex<Sender<(String, rosxmlrpc::server::ResponseIterator)>>,
-    res: Mutex<Receiver<Vec<u8>>>,
+    req: Mutex<Sender<(String, rosxmlrpc::server::ParameterIterator)>>,
+    res: Mutex<Receiver<rosxmlrpc::server::Answer>>,
 }
 
 type SerdeResult<T> = Result<T, Error>;
@@ -62,7 +62,7 @@ impl Slave {
     }
 
     fn get_bus_stats(&self,
-                     req: &mut rosxmlrpc::server::ResponseIterator)
+                     req: &mut rosxmlrpc::server::ParameterIterator)
                      -> SerdeResult<(&[(String, String, (String, i32, i32, bool))],
                                      &[(String, (String, i32, i32, bool))],
                                      (i32, i32, i32))> {
@@ -76,7 +76,7 @@ impl Slave {
     }
 
     fn get_bus_info(&self,
-                    req: &mut rosxmlrpc::server::ResponseIterator)
+                    req: &mut rosxmlrpc::server::ParameterIterator)
                     -> SerdeResult<&[(String, String, String, String, String, bool)]> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
@@ -91,20 +91,17 @@ impl Slave {
                                      response: SerdeResult<T>,
                                      message: &str)
                                      -> SerdeResult<()> {
-        let mut res = rosxmlrpc::serde::Encoder::new();
+        let mut res = rosxmlrpc::server::Answer::new();
         match response {
-            Ok(value) => (1i32, message, value).encode(&mut res),
-            Err(err) => (-1i32, err.description(), 0).encode(&mut res),
+            Ok(value) => res.add(&(1i32, message, value)),
+            Err(err) => res.add(&(-1i32, err.description(), 0)),
         }?;
 
-        let mut body = Vec::<u8>::new();
-        res.write_response(&mut body)?;
-
-        self.res.lock().unwrap().send(body).unwrap();
+        self.res.lock().unwrap().send(res).unwrap();
         Ok(())
     }
 
-    fn param_update(&self, req: &mut rosxmlrpc::server::ResponseIterator) -> SerdeResult<i32> {
+    fn param_update(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         let key = pop::<String>(req)?;
         let value = pop::<String>(req)?;
@@ -117,7 +114,7 @@ impl Slave {
         }
     }
 
-    fn get_pid(&self, req: &mut rosxmlrpc::server::ResponseIterator) -> SerdeResult<i32> {
+    fn get_pid(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             Ok(unsafe { getpid() })
@@ -126,7 +123,7 @@ impl Slave {
         }
     }
 
-    fn shutdown(&mut self, req: &mut rosxmlrpc::server::ResponseIterator) -> SerdeResult<i32> {
+    fn shutdown(&mut self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             match self.server.shutdown() {
@@ -162,7 +159,7 @@ impl Slave {
     }
 
     fn get_publications(&self,
-                        req: &mut rosxmlrpc::server::ResponseIterator)
+                        req: &mut rosxmlrpc::server::ParameterIterator)
                         -> SerdeResult<Vec<(String, String)>> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
@@ -195,7 +192,7 @@ impl Slave {
     }
 
     fn get_subscriptions(&self,
-                         req: &mut rosxmlrpc::server::ResponseIterator)
+                         req: &mut rosxmlrpc::server::ParameterIterator)
                          -> SerdeResult<Vec<(String, String)>> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
@@ -208,7 +205,7 @@ impl Slave {
         }
     }
 
-    fn publisher_update(&self, req: &mut rosxmlrpc::server::ResponseIterator) -> SerdeResult<i32> {
+    fn publisher_update(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         let topic = pop::<String>(req)?;
         let publishers = pop::<Vec<String>>(req)?;
@@ -226,7 +223,7 @@ impl Slave {
         }
     }
 
-    fn get_master_uri(&self, req: &mut rosxmlrpc::server::ResponseIterator) -> SerdeResult<&str> {
+    fn get_master_uri(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<&str> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             Ok(&self.master_uri)
@@ -236,7 +233,7 @@ impl Slave {
     }
 
     fn request_topic(&self,
-                     req: &mut rosxmlrpc::server::ResponseIterator)
+                     req: &mut rosxmlrpc::server::ParameterIterator)
                      -> SerdeResult<(String, String, i32)> {
         let caller_id = pop::<String>(req)?;
         let topic = pop::<String>(req)?;
@@ -273,7 +270,7 @@ impl Slave {
 
     fn handle_call(&mut self,
                    method_name: &str,
-                   req: &mut rosxmlrpc::server::ResponseIterator)
+                   req: &mut rosxmlrpc::server::ParameterIterator)
                    -> SerdeResult<()> {
         println!("HANDLING METHOD: {}", method_name);
         match method_name {
@@ -338,14 +335,17 @@ impl Slave {
 }
 
 impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
-    fn handle(&self, method_name: &str, req: rosxmlrpc::server::ResponseIterator) -> Vec<u8> {
+    fn handle(&self,
+              method_name: &str,
+              req: rosxmlrpc::server::ParameterIterator)
+              -> rosxmlrpc::server::Answer {
         println!("CALLED METHOD: {}", method_name);
         self.req.lock().unwrap().send((method_name.to_owned(), req)).unwrap();
         self.res.lock().unwrap().recv().unwrap()
     }
 }
 
-fn pop<T: Decodable>(req: &mut rosxmlrpc::server::ResponseIterator) -> SerdeResult<T> {
+fn pop<T: Decodable>(req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<T> {
     req.next()
         .ok_or(Error::Protocol(String::from("Missing parameter")))?
         .read()
