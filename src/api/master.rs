@@ -20,6 +20,36 @@ impl Master {
         data.map(|d| d.0)
     }
 
+    fn remove_tree_wrap(data: MasterResult<rosxmlrpc::XmlRpcValue>)
+                        -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        if let rosxmlrpc::XmlRpcValue::Array(values) = data? {
+            if values.len() != 3 {
+                return Err(rosxmlrpc::error::Error::Deserialization(
+                    rosxmlrpc::serde::decoder::Error::MismatchedDataFormat));
+            }
+            let mut values = values.into_iter();
+            if let Some(rosxmlrpc::XmlRpcValue::Int(code)) = values.next() {
+                if let Some(rosxmlrpc::XmlRpcValue::String(message)) = values.next() {
+                    if let Some(value) = values.next() {
+                        return match code {
+                            0 | -1 => {
+                                Err(rosxmlrpc::error::Error::Deserialization(
+                                    rosxmlrpc::serde::decoder::Error::Other(message)))
+                            }
+                            1 => Ok(value),
+                            _ => {
+                                Err(rosxmlrpc::error::Error::Deserialization(
+                                    rosxmlrpc::serde::decoder::Error::Other(
+                                        String::from("Invalid response code returned by ROS"))))
+                            }
+                        };
+                    }
+                }
+            }
+        }
+        Err(rosxmlrpc::serde::decoder::Error::MismatchedDataFormat)?
+    }
+
     fn request<T: Decodable>(&self, function_name: &str, parameters: &[&str]) -> MasterResult<T> {
         let mut request = rosxmlrpc::client::Request::new(function_name);
         for parameter in parameters {
@@ -96,6 +126,13 @@ impl Master {
 
     pub fn get_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
         self.request("getParam", &[self.client_id.as_str(), key])
+    }
+
+    pub fn get_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        let mut request = rosxmlrpc::client::Request::new("getParam");
+        request.add(&self.client_id)?;
+        request.add(&key)?;
+        Master::remove_tree_wrap(self.client.request_tree(request))
     }
 
     pub fn search_param(&self, key: &str) -> MasterResult<String> {

@@ -16,6 +16,23 @@ impl Client {
         }
     }
 
+    pub fn request_tree(&self, request: Request) -> ClientResult<serde::XmlRpcValue> {
+        let mut body = Vec::<u8>::new();
+        request.encoder.write_request(&request.name, &mut body)?;
+
+        let body = String::from_utf8(body)?;
+        let res = self.http_client
+            .post(&self.server_uri)
+            .body(&body)
+            .send()?;
+
+        let mut res = serde::Decoder::new_response(res)?;
+
+        Ok(res.pop()
+            .ok_or(Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?
+            .value())
+    }
+
     pub fn request<T: Decodable>(&self, request: Request) -> ClientResult<T> {
         let mut body = Vec::<u8>::new();
         request.encoder.write_request(&request.name, &mut body)?;

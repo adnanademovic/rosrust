@@ -9,6 +9,7 @@ pub enum XmlRpcValue {
     String(String),
     Double(f64),
     Array(Vec<XmlRpcValue>),
+    Struct(Vec<(String, XmlRpcValue)>),
 }
 
 #[derive(Debug)]
@@ -39,6 +40,15 @@ impl std::fmt::Display for XmlRpcValue {
                     item.fmt(f)?;
                 }
                 write!(f, "</data></array></value>")
+            }
+            XmlRpcValue::Struct(ref v) => {
+                write!(f, "<value><struct>")?;
+                for &(ref name, ref item) in v {
+                    write!(f, "<member><name>{}</name>", name)?;
+                    item.fmt(f)?;
+                    write!(f, "</member>")?;
+                }
+                write!(f, "</struct></value>")
             }
         }
     }
@@ -115,8 +125,32 @@ impl XmlRpcValue {
         XmlRpcValue::from_tree(Tree::new(body)?)
     }
 
+    fn read_member(tree: Tree) -> Result<(String, XmlRpcValue), DecodeError> {
+        if let Tree::Node(key, mut children) = tree {
+            if key != "member" {
+                return Err(DecodeError::BadXmlStructure);
+            }
+            if children.len() != 2 {
+                return Err(DecodeError::BadXmlStructure);
+            }
+            if let Some(value) = children.pop() {
+                if let Some(name_node) = children.pop() {
+                    if let Tree::Leaf(name) = name_node.peel_layer("name")? {
+                        return XmlRpcValue::from_tree(value).and_then(|v| Ok((name, v)));
+                    }
+                }
+            }
+        }
+        Err(DecodeError::BadXmlStructure)
+    }
+
     fn from_tree(tree: Tree) -> Result<XmlRpcValue, DecodeError> {
         if let Ok(Tree::Node(key, mut values)) = tree.peel_layer("value") {
+            if key == "struct" {
+                return Ok(XmlRpcValue::Struct(values.into_iter()
+                    .map(XmlRpcValue::read_member)
+                    .collect::<Result<Vec<(String, XmlRpcValue)>, DecodeError>>()?));
+            }
             if values.len() > 1 {
                 return Err(DecodeError::BadXmlStructure);
             }
@@ -332,6 +366,45 @@ mod tests {
     }
 
     #[test]
+    fn reads_struct() {
+        let data = r#"<?xml version="1.0"?>
+<value><struct>
+  <member>
+    <name>a</name>
+    <value><i4>41</i4></value>
+  </member>
+  <member>
+    <name>b</name>
+    <value><boolean>1</boolean></value>
+  </member>
+  <member>
+    <name>c</name>
+    <value><struct>
+      <member>
+        <name>xxx</name>
+        <value><string>Hello</string></value>
+      </member>
+      <member>
+        <name>yyy</name>
+        <value><double>0.5</double></value>
+      </member>
+    </struct></value>
+  </member>
+</struct></value>"#;
+        let mut cursor = std::io::Cursor::new(data.as_bytes());
+        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        assert_eq!(XmlRpcValue::Struct(vec![
+            (String::from("a"), XmlRpcValue::Int(41)),
+            (String::from("b"), XmlRpcValue::Bool(true)),
+            (String::from("c"), XmlRpcValue::Struct(vec![
+                (String::from("xxx"), XmlRpcValue::String(String::from("Hello"))),
+                (String::from("yyy"), XmlRpcValue::Double(0.5)),
+            ])),
+        ]),
+                   value);
+    }
+
+    #[test]
     fn reads_request() {
         let data = r#"<?xml version="1.0"?>
 <methodCall>
@@ -452,6 +525,42 @@ mod tests {
                                    XmlRpcValue::Double(0.5),
                                ]),
                            ])));
+    }
+
+    #[test]
+    fn writes_struct() {
+        assert_eq!(concat!(r#"<value><struct>"#,
+                           r#"<member>"#,
+                           r#"<name>a</name>"#,
+                           r#"<value><i4>41</i4></value>"#,
+                           r#"</member>"#,
+                           r#"<member>"#,
+                           r#"<name>b</name>"#,
+                           r#"<value><boolean>1</boolean></value>"#,
+                           r#"</member>"#,
+                           r#"<member>"#,
+                           r#"<name>c</name>"#,
+                           r#"<value><struct>"#,
+                           r#"<member>"#,
+                           r#"<name>xxx</name>"#,
+                           r#"<value><string>Hello</string></value>"#,
+                           r#"</member>"#,
+                           r#"<member>"#,
+                           r#"<name>yyy</name>"#,
+                           r#"<value><double>0.5</double></value>"#,
+                           r#"</member>"#,
+                           r#"</struct></value>"#,
+                           r#"</member>"#,
+                           r#"</struct></value>"#),
+                   format!("{}",
+                           XmlRpcValue::Struct(vec![
+                       (String::from("a"), XmlRpcValue::Int(41)),
+                       (String::from("b"), XmlRpcValue::Bool(true)),
+                       (String::from("c"), XmlRpcValue::Struct(vec![
+                           (String::from("xxx"), XmlRpcValue::String(String::from("Hello"))),
+                           (String::from("yyy"), XmlRpcValue::Double(0.5)),
+                       ])),
+                   ])));
     }
 
     #[test]
