@@ -82,42 +82,38 @@ impl XmlRpcRequest {
             if key != "methodCall" || children.len() != 2 {
                 return Err(DecodeError::BadXmlStructure);
             }
-            let parameters = children.pop().ok_or(DecodeError::BadXmlStructure)?;
-            let method =
-                children.pop().ok_or(DecodeError::BadXmlStructure)?.peel_layer("methodName")?;
-            if let Tree::Leaf(method) = method {
-                if let Tree::Node(key, parameters) = parameters {
-                    if key != "params" {
-                        return Err(DecodeError::BadXmlStructure);
-                    }
-                    return Ok(XmlRpcRequest {
-                        method: method,
-                        parameters: parameters.into_iter()
-                            .map(|v| XmlRpcValue::from_tree(v.peel_layer("param")?))
-                            .collect::<Result<_, _>>()?,
-                    });
+            let parameters_tree = children.pop().ok_or(DecodeError::BadXmlStructure)?;
+            let method = children.pop().ok_or(DecodeError::BadXmlStructure)?;
+            match method.peel_layer("methodName") {
+                Ok(Tree::Leaf(method_name)) => {
+                    Ok(XmlRpcRequest {
+                        method: method_name,
+                        parameters: extract_parameters(parameters_tree)?,
+                    })
                 }
+                Ok(_) => Err(DecodeError::BadXmlStructure),
+                Err(err) => Err(err),
             }
+        } else {
+            Err(DecodeError::BadXmlStructure)
         }
-        Err(DecodeError::BadXmlStructure)
     }
 }
 
 impl XmlRpcResponse {
     pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcResponse, DecodeError> {
-        let parameters = Tree::new(body)?.peel_layer("methodResponse")?;
-        if let Tree::Node(key, parameters) = parameters {
-            if key != "params" {
-                return Err(DecodeError::BadXmlStructure);
-            }
-            return Ok(XmlRpcResponse {
-                parameters: parameters.into_iter()
-                    .map(|v| XmlRpcValue::from_tree(v.peel_layer("param")?))
-                    .collect::<Result<_, _>>()?,
-            });
-        }
-        return Err(DecodeError::BadXmlStructure);
+        extract_parameters(Tree::new(body)?.peel_layer("methodResponse")?)
+            .map(|parameters| XmlRpcResponse { parameters: parameters })
     }
+}
+
+fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>, DecodeError> {
+    if let Tree::Node(key, parameters) = parameters {
+        if key == "params" {
+            return parameters.into_iter().map(XmlRpcValue::from_parameter).collect();
+        }
+    }
+    Err(DecodeError::BadXmlStructure)
 }
 
 impl XmlRpcValue {
@@ -127,10 +123,7 @@ impl XmlRpcValue {
 
     fn read_member(tree: Tree) -> Result<(String, XmlRpcValue), DecodeError> {
         if let Tree::Node(key, mut children) = tree {
-            if key != "member" {
-                return Err(DecodeError::BadXmlStructure);
-            }
-            if children.len() != 2 {
+            if key != "member" || children.len() != 2 {
                 return Err(DecodeError::BadXmlStructure);
             }
             if let Some(value) = children.pop() {
@@ -142,6 +135,10 @@ impl XmlRpcValue {
             }
         }
         Err(DecodeError::BadXmlStructure)
+    }
+
+    fn from_parameter(tree: Tree) -> Result<XmlRpcValue, DecodeError> {
+        XmlRpcValue::from_tree(tree.peel_layer("param")?)
     }
 
     fn from_tree(tree: Tree) -> Result<XmlRpcValue, DecodeError> {
