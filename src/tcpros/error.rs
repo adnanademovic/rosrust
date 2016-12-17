@@ -1,12 +1,59 @@
 use std;
 
 #[derive(Debug)]
+pub enum EncodeError {
+    UnsupportedData,
+    Io(std::io::Error),
+}
+
+impl std::fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            EncodeError::UnsupportedData => write!(f, "Error: Data type not supported by TCPROS"),
+            EncodeError::Io(ref err) => write!(f, "IO error: {}", err),
+        }
+    }
+}
+
+impl From<std::io::Error> for EncodeError {
+    fn from(err: std::io::Error) -> EncodeError {
+        EncodeError::Io(err)
+    }
+}
+
+impl std::error::Error for EncodeError {
+    fn description(&self) -> &str {
+        match *self {
+            EncodeError::UnsupportedData => "Data type not supported by TCPROS",
+            EncodeError::Io(ref err) => err.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match *self {
+            EncodeError::UnsupportedData => None,
+            EncodeError::Io(ref err) => Some(err),
+        }
+    }
+}
+
+
+#[derive(Debug)]
 pub enum Error {
     UnsupportedData,
     Mismatch,
     Truncated,
     Io(std::io::Error),
     Other(String),
+}
+
+impl From<EncodeError> for Error {
+    fn from(err: EncodeError) -> Error {
+        match err {
+            EncodeError::UnsupportedData => Error::UnsupportedData,
+            EncodeError::Io(err) => Error::Io(err),
+        }
+    }
 }
 
 impl From<String> for Error {
