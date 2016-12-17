@@ -8,7 +8,7 @@ use super::slave::Slave;
 use super::error::ServerError;
 use rosxmlrpc::error::Error;
 use rosxmlrpc;
-use tcpros::message::RosMessage;
+use tcpros::Message;
 use tcpros;
 
 pub struct Ros {
@@ -60,7 +60,7 @@ impl Ros {
     }
 
     pub fn subscribe<T>(&mut self, topic: &str) -> Result<mpsc::Receiver<T>, Error>
-        where T: RosMessage + Decodable + Send + 'static
+        where T: Message + Decodable + Send + 'static
     {
         if let Some(rx_publishers) = self.slave.add_subscription(topic, &T::msg_type()) {
             match self.master.register_subscriber(topic, &T::msg_type()) {
@@ -92,7 +92,7 @@ impl Ros {
     }
 
     pub fn publish<T>(&mut self, topic: &str) -> Result<mpsc::Sender<T>, ServerError>
-        where T: RosMessage + Encodable + Clone + Send + 'static
+        where T: Message + Encodable + Clone + Send + 'static
     {
         if self.slave.is_publishing_to(topic) {
             return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
@@ -119,7 +119,7 @@ impl Ros {
 }
 
 fn connect_subscriber<T>(caller_id: &str, publisher: &str, topic: &str, tx: mpsc::Sender<T>)
-    where T: RosMessage + Decodable + Send + 'static
+    where T: Message + Decodable + Send + 'static
 {
     let (protocol, hostname, port) = request_topic(publisher, caller_id, topic).unwrap();
     if protocol != "TCPROS" {

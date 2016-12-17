@@ -9,10 +9,10 @@ use std;
 use super::encoder::Encoder;
 use super::error::Error;
 use super::header::{encode, decode};
-use super::message::RosMessage;
+use super::Message;
 
 pub struct Publisher<T>
-    where T: RosMessage + Encodable + Clone + Send + 'static
+    where T: Message + Encodable + Clone + Send + 'static
 {
     sender_receiver: mpsc::Receiver<mpsc::Sender<T>>,
     senders: Vec<mpsc::Sender<T>>,
@@ -24,18 +24,18 @@ fn handle_stream<T>(topic: String,
                     mut stream: TcpStream,
                     rx: mpsc::Receiver<T>)
                     -> Result<(), Error>
-    where T: RosMessage + Encodable + Clone + Send
+    where T: Message + Encodable + Clone + Send
 {
     let caller_id: String;
     {
         let mut bytes = [0u8; 4];
-        try!(stream.read_exact(&mut bytes));
+        stream.read_exact(&mut bytes)?;
         let mut reader = std::io::Cursor::new(bytes);
-        let data_length = try!(reader.read_u32::<LittleEndian>());
+        let data_length = reader.read_u32::<LittleEndian>()?;
         let mut payload = vec![0u8; data_length as usize];
-        try!(stream.read_exact(&mut payload));
+        stream.read_exact(&mut payload)?;
         let data = bytes.iter().chain(payload.iter()).cloned().collect();
-        let fields = try!(decode(data));
+        let fields = decode(data)?;
         if fields.get("md5sum") != Some(&T::md5sum()) {
             return Err(Error::Mismatch);
         }
@@ -58,13 +58,13 @@ fn handle_stream<T>(topic: String,
         let mut fields = std::collections::HashMap::<String, String>::new();
         fields.insert("md5sum".to_owned(), T::md5sum());
         fields.insert("type".to_owned(), T::msg_type());
-        let fields = try!(encode(fields));
-        try!(stream.write_all(&fields));
+        let fields = encode(fields)?;
+        stream.write_all(&fields)?;
     }
     while let Ok(v) = rx.recv() {
         let mut encoder = Encoder::new();
-        try!(v.encode(&mut encoder));
-        try!(stream.write_all(&encoder.extract_data()));
+        v.encode(&mut encoder)?;
+        stream.write_all(&encoder.extract_data())?;
     }
     Ok(())
 }
@@ -73,10 +73,10 @@ fn listen<T>(topic: String,
              listener: TcpListener,
              tx_sender: mpsc::Sender<mpsc::Sender<T>>)
              -> Result<(), Error>
-    where T: RosMessage + Encodable + Clone + Send + 'static
+    where T: Message + Encodable + Clone + Send + 'static
 {
     for stream in listener.incoming() {
-        let stream = try!(stream);
+        let stream = stream?;
         let (tx, rx) = mpsc::channel();
         if let Err(_) = tx_sender.send(tx) {
             // Stop once the corresponding Publisher gets destroyed
@@ -89,14 +89,14 @@ fn listen<T>(topic: String,
 }
 
 impl<T> Publisher<T>
-    where T: RosMessage + Encodable + Clone + Send + 'static
+    where T: Message + Encodable + Clone + Send + 'static
 {
     pub fn new<U>(address: U, topic: &str) -> Result<Publisher<T>, Error>
         where U: ToSocketAddrs
     {
-        let listener = try!(TcpListener::bind(address));
+        let listener = TcpListener::bind(address)?;
         let (tx_sender, rx_sender) = mpsc::channel();
-        let socket_address = try!(listener.local_addr());
+        let socket_address = listener.local_addr()?;
         let topic = topic.to_owned();
         thread::spawn(move || listen(topic, listener, tx_sender));
         Ok(Publisher {

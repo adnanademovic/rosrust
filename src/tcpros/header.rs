@@ -3,18 +3,15 @@ use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std;
 use super::{Decoder, Encoder};
-use super::error::{Error, EncodeError};
-
-fn number_to_result(n: &u8) -> Result<u8, std::io::Error> {
-    Ok(*n)
-}
+use super::error::Error;
 
 pub fn decode(data: Vec<u8>) -> Result<HashMap<String, String>, Error> {
     let vector_length = data.len();
-    let mut decoder = Decoder::new(data.iter().map(number_to_result));
+    let reader = std::io::Cursor::new(data);
+    let mut decoder = Decoder::new(reader);
     let length = decoder.pop_length()? as usize;
     if length + 4 != vector_length {
-        return Err(Error::Truncated);
+        return Err(Error::Mismatch);
     }
     let mut result = HashMap::<String, String>::new();
     let mut size_count = 0;
@@ -29,12 +26,12 @@ pub fn decode(data: Vec<u8>) -> Result<HashMap<String, String>, Error> {
     Ok(result)
 }
 
-pub fn encode(data: HashMap<String, String>) -> Result<Vec<u8>, EncodeError> {
+pub fn encode(data: HashMap<String, String>) -> Result<Vec<u8>, Error> {
     let mut encoder = Encoder::new();
     for (key, value) in data {
         [key, value].join("=").encode(&mut encoder)?;
     }
-    let mut buffer = vec![];
+    let mut buffer = Vec::new();
     let mut data = encoder.extract_data();
     buffer.reserve(4 + data.len());
     buffer.write_u32::<LittleEndian>(data.len() as u32)?;

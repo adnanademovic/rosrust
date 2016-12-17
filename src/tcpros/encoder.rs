@@ -1,6 +1,6 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize;
-use super::error::EncodeError as Error;
+use super::error::Error;
 
 #[derive(Debug)]
 pub struct Encoder {

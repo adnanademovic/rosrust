@@ -7,22 +7,22 @@ use std::thread;
 use std;
 use super::error::Error;
 use super::header::{encode, decode};
-use super::message::RosMessage;
+use super::Message;
 use super::decoder::Decoder;
 
 pub struct Subscriber<T>
-    where T: RosMessage + Decodable + Send + 'static
+    where T: Message + Decodable + Send + 'static
 {
     rx: mpsc::Receiver<T>,
 }
 
 impl<T> Subscriber<T>
-    where T: RosMessage + Decodable + Send + 'static
+    where T: Message + Decodable + Send + 'static
 {
     pub fn new<U>(address: U, caller_id: &str, topic: &str) -> Result<Subscriber<T>, Error>
         where U: ToSocketAddrs
     {
-        let mut stream = try!(TcpStream::connect(address));
+        let mut stream = TcpStream::connect(address)?;
         {
             let mut fields = std::collections::HashMap::<String, String>::new();
             fields.insert("message_definition".to_owned(), T::msg_definition());
@@ -31,19 +31,19 @@ impl<T> Subscriber<T>
             fields.insert("md5sum".to_owned(), T::md5sum());
             fields.insert("type".to_owned(), T::msg_type());
 
-            let fields = try!(encode(fields));
+            let fields = encode(fields)?;
 
-            try!(stream.write_all(&fields));
+            stream.write_all(&fields)?;
         }
         {
             let mut bytes = [0u8; 4];
-            try!(stream.read_exact(&mut bytes));
+            stream.read_exact(&mut bytes)?;
             let mut reader = std::io::Cursor::new(bytes);
-            let data_length = try!(reader.read_u32::<LittleEndian>());
+            let data_length = reader.read_u32::<LittleEndian>()?;
             let mut payload = vec![0u8; data_length as usize];
-            try!(stream.read_exact(&mut payload));
+            stream.read_exact(&mut payload)?;
             let data = bytes.iter().chain(payload.iter()).cloned().collect();
-            let fields = try!(decode(data));
+            let fields = decode(data)?;
             if fields.get("md5sum") != Some(&T::md5sum()) {
                 return Err(Error::Mismatch);
             }
@@ -63,14 +63,14 @@ impl<T> Subscriber<T>
 fn spin_subscriber<T>(stream: TcpStream, tx: mpsc::Sender<T>) -> Result<(), Error>
     where T: Decodable
 {
-    let mut stream = Decoder::new(stream.bytes());
-    while let Ok(()) = tx.send(try!(T::decode(&mut stream))) {
+    let mut stream = Decoder::new(stream);
+    while let Ok(()) = tx.send(T::decode(&mut stream)?) {
     }
     Ok(())
 }
 
 impl<T> std::iter::Iterator for Subscriber<T>
-    where T: RosMessage + Decodable + Send + 'static
+    where T: Message + Decodable + Send + 'static
 {
     type Item = T;
 
