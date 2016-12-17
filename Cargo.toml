@@ -11,7 +11,7 @@ readme = "README.md"
 byteorder = "0.5"
 rustc-serialize = "0.3"
 xml-rs = "0.3"
-libc = "0.2"
+nix = "0.7"
 regex = "0.1"
 lazy_static = "0.2"
 

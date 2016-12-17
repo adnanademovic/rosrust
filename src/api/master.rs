@@ -1,5 +1,6 @@
 use rosxmlrpc;
 use rustc_serialize::{Decodable, Decoder, Encodable};
+use super::value::Topic;
 
 pub struct Master {
     client: rosxmlrpc::Client,
@@ -20,18 +21,42 @@ impl Master {
         data.map(|d| d.0)
     }
 
-    fn request<T: Decodable>(&self, function_name: &str, parameters: &[&str]) -> MasterResult<T> {
-        Master::remove_wrap(self.client
-            .request(function_name, parameters))
+    fn remove_tree_wrap(data: MasterResult<rosxmlrpc::XmlRpcValue>)
+                        -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        if let rosxmlrpc::XmlRpcValue::Array(values) = data? {
+            if values.len() != 3 {
+                return Err(rosxmlrpc::error::Error::Deserialization(
+                    rosxmlrpc::serde::decoder::Error::MismatchedDataFormat));
+            }
+            let mut values = values.into_iter();
+            if let Some(rosxmlrpc::XmlRpcValue::Int(code)) = values.next() {
+                if let Some(rosxmlrpc::XmlRpcValue::String(message)) = values.next() {
+                    if let Some(value) = values.next() {
+                        return match code {
+                            0 | -1 => {
+                                Err(rosxmlrpc::error::Error::Deserialization(
+                                    rosxmlrpc::serde::decoder::Error::Other(message)))
+                            }
+                            1 => Ok(value),
+                            _ => {
+                                Err(rosxmlrpc::error::Error::Deserialization(
+                                    rosxmlrpc::serde::decoder::Error::Other(
+                                        String::from("Invalid response code returned by ROS"))))
+                            }
+                        };
+                    }
+                }
+            }
+        }
+        Err(rosxmlrpc::serde::decoder::Error::MismatchedDataFormat)?
     }
 
-    fn request_long<T: Decodable, Targ: Encodable>(&self,
-                                                   function_name: &str,
-                                                   parameters: &[&str],
-                                                   extra_parameter: Targ)
-                                                   -> MasterResult<T> {
-        Master::remove_wrap(self.client
-            .request_long(function_name, parameters, Some(&extra_parameter)))
+    fn request<T: Decodable>(&self, function_name: &str, parameters: &[&str]) -> MasterResult<T> {
+        let mut request = rosxmlrpc::client::Request::new(function_name);
+        for parameter in parameters {
+            request.add(parameter)?;
+        }
+        Master::remove_wrap(self.client.request(request))
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
@@ -72,11 +97,11 @@ impl Master {
         self.request("getPublishedTopics", &[self.client_id.as_str(), subgraph])
     }
 
-    pub fn get_topic_types(&self) -> MasterResult<Vec<(String, String)>> {
+    pub fn get_topic_types(&self) -> MasterResult<Vec<Topic>> {
         self.request("getTopicTypes", &[self.client_id.as_str()])
     }
 
-    pub fn get_system_state(&self) -> MasterResult<Vec<Vec<(String, Vec<String>)>>> {
+    pub fn get_system_state(&self) -> MasterResult<SystemState> {
         self.request("getSystemState", &[self.client_id.as_str()])
     }
 
@@ -93,11 +118,22 @@ impl Master {
     }
 
     pub fn set_param<T: Encodable>(&self, key: &str, value: &T) -> MasterResult<i32> {
-        self.request_long("setParam", &[self.client_id.as_str(), key], value)
+        let mut request = rosxmlrpc::client::Request::new("setParam");
+        request.add(&self.client_id)?;
+        request.add(&key)?;
+        request.add(value)?;
+        Master::remove_wrap(self.client.request(request))
     }
 
     pub fn get_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
         self.request("getParam", &[self.client_id.as_str(), key])
+    }
+
+    pub fn get_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        let mut request = rosxmlrpc::client::Request::new("getParam");
+        request.add(&self.client_id)?;
+        request.add(&key)?;
+        Master::remove_tree_wrap(self.client.request_tree(request))
     }
 
     pub fn search_param(&self, key: &str) -> MasterResult<String> {
@@ -107,6 +143,14 @@ impl Master {
     pub fn subscribe_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
         self.request("subscribeParam",
                      &[self.client_id.as_str(), self.caller_api.as_str(), key])
+    }
+
+    pub fn subscribe_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        let mut request = rosxmlrpc::client::Request::new("subscribeParam");
+        request.add(&self.client_id)?;
+        request.add(&self.caller_api)?;
+        request.add(&key)?;
+        Master::remove_tree_wrap(self.client.request_tree(request))
     }
 
     pub fn unsubscribe_param(&self, key: &str) -> MasterResult<i32> {
@@ -128,18 +172,31 @@ pub type Error = rosxmlrpc::error::Error;
 pub type MasterResult<T> = Result<T, Error>;
 
 #[derive(Debug)]
-pub struct ResponseData<T>(T);
+struct ResponseData<T>(T);
 
 impl<T: Decodable> Decodable for ResponseData<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<ResponseData<T>, D::Error> {
         d.read_struct("ResponseData", 3, |d| {
-            let code = try!(d.read_struct_field("status_code", 0, |d| d.read_i32()));
-            let message = try!(d.read_struct_field("status_message", 1, |d| d.read_str()));
+            let code = d.read_struct_field("status_code", 0, |d| d.read_i32())?;
+            let message = d.read_struct_field("status_message", 1, |d| d.read_str())?;
             match code {
                 0 | -1 => Err(d.error(&message)),
-                1 => Ok(ResponseData(try!(d.read_struct_field("data", 2, |d| T::decode(d))))),
+                1 => Ok(ResponseData(d.read_struct_field("data", 2, |d| T::decode(d))?)),
                 _ => Err(d.error("Invalid response code returned by ROS")),
             }
         })
     }
+}
+
+#[derive(RustcDecodable)]
+pub struct TopicData {
+    pub name: String,
+    pub connections: Vec<String>,
+}
+
+#[derive(RustcDecodable)]
+pub struct SystemState {
+    pub publishers: Vec<TopicData>,
+    pub subscribers: Vec<TopicData>,
+    pub services: Vec<TopicData>,
 }

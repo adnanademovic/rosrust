@@ -1,103 +1,47 @@
-use xml;
 use rustc_serialize;
 use std;
+use std::error::Error as ErrorTrait;
+use super::value;
 
 pub struct Decoder {
-    tree: std::vec::IntoIter<FlatTree>,
+    value: value::XmlRpcValue,
+    chain: std::vec::IntoIter<(value::XmlRpcValue, usize)>,
 }
 
 impl Decoder {
-    pub fn new<T: std::io::Read>(body: T) -> Decoder {
-        Decoder { tree: Tree::new(body).map(flatten_tree).unwrap_or(vec![].into_iter()) }
-    }
-
-    pub fn peel_named_layer(&mut self, name: &str) -> Result<(), Error> {
-        if let Some(FlatTree::Node(key, length)) = self.tree.next() {
-            if key == name && length == 1 {
-                return Ok(());
-            }
+    pub fn new(body: value::XmlRpcValue) -> Decoder {
+        let mut chain = vec![];
+        append_elements(&mut chain, &body);
+        Decoder {
+            value: body,
+            chain: chain.into_iter(),
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
-    fn peel_layer(&mut self) -> Result<(String, usize), Error> {
-        if let Some(FlatTree::Node(key, length)) = self.tree.next() {
-            if key == "value" && length == 1 {
-                if let Some(FlatTree::Node(key, length)) = self.tree.next() {
-                    return Ok((key, length));
-                }
-            }
+    pub fn new_request<T: std::io::Read>(body: T)
+                                         -> Result<(String, Vec<Decoder>), value::DecodeError> {
+        let value = value::XmlRpcRequest::new(body)?;
+        Ok((value.method, value.parameters.into_iter().map(Decoder::new).collect()))
+    }
+
+    pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>, value::DecodeError> {
+        let value = value::XmlRpcResponse::new(body)?;
+        Ok(value.parameters.into_iter().map(Decoder::new).collect())
+    }
+
+    pub fn value(self) -> value::XmlRpcValue {
+        self.value
+    }
+}
+
+fn append_elements(array: &mut Vec<(value::XmlRpcValue, usize)>, v: &value::XmlRpcValue) {
+    if let &value::XmlRpcValue::Array(ref children) = v {
+        array.push((value::XmlRpcValue::Array(vec![]), children.len()));
+        for child in children {
+            append_elements(array, child);
         }
-        Err(Error::UnsupportedDataFormat)
-    }
-
-    pub fn peel_response_body(&mut self) -> Result<(), Error> {
-        try!(self.peel_named_layer("methodResponse"));
-        try!(self.peel_named_layer("params"));
-        try!(self.peel_named_layer("param"));
-        Ok(())
-    }
-
-    pub fn peel_request_body(&mut self) -> Result<(String, usize), Error> {
-        if let Some(FlatTree::Node(key, length)) = self.tree.next() {
-            if key == "methodCall" && length == 2 {
-                try!(self.peel_named_layer("methodName"));
-                if let Some(FlatTree::Leaf(method_name)) = self.tree.next() {
-                    if let Some(FlatTree::Node(key, children)) = self.tree.next() {
-                        if key == "params" {
-                            return Ok((method_name, children));
-                        }
-                    }
-                }
-            }
-        }
-        Err(Error::UnsupportedDataFormat)
-    }
-
-    pub fn decode_request_parameter<T: rustc_serialize::Decodable>(&mut self) -> Result<T, Error> {
-        try!(self.peel_named_layer("param"));
-        T::decode(self)
-    }
-
-    pub fn decode_request_parameter_node(&mut self) -> Result<XmlRpcValue, Error> {
-        try!(self.peel_named_layer("param"));
-        self.decode_node()
-    }
-
-    pub fn decode_node(&mut self) -> Result<XmlRpcValue, Error> {
-        let (key, length) = try!(self.peel_layer());
-        if key == "string" && length == 0 {
-            return Ok(XmlRpcValue::String("".to_owned()));
-        }
-        if length != 1 {
-            return Err(Error::UnsupportedDataFormat);
-        }
-        if key == "array" {
-            if let Some(FlatTree::Node(key, length)) = self.tree.next() {
-                if key != "data" {
-                    return Err(Error::UnsupportedDataFormat);
-                }
-                let mut children = vec![];
-                for _ in 0..length {
-                    children.push(try!(self.decode_node()))
-                }
-                Ok(XmlRpcValue::Array(children))
-            } else {
-                return Err(Error::UnsupportedDataFormat);
-            }
-        } else {
-            let value = match self.tree.next() {
-                Some(FlatTree::Leaf(value)) => value,
-                _ => return Err(Error::UnsupportedDataFormat),
-            };
-            match key.as_str() {
-                "i4" | "int" => Ok(XmlRpcValue::Int(try!(value.parse()))),
-                "boolean" => Ok(XmlRpcValue::Bool(try!(value.parse::<i32>()) != 0)),
-                "string" => Ok(XmlRpcValue::String(value)),
-                "double" => Ok(XmlRpcValue::Double(try!(value.parse()))),
-                _ => Err(Error::UnsupportedDataFormat),
-            }
-        }
+    } else {
+        array.push((v.clone(), 0));
     }
 }
 
@@ -137,13 +81,11 @@ impl rustc_serialize::Decoder for Decoder {
     }
 
     fn read_i32(&mut self) -> Result<i32, Self::Error> {
-        let (key, length) = try!(self.peel_layer());
-        if length == 1 && (key == "i4" || key == "int") {
-            if let Some(FlatTree::Leaf(value)) = self.tree.next() {
-                return Ok(try!(value.parse::<i32>()));
-            }
+        if let Some((value::XmlRpcValue::Int(v), _)) = self.chain.next() {
+            Ok(v)
+        } else {
+            Err(Error::MismatchedDataFormat)
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
     fn read_i16(&mut self) -> Result<i16, Self::Error> {
@@ -155,23 +97,19 @@ impl rustc_serialize::Decoder for Decoder {
     }
 
     fn read_bool(&mut self) -> Result<bool, Self::Error> {
-        let (key, length) = try!(self.peel_layer());
-        if length == 1 && key == "boolean" {
-            if let Some(FlatTree::Leaf(value)) = self.tree.next() {
-                return Ok(try!(value.parse::<i32>()) != 0);
-            }
+        if let Some((value::XmlRpcValue::Bool(v), _)) = self.chain.next() {
+            Ok(v)
+        } else {
+            Err(Error::MismatchedDataFormat)
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
     fn read_f64(&mut self) -> Result<f64, Self::Error> {
-        let (key, length) = try!(self.peel_layer());
-        if length == 1 && key == "double" {
-            if let Some(FlatTree::Leaf(value)) = self.tree.next() {
-                return Ok(try!(value.parse::<f64>()));
-            }
+        if let Some((value::XmlRpcValue::Double(v), _)) = self.chain.next() {
+            Ok(v)
+        } else {
+            Err(Error::MismatchedDataFormat)
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
     fn read_f32(&mut self) -> Result<f32, Self::Error> {
@@ -183,17 +121,11 @@ impl rustc_serialize::Decoder for Decoder {
     }
 
     fn read_str(&mut self) -> Result<String, Self::Error> {
-        let (key, length) = try!(self.peel_layer());
-        if key == "string" {
-            if length == 1 {
-                if let Some(FlatTree::Leaf(value)) = self.tree.next() {
-                    return Ok(value);
-                }
-            } else if length == 0 {
-                return Ok("".to_owned());
-            }
+        if let Some((value::XmlRpcValue::String(v), _)) = self.chain.next() {
+            Ok(v)
+        } else {
+            Err(Error::MismatchedDataFormat)
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
     fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T, Self::Error>
@@ -242,18 +174,18 @@ impl rustc_serialize::Decoder for Decoder {
         f(self)
     }
 
-    fn read_tuple<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
+    fn read_tuple<T, F>(&mut self, l: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        let (key, length) = try!(self.peel_layer());
-        if length == 1 && key == "array" {
-            if let Some(FlatTree::Node(key, _)) = self.tree.next() {
-                if key == "data" {
-                    return f(self);
-                }
+        if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
+            if l == len {
+                f(self)
+            } else {
+                Err(Error::MismatchedDataFormat)
             }
+        } else {
+            Err(Error::MismatchedDataFormat)
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
     fn read_tuple_arg<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
@@ -283,15 +215,11 @@ impl rustc_serialize::Decoder for Decoder {
     fn read_seq<T, F>(&mut self, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
     {
-        let (key, length) = try!(self.peel_layer());
-        if length == 1 && key == "array" {
-            if let Some(FlatTree::Node(key, length)) = self.tree.next() {
-                if key == "data" {
-                    return f(self, length);
-                }
-            }
+        if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
+            f(self, len)
+        } else {
+            Err(Error::MismatchedDataFormat)
         }
-        Err(Error::UnsupportedDataFormat)
     }
 
     fn read_seq_elt<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
@@ -318,139 +246,244 @@ impl rustc_serialize::Decoder for Decoder {
         Err(Error::UnsupportedDataFormat)
     }
 
-    fn error(&mut self, err: &str) -> Self::Error {
-        Error::Decoding(err.to_owned())
+    fn error(&mut self, s: &str) -> Self::Error {
+        Error::Other(String::from(s))
     }
-}
-
-enum Node {
-    Open(String),
-    Data(String),
-    Close(String),
-}
-
-enum Tree {
-    Leaf(String),
-    Node(String, Vec<Tree>),
-}
-
-enum FlatTree {
-    Leaf(String),
-    Node(String, usize),
-}
-
-fn flatten_tree(tree: Tree) -> std::vec::IntoIter<FlatTree> {
-    match tree {
-        Tree::Leaf(value) => vec![FlatTree::Leaf(value)].into_iter(),
-        Tree::Node(key, children) => {
-            let mut result = vec![FlatTree::Node(key, children.len())];
-            for child in children.into_iter().map(flatten_tree) {
-                for node in child {
-                    result.push(node);
-                }
-            }
-            result.into_iter()
-        }
-    }
-}
-
-impl Tree {
-    fn new<T: std::io::Read>(body: T) -> Result<Tree, Error> {
-        try!(parse_tree(&mut xml::EventReader::new(body))).ok_or(Error::UnsupportedDataFormat)
-    }
-}
-
-fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Option<Tree>, Error> {
-    match try!(next_node(reader)) {
-        Node::Close(..) => Ok(None),
-        Node::Data(value) => Ok(Some(Tree::Leaf(value))),
-        Node::Open(name) => {
-            Ok(Some(Tree::Node(name, {
-                let mut children = Vec::<Tree>::new();
-                while let Some(node) = try!(parse_tree(reader)) {
-                    children.push(node);
-                }
-                children
-            })))
-        }
-    }
-}
-
-fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Node, Error> {
-    match try!(reader.next()) {
-        xml::reader::XmlEvent::StartElement { name, .. } => Ok(Node::Open(name.local_name)),
-        xml::reader::XmlEvent::Characters(value) => Ok(Node::Data(value)),
-        xml::reader::XmlEvent::EndElement { name } => Ok(Node::Close(name.local_name)),
-        _ => next_node(reader),
-    }
-}
-
-#[derive(Debug)]
-pub enum XmlRpcValue {
-    Int(i32),
-    Bool(bool),
-    String(String),
-    Double(f64),
-    Array(Vec<XmlRpcValue>),
 }
 
 #[derive(Debug)]
 pub enum Error {
-    XmlRead(xml::reader::Error),
+    Other(String),
+    MismatchedDataFormat,
     UnsupportedDataFormat,
-    Decoding(String),
-    ParseInt(std::num::ParseIntError),
-    ParseFloat(std::num::ParseFloatError),
-}
-
-impl From<xml::reader::Error> for Error {
-    fn from(err: xml::reader::Error) -> Error {
-        Error::XmlRead(err)
-    }
-}
-
-impl From<std::num::ParseIntError> for Error {
-    fn from(err: std::num::ParseIntError) -> Error {
-        Error::ParseInt(err)
-    }
-}
-
-impl From<std::num::ParseFloatError> for Error {
-    fn from(err: std::num::ParseFloatError) -> Error {
-        Error::ParseFloat(err)
-    }
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Error::XmlRead(ref err) => write!(f, "XML reading error: {}", err),
-            Error::UnsupportedDataFormat => write!(f, "Unencodable data provided"),
-            Error::Decoding(ref err) => write!(f, "Internal error while decoding: {}", err),
-            Error::ParseInt(ref err) => write!(f, "Int parsing error: {}", err),
-            Error::ParseFloat(ref err) => write!(f, "Float parsing error: {}", err),
-        }
+        write!(f, "{}", self.description())
     }
 }
 
 impl std::error::Error for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::XmlRead(ref err) => err.description(),
-            Error::UnsupportedDataFormat => "Unencodable data provided",
-            Error::Decoding(..) => "Internal error while decoding",
-            Error::ParseInt(ref err) => err.description(),
-            Error::ParseFloat(ref err) => err.description(),
+            Error::Other(ref err) => err,
+            Error::MismatchedDataFormat => "Given XML-RPC value tree does not match target format",
+            Error::UnsupportedDataFormat => {
+                "Decoder does not support all members of given data structure"
+            }
         }
     }
 
     fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            Error::XmlRead(ref err) => Some(err),
-            Error::UnsupportedDataFormat => None,
-            Error::Decoding(..) => None,
-            Error::ParseInt(ref err) => Some(err),
-            Error::ParseFloat(ref err) => Some(err),
-        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::XmlRpcValue;
+    use rustc_serialize::Decodable;
+    use std;
+
+    #[test]
+    fn reads_string() {
+        assert_eq!("First test", String::decode(
+            &mut Decoder::new(XmlRpcValue::String(String::from("First test")))).unwrap());
+    }
+
+    #[test]
+    fn reads_int() {
+        assert_eq!(41,
+                   i32::decode(&mut Decoder::new(XmlRpcValue::Int(41))).unwrap());
+    }
+
+    #[test]
+    fn reads_float() {
+        assert_eq!(32.5,
+                   f64::decode(&mut Decoder::new(XmlRpcValue::Double(32.5))).unwrap());
+    }
+
+    #[test]
+    fn reads_bool() {
+        assert_eq!(true,
+                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(true))).unwrap());
+        assert_eq!(false,
+                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(false))).unwrap());
+    }
+
+    #[test]
+    fn reads_array() {
+        assert_eq!(vec![1, 2, 3, 4, 5],
+                   Vec::<i32>::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
+                       XmlRpcValue::Int(1),
+                       XmlRpcValue::Int(2),
+                       XmlRpcValue::Int(3),
+                       XmlRpcValue::Int(4),
+                       XmlRpcValue::Int(5),
+                   ])))
+                       .unwrap());
+    }
+
+    #[derive(Debug,PartialEq,RustcDecodable)]
+    struct ExampleTuple(i32, f64, String, bool);
+
+    #[test]
+    fn reads_tuple() {
+        assert_eq!(ExampleTuple(5, 0.5, String::from("abc"), false),
+                   ExampleTuple::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
+                       XmlRpcValue::Int(5),
+                       XmlRpcValue::Double(0.5),
+                       XmlRpcValue::String(String::from("abc")),
+                       XmlRpcValue::Bool(false),
+                   ])))
+                       .unwrap());
+    }
+
+    #[derive(Debug,PartialEq,RustcDecodable)]
+    struct ExampleStruct {
+        a: i32,
+        b: ExampleTuple,
+    }
+
+    #[test]
+    fn reads_struct() {
+        assert_eq!(ExampleStruct {
+                       a: 11,
+                       b: ExampleTuple(5, 0.5, String::from("abc"), false),
+                   },
+                   ExampleStruct::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
+                       XmlRpcValue::Int(11),
+                       XmlRpcValue::Array(vec![
+                           XmlRpcValue::Int(5),
+                           XmlRpcValue::Double(0.5),
+                           XmlRpcValue::String(String::from("abc")),
+                           XmlRpcValue::Bool(false),
+                       ]),
+                   ])))
+                       .unwrap());
+    }
+
+    #[derive(Debug,PartialEq,RustcDecodable)]
+    struct ExampleRequestStruct {
+        a: i32,
+        b: bool,
+        c: ExampleRequestStructChild,
+    }
+
+    #[derive(Debug,PartialEq,RustcDecodable)]
+    struct ExampleRequestStructChild {
+        a: String,
+        b: f64,
+    }
+
+    #[test]
+    fn handles_requests() {
+        let data = r#"<?xml version="1.0"?>
+<methodCall>
+  <methodName>mytype.mymethod</methodName>
+  <params>
+    <param>
+      <value><i4>33</i4></value>
+    </param>
+    <param>
+      <value><array><data>
+        <value><i4>41</i4></value>
+        <value><boolean>1</boolean></value>
+        <value><array><data>
+          <value><string>Hello</string></value>
+          <value><double>0.5</double></value>
+        </data></array></value>
+      </data></array></value>
+    </param>
+  </params>
+</methodCall>"#;
+        let mut cursor = std::io::Cursor::new(data.as_bytes());
+        let (method, mut parameters) = Decoder::new_request(&mut cursor).unwrap();
+        assert_eq!("mytype.mymethod", method);
+        assert_eq!(2, parameters.len());
+        assert_eq!(33, i32::decode(&mut parameters[0]).unwrap());
+        assert_eq!(ExampleRequestStruct {
+                       a: 41,
+                       b: true,
+                       c: ExampleRequestStructChild {
+                           a: String::from("Hello"),
+                           b: 0.5,
+                       },
+                   },
+                   ExampleRequestStruct::decode(&mut parameters[1]).unwrap());
+    }
+
+    #[test]
+    fn handles_responses() {
+        let data = r#"<?xml version="1.0"?>
+<methodResponse>
+  <params>
+    <param>
+      <value><i4>33</i4></value>
+    </param>
+    <param>
+      <value><array><data>
+        <value><i4>41</i4></value>
+        <value><boolean>1</boolean></value>
+        <value><array><data>
+          <value><string>Hello</string></value>
+          <value><double>0.5</double></value>
+        </data></array></value>
+      </data></array></value>
+    </param>
+  </params>
+</methodResponse>"#;
+        let mut cursor = std::io::Cursor::new(data.as_bytes());
+        let mut parameters = Decoder::new_response(&mut cursor).unwrap();
+        assert_eq!(2, parameters.len());
+        assert_eq!(33, i32::decode(&mut parameters[0]).unwrap());
+        assert_eq!(ExampleRequestStruct {
+                       a: 41,
+                       b: true,
+                       c: ExampleRequestStructChild {
+                           a: String::from("Hello"),
+                           b: 0.5,
+                       },
+                   },
+                   ExampleRequestStruct::decode(&mut parameters[1]).unwrap());
+    }
+
+    #[test]
+    fn decoders_value_field_matches_data() {
+        let data = r#"<?xml version="1.0"?>
+<methodCall>
+  <methodName>mytype.mymethod</methodName>
+  <params>
+    <param>
+      <value><i4>33</i4></value>
+    </param>
+    <param>
+      <value><array><data>
+        <value><i4>41</i4></value>
+        <value><boolean>1</boolean></value>
+        <value><array><data>
+          <value><string>Hello</string></value>
+          <value><double>0.5</double></value>
+        </data></array></value>
+      </data></array></value>
+    </param>
+  </params>
+</methodCall>"#;
+        let mut cursor = std::io::Cursor::new(data.as_bytes());
+        let (method, mut parameters) = Decoder::new_request(&mut cursor).unwrap();
+        assert_eq!("mytype.mymethod", method);
+        assert_eq!(2, parameters.len());
+        assert_eq!(XmlRpcValue::Array(vec![
+            XmlRpcValue::Int(41),
+            XmlRpcValue::Bool(true),
+            XmlRpcValue::Array(vec![
+                XmlRpcValue::String(String::from("Hello")),
+                XmlRpcValue::Double(0.5),
+            ]),
+        ]),
+                   parameters.pop().unwrap().value());
+        assert_eq!(XmlRpcValue::Int(33), parameters.pop().unwrap().value());
     }
 }
