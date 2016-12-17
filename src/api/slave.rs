@@ -8,6 +8,7 @@ use std::sync::Mutex;
 use std::error::Error as ErrorTrait;
 use nix::unistd::getpid;
 use super::error::ServerError as Error;
+use super::value::Topic;
 
 struct Subscription {
     topic: String,
@@ -63,13 +64,19 @@ impl Slave {
 
     fn get_bus_stats(&self,
                      req: &mut rosxmlrpc::server::ParameterIterator)
-                     -> SerdeResult<(&[(String, String, (String, i32, i32, bool))],
-                                     &[(String, (String, i32, i32, bool))],
-                                     (i32, i32, i32))> {
+                     -> SerdeResult<BusStats> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             // TODO: implement actual stats displaying
-            Ok((&[], &[], (0, 0, 0)))
+            Ok(BusStats {
+                publish: vec![],
+                subscribe: vec![],
+                service: ServiceStats {
+                    bytes_received: 0,
+                    bytes_sent: 0,
+                    number_of_requests: 0,
+                },
+            })
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
         }
@@ -77,11 +84,11 @@ impl Slave {
 
     fn get_bus_info(&self,
                     req: &mut rosxmlrpc::server::ParameterIterator)
-                    -> SerdeResult<&[(String, String, String, String, String, bool)]> {
+                    -> SerdeResult<Vec<BusInfo>> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             // TODO: implement actual info displaying
-            Ok(&[])
+            Ok(vec![])
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
         }
@@ -104,8 +111,10 @@ impl Slave {
     fn param_update(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         let key = pop::<String>(req)?;
-        let value = pop::<String>(req)?;
-        if caller_id != "" && key != "" && value != "" {
+        let value = req.next()
+            .ok_or(Error::Protocol(String::from("Missing parameter")))?
+            .value();
+        if caller_id != "" && key != "" {
             // TODO: implement handling of parameter updates
             println!("{} {} {}", caller_id, key, value);
             Ok(0)
@@ -125,7 +134,9 @@ impl Slave {
 
     fn shutdown(&mut self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
+        let message = pop::<String>(req).unwrap_or(String::from(""));
         if caller_id != "" {
+            println!("Server is shutting down because: {}", message);
             match self.server.shutdown() {
                 Ok(()) => Ok(0),
                 Err(_) => Err(Error::Critical("Failed to shutdown server".to_owned())),
@@ -160,12 +171,17 @@ impl Slave {
 
     fn get_publications(&self,
                         req: &mut rosxmlrpc::server::ParameterIterator)
-                        -> SerdeResult<Vec<(String, String)>> {
+                        -> SerdeResult<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             Ok(self.publications
                 .values()
-                .map(|ref v| return (v.topic.clone(), v.msg_type.clone()))
+                .map(|ref v| {
+                    return Topic {
+                        name: v.topic.clone(),
+                        datatype: v.msg_type.clone(),
+                    };
+                })
                 .collect())
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
@@ -193,12 +209,17 @@ impl Slave {
 
     fn get_subscriptions(&self,
                          req: &mut rosxmlrpc::server::ParameterIterator)
-                         -> SerdeResult<Vec<(String, String)>> {
+                         -> SerdeResult<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
         if caller_id != "" {
             Ok(self.subscriptions
                 .values()
-                .map(|ref v| return (v.topic.clone(), v.msg_type.clone()))
+                .map(|ref v| {
+                    return Topic {
+                        name: v.topic.clone(),
+                        datatype: v.msg_type.clone(),
+                    };
+                })
                 .collect())
         } else {
             Err(Error::Protocol("Empty strings given".to_owned()))
@@ -350,4 +371,57 @@ fn pop<T: Decodable>(req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeRes
         .ok_or(Error::Protocol(String::from("Missing parameter")))?
         .read()
         .map_err(|v| Error::Decoding(v))
+}
+
+#[derive(RustcEncodable)]
+pub struct BusStats {
+    pub publish: Vec<PublishStats>,
+    pub subscribe: Vec<SubscribeStats>,
+    pub service: ServiceStats,
+}
+
+#[derive(RustcEncodable)]
+pub struct PublishStats {
+    pub name: String,
+    pub data_sent: String,
+    pub connection_data: PublishConnectionData,
+}
+
+#[derive(RustcEncodable)]
+pub struct PublishConnectionData {
+    pub connection_id: String,
+    pub bytes_sent: i32,
+    pub number_sent: i32,
+    pub connected: bool,
+}
+
+#[derive(RustcEncodable)]
+pub struct SubscribeStats {
+    pub name: String,
+    pub connection_data: SubscribeConnectionData,
+}
+
+#[derive(RustcEncodable)]
+pub struct SubscribeConnectionData {
+    pub connection_id: String,
+    pub bytes_received: i32,
+    pub drop_estimate: i32,
+    pub connected: bool,
+}
+
+#[derive(RustcEncodable)]
+pub struct ServiceStats {
+    pub number_of_requests: i32,
+    pub bytes_received: i32,
+    pub bytes_sent: i32,
+}
+
+#[derive(RustcEncodable)]
+pub struct BusInfo {
+    pub connection_id: String,
+    pub destination_id: String,
+    pub direction: String,
+    pub transport: String,
+    pub topic: String,
+    pub connected: bool,
 }

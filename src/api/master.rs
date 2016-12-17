@@ -1,5 +1,6 @@
 use rosxmlrpc;
 use rustc_serialize::{Decodable, Decoder, Encodable};
+use super::value::Topic;
 
 pub struct Master {
     client: rosxmlrpc::Client,
@@ -96,11 +97,11 @@ impl Master {
         self.request("getPublishedTopics", &[self.client_id.as_str(), subgraph])
     }
 
-    pub fn get_topic_types(&self) -> MasterResult<Vec<(String, String)>> {
+    pub fn get_topic_types(&self) -> MasterResult<Vec<Topic>> {
         self.request("getTopicTypes", &[self.client_id.as_str()])
     }
 
-    pub fn get_system_state(&self) -> MasterResult<Vec<Vec<(String, Vec<String>)>>> {
+    pub fn get_system_state(&self) -> MasterResult<SystemState> {
         self.request("getSystemState", &[self.client_id.as_str()])
     }
 
@@ -144,6 +145,14 @@ impl Master {
                      &[self.client_id.as_str(), self.caller_api.as_str(), key])
     }
 
+    pub fn subscribe_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        let mut request = rosxmlrpc::client::Request::new("subscribeParam");
+        request.add(&self.client_id)?;
+        request.add(&self.caller_api)?;
+        request.add(&key)?;
+        Master::remove_tree_wrap(self.client.request_tree(request))
+    }
+
     pub fn unsubscribe_param(&self, key: &str) -> MasterResult<i32> {
         self.request("unsubscribeParam",
                      &[self.client_id.as_str(), self.caller_api.as_str(), key])
@@ -163,7 +172,7 @@ pub type Error = rosxmlrpc::error::Error;
 pub type MasterResult<T> = Result<T, Error>;
 
 #[derive(Debug)]
-pub struct ResponseData<T>(T);
+struct ResponseData<T>(T);
 
 impl<T: Decodable> Decodable for ResponseData<T> {
     fn decode<D: Decoder>(d: &mut D) -> Result<ResponseData<T>, D::Error> {
@@ -177,4 +186,17 @@ impl<T: Decodable> Decodable for ResponseData<T> {
             }
         })
     }
+}
+
+#[derive(RustcDecodable)]
+pub struct TopicData {
+    pub name: String,
+    pub connections: Vec<String>,
+}
+
+#[derive(RustcDecodable)]
+pub struct SystemState {
+    pub publishers: Vec<TopicData>,
+    pub subscribers: Vec<TopicData>,
+    pub services: Vec<TopicData>,
 }
