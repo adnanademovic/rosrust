@@ -221,3 +221,173 @@ impl<N> rustc_serialize::Decoder for Decoder<N>
         Error::Other(String::from(err))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std;
+    use rustc_serialize::Decodable;
+
+    fn push_data(data: Vec<u8>) -> Decoder<std::io::Cursor<Vec<u8>>> {
+        Decoder::new(std::io::Cursor::new(data))
+    }
+
+    #[test]
+    fn pops_length_right() {
+        let mut decoder = push_data(vec![4, 0, 0, 0, 2, 33, 17, 0]);
+        assert_eq!(4, decoder.pop_length().unwrap());
+        assert_eq!(1122562, decoder.pop_length().unwrap());
+    }
+
+    #[test]
+    fn reads_u8() {
+        let mut decoder = push_data(vec![1, 0, 0, 0, 150]);
+        assert_eq!(150, u8::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_u16() {
+        let mut decoder = push_data(vec![2, 0, 0, 0, 0x34, 0xA2]);
+        assert_eq!(0xA234, u16::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_u32() {
+        let mut decoder = push_data(vec![4, 0, 0, 0, 0x45, 0x23, 1, 0xCD]);
+        assert_eq!(0xCD012345, u32::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_u64() {
+        let mut decoder = push_data(vec![8, 0, 0, 0, 0xBB, 0xAA, 0x10, 0x32, 0x54, 0x76, 0x98,
+                                         0xAB]);
+        assert_eq!(0xAB9876543210AABB, u64::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_i8() {
+        let mut decoder = push_data(vec![1, 0, 0, 0, 156]);
+        assert_eq!(-100, i8::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_i16() {
+        let mut decoder = push_data(vec![2, 0, 0, 0, 0xD0, 0x8A]);
+        assert_eq!(-30000, i16::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_i32() {
+        let mut decoder = push_data(vec![4, 0, 0, 0, 0x00, 0x6C, 0xCA, 0x88]);
+        assert_eq!(-2000000000, i32::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_i64() {
+        let mut decoder = push_data(vec![8, 0, 0, 0, 0x00, 0x00, 0x7c, 0x1d, 0xaf, 0x93, 0x19,
+                                         0x83]);
+        assert_eq!(-9000000000000000000, i64::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_f32() {
+        let mut decoder = push_data(vec![4, 0, 0, 0, 0x00, 0x70, 0x7b, 0x44]);
+        assert_eq!(1005.75, f32::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_f64() {
+        let mut decoder = push_data(vec![8, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x8f,
+                                         0x40]);
+        assert_eq!(1005.75, f64::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_bool() {
+        let mut decoder = push_data(vec![1, 0, 0, 0, 1]);
+        assert_eq!(true, bool::decode(&mut decoder).unwrap());
+        let mut decoder = push_data(vec![1, 0, 0, 0, 0]);
+        assert_eq!(false, bool::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_string() {
+        let mut decoder = push_data(vec![0, 0, 0, 0]);
+        assert_eq!("", String::decode(&mut decoder).unwrap());
+        let mut decoder = push_data(vec![13, 0, 0, 0, 72, 101, 108, 108, 111, 44, 32, 87, 111,
+                                         114, 108, 100, 33]);
+        assert_eq!("Hello, World!", String::decode(&mut decoder).unwrap());
+    }
+
+    #[test]
+    fn reads_array() {
+        let mut decoder = push_data(vec![28, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 7, 0, 2, 0, 0, 0,
+                                         1, 4, 2, 0, 0, 0, 33, 0, 2, 0, 0, 0, 57, 0]);
+        assert_eq!(vec![7, 1025, 33, 57],
+                   Vec::<i16>::decode(&mut decoder).unwrap());
+    }
+
+    #[derive(Debug,RustcDecodable,PartialEq)]
+    struct TestStructOne {
+        a: i16,
+        b: bool,
+        c: u8,
+        d: String,
+        e: Vec<bool>,
+    }
+
+    #[test]
+    fn reads_simple_struct() {
+        let v = TestStructOne {
+            a: 2050i16,
+            b: true,
+            c: 7u8,
+            d: String::from("ABC012"),
+            e: vec![true, false, false, true],
+        };
+        let mut decoder = push_data(vec![54, 0, 0, 0, 2, 0, 0, 0, 2, 8, 1, 0, 0, 0, 1, 1, 0, 0,
+                                         0, 7, 6, 0, 0, 0, 65, 66, 67, 48, 49, 50, 24, 0, 0, 0,
+                                         4, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                                         1, 0, 0, 0, 1]);
+        assert_eq!(v, TestStructOne::decode(&mut decoder).unwrap());
+    }
+
+    #[derive(Debug,RustcDecodable,PartialEq)]
+    struct TestStructPart {
+        a: String,
+        b: bool,
+    }
+
+    #[derive(Debug,RustcDecodable,PartialEq)]
+    struct TestStructBig {
+        a: Vec<TestStructPart>,
+        b: String,
+    }
+
+    #[test]
+    fn reads_complex_struct() {
+        let mut parts = Vec::new();
+        parts.push(TestStructPart {
+            a: String::from("ABC"),
+            b: true,
+        });
+        parts.push(TestStructPart {
+            a: String::from("1!!!!"),
+            b: true,
+        });
+        parts.push(TestStructPart {
+            a: String::from("234b"),
+            b: false,
+        });
+        let v = TestStructBig {
+            a: parts,
+            b: String::from("EEe"),
+        };
+        let mut decoder = push_data(vec![66, 0, 0, 0, 55, 0, 0, 0, 3, 0, 0, 0, 12, 0, 0, 0, 3, 0,
+                                         0, 0, 65, 66, 67, 1, 0, 0, 0, 1, 14, 0, 0, 0, 5, 0, 0,
+                                         0, 49, 33, 33, 33, 33, 1, 0, 0, 0, 1, 13, 0, 0, 0, 4, 0,
+                                         0, 0, 50, 51, 52, 98, 1, 0, 0, 0, 0, 3, 0, 0, 0, 69, 69,
+                                         101]);
+        assert_eq!(v, TestStructBig::decode(&mut decoder).unwrap());
+    }
+}
