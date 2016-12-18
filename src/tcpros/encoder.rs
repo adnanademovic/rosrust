@@ -1,5 +1,6 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize;
+use std;
 use super::error::Error;
 
 #[derive(Debug)]
@@ -12,12 +13,15 @@ impl Encoder {
         Encoder { output: Vec::<Vec<u8>>::new() }
     }
 
-    pub fn pad(&mut self, len: usize) {
-        self.output.push(vec![0; len]);
+    pub fn len(&self) -> usize {
+        self.output.iter().fold(0, |accum, ref v| accum + v.len())
     }
 
-    pub fn extract_data(self) -> Vec<u8> {
-        self.output.into_iter().flat_map(|v| v.into_iter()).collect()
+    pub fn write_to<T: std::io::Write>(self, output: &mut T) -> Result<(), std::io::Error> {
+        for v in self.output {
+            output.write_all(&v)?;
+        }
+        Ok(())
     }
 
     fn write_size(&mut self, v: usize) -> Result<(), Error> {

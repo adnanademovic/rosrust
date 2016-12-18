@@ -1,8 +1,6 @@
-use byteorder::{LittleEndian, ReadBytesExt};
 use rustc_serialize::Encodable;
 use std::clone::Clone;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::io::{Read, Write};
 use std::sync::mpsc;
 use std::thread;
 use std;
@@ -28,14 +26,7 @@ fn handle_stream<T>(topic: String,
 {
     let caller_id: String;
     {
-        let mut bytes = [0u8; 4];
-        stream.read_exact(&mut bytes)?;
-        let mut reader = std::io::Cursor::new(bytes);
-        let data_length = reader.read_u32::<LittleEndian>()?;
-        let mut payload = vec![0u8; data_length as usize];
-        stream.read_exact(&mut payload)?;
-        let data = bytes.iter().chain(payload.iter()).cloned().collect();
-        let fields = decode(data)?;
+        let fields = decode(&mut stream)?;
         if fields.get("md5sum") != Some(&T::md5sum()) {
             return Err(Error::Mismatch);
         }
@@ -58,13 +49,12 @@ fn handle_stream<T>(topic: String,
         let mut fields = std::collections::HashMap::<String, String>::new();
         fields.insert("md5sum".to_owned(), T::md5sum());
         fields.insert("type".to_owned(), T::msg_type());
-        let fields = encode(fields)?;
-        stream.write_all(&fields)?;
+        encode(fields, &mut stream)?;
     }
     while let Ok(v) = rx.recv() {
         let mut encoder = Encoder::new();
         v.encode(&mut encoder)?;
-        stream.write_all(&encoder.extract_data())?;
+        encoder.write_to(&mut stream)?;
     }
     Ok(())
 }

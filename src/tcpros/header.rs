@@ -5,14 +5,9 @@ use std;
 use super::{Decoder, Encoder};
 use super::error::Error;
 
-pub fn decode(data: Vec<u8>) -> Result<HashMap<String, String>, Error> {
-    let vector_length = data.len();
-    let reader = std::io::Cursor::new(data);
-    let mut decoder = Decoder::new(reader);
+pub fn decode<T: std::io::Read>(data: &mut T) -> Result<HashMap<String, String>, Error> {
+    let mut decoder = Decoder::new(data);
     let length = decoder.pop_length()? as usize;
-    if length + 4 != vector_length {
-        return Err(Error::Mismatch);
-    }
     let mut result = HashMap::<String, String>::new();
     let mut size_count = 0;
     while length > size_count {
@@ -21,20 +16,18 @@ pub fn decode(data: Vec<u8>) -> Result<HashMap<String, String>, Error> {
         let mut point = point.splitn(2, '=');
         let key = point.next().ok_or(Error::UnsupportedData)?;
         let value = point.next().ok_or(Error::UnsupportedData)?;
-        result.insert(key.to_owned(), value.to_owned());
+        result.insert(String::from(key), String::from(value));
     }
     Ok(result)
 }
 
-pub fn encode(data: HashMap<String, String>) -> Result<Vec<u8>, Error> {
+pub fn encode<T: std::io::Write>(data: HashMap<String, String>,
+                                 buffer: &mut T)
+                                 -> Result<(), Error> {
     let mut encoder = Encoder::new();
     for (key, value) in data {
         [key, value].join("=").encode(&mut encoder)?;
     }
-    let mut buffer = Vec::new();
-    let mut data = encoder.extract_data();
-    buffer.reserve(4 + data.len());
-    buffer.write_u32::<LittleEndian>(data.len() as u32)?;
-    buffer.append(&mut data);
-    Ok(buffer)
+    buffer.write_u32::<LittleEndian>(encoder.len() as u32)?;
+    encoder.write_to(buffer).map_err(|v| Error::Io(v))
 }
