@@ -2,6 +2,7 @@ use rustc_serialize::Decodable;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::mpsc;
 use std::thread;
+use std::collections::HashMap;
 use std;
 use super::error::Error;
 use super::header::{encode, decode};
@@ -11,7 +12,7 @@ use super::decoder::Decoder;
 pub struct Subscriber<T>
     where T: Message + Decodable + Send + 'static
 {
-    rx: mpsc::Receiver<T>,
+    message_stream: mpsc::Receiver<T>,
 }
 
 impl<T> Subscriber<T>
@@ -20,40 +21,48 @@ impl<T> Subscriber<T>
     pub fn new<U>(address: U, caller_id: &str, topic: &str) -> Result<Subscriber<T>, Error>
         where U: ToSocketAddrs
     {
-        let mut stream = TcpStream::connect(address)?;
-        {
-            let mut fields = std::collections::HashMap::<String, String>::new();
-            fields.insert("message_definition".to_owned(), T::msg_definition());
-            fields.insert("callerid".to_owned(), caller_id.to_owned());
-            fields.insert("topic".to_owned(), topic.to_owned());
-            fields.insert("md5sum".to_owned(), T::md5sum());
-            fields.insert("type".to_owned(), T::msg_type());
+        Subscriber::<T>::wrap_stream(TcpStream::connect(address)?, caller_id, topic)
+    }
 
-            encode(fields, &mut stream)?;
-        }
-        {
-            let fields = decode(&mut stream)?;
-            if fields.get("md5sum") != Some(&T::md5sum()) {
-                return Err(Error::Mismatch);
-            }
-            if fields.get("type") != Some(&T::msg_type()) {
-                return Err(Error::Mismatch);
-            }
+    fn wrap_stream<U>(mut stream: U, caller_id: &str, topic: &str) -> Result<Subscriber<T>, Error>
+        where U: std::io::Read + std::io::Write + Send + 'static
+    {
+        write_request::<T, U>(&mut stream, caller_id, topic)?;
+        if !header_matches::<T>(&decode(&mut stream)?) {
+            return Err(Error::Mismatch);
         }
 
-        let (tx, rx) = mpsc::channel();
+        let (tx_message_stream, rx_message_stream) = mpsc::channel();
 
-        thread::spawn(move || spin_subscriber(stream, tx));
+        thread::spawn(move || decode_stream(stream, tx_message_stream));
 
-        Ok(Subscriber { rx: rx })
+        Ok(Subscriber { message_stream: rx_message_stream })
     }
 }
 
-fn spin_subscriber<T>(stream: TcpStream, tx: mpsc::Sender<T>) -> Result<(), Error>
-    where T: Decodable
+fn write_request<T: Message, U: std::io::Write>(mut stream: &mut U,
+                                                caller_id: &str,
+                                                topic: &str)
+                                                -> Result<(), Error> {
+    let mut fields = HashMap::<String, String>::new();
+    fields.insert(String::from("message_definition"), T::msg_definition());
+    fields.insert(String::from("callerid"), String::from(caller_id));
+    fields.insert(String::from("topic"), String::from(topic));
+    fields.insert(String::from("md5sum"), T::md5sum());
+    fields.insert(String::from("type"), T::msg_type());
+    encode(fields, &mut stream)
+}
+
+fn header_matches<T: Message>(fields: &HashMap<String, String>) -> bool {
+    fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type())
+}
+
+fn decode_stream<T, U>(stream: U, message_sender: mpsc::Sender<T>) -> Result<(), Error>
+    where T: Message + Decodable,
+          U: std::io::Read
 {
     let mut stream = Decoder::new(stream);
-    while let Ok(()) = tx.send(T::decode(&mut stream)?) {
+    while let Ok(()) = message_sender.send(T::decode(&mut stream)?) {
     }
     Ok(())
 }
@@ -64,6 +73,6 @@ impl<T> std::iter::Iterator for Subscriber<T>
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.rx.recv().ok()
+        self.message_stream.recv().ok()
     }
 }
