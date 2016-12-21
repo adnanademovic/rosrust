@@ -13,6 +13,8 @@ pub struct Publisher {
     subscriptions: DataStream,
     pub ip: String,
     pub port: u16,
+    pub msg_type: String,
+    pub topic: String,
 }
 
 fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
@@ -82,12 +84,14 @@ impl Publisher {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
         let (targets, data) = fork();
-        let topic = String::from(topic);
-        thread::spawn(move || listen_for_subscribers::<T>(topic, listener, targets));
+        let topic_name = String::from(topic);
+        thread::spawn(move || listen_for_subscribers::<T>(topic_name, listener, targets));
         Ok(Publisher {
             subscriptions: data,
             ip: format!("{}", socket_address.ip()),
             port: socket_address.port(),
+            msg_type: T::msg_type(),
+            topic: String::from(topic),
         })
     }
 

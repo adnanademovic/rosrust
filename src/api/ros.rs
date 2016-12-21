@@ -8,8 +8,7 @@ use super::slave::Slave;
 use super::error::ServerError;
 use rosxmlrpc::error::Error;
 use rosxmlrpc;
-use tcpros::Message;
-use tcpros;
+use tcpros::{self, Message, Publisher};
 
 pub struct Ros {
     pub master: Master,
@@ -91,28 +90,19 @@ impl Ros {
         }
     }
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<mpsc::Sender<T>, ServerError>
-        where T: Message + Encodable + Send + 'static
+    pub fn publish<T>(&mut self, topic: &str) -> Result<&Publisher, ServerError>
+        where T: Message + Encodable
     {
-        if self.slave.is_publishing_to(topic) {
-            return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
-        }
-        let mut publisher =
-            tcpros::Publisher::new::<T, _>(format!("{}:0", self.hostname).as_str(), topic)?;
-        self.slave.add_publication(topic, &T::msg_type(), &publisher.ip, publisher.port);
+        self.slave.add_publication::<T>(&self.hostname, topic)?;
         match self.master.register_publisher(topic, &T::msg_type()) {
-            Ok(_) => {
-                let (tx, rx) = mpsc::channel::<T>();
-                thread::spawn(move || {
-                    while let Ok(val) = rx.recv() {
-                        publisher.send(val);
-                    }
-                });
-                Ok(tx)
-            }
-            Err(err) => {
+            Ok(_) => Ok(self.slave.get_publication::<T>(topic).unwrap()),
+            Err(error) => {
+                error!("Failed to register publisher for topic '{}': {}",
+                       topic,
+                       error);
                 self.slave.remove_publication(topic);
-                Err(ServerError::XmlRpc(err))
+                self.master.unregister_publisher(topic)?;
+                Err(ServerError::XmlRpc(error))
             }
         }
     }

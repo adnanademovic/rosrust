@@ -9,6 +9,7 @@ use std::error::Error as ErrorTrait;
 use nix::unistd::getpid;
 use super::error::ServerError as Error;
 use super::value::Topic;
+use tcpros::{self, Message, Publisher};
 
 struct Subscription {
     topic: String,
@@ -16,19 +17,12 @@ struct Subscription {
     channel: Sender<String>,
 }
 
-struct Publication {
-    topic: String,
-    msg_type: String,
-    ip: String,
-    port: u16,
-}
-
 pub struct Slave {
     server: rosxmlrpc::Server,
     req: Mutex<Receiver<(String, rosxmlrpc::server::ParameterIterator)>>,
     res: Mutex<Sender<rosxmlrpc::server::Answer>>,
     subscriptions: HashMap<String, Subscription>,
-    publications: HashMap<String, Publication>,
+    publications: HashMap<String, Publisher>,
     master_uri: String,
 }
 
@@ -146,27 +140,35 @@ impl Slave {
         }
     }
 
-    pub fn add_publication(&mut self, topic: &str, msg_type: &str, ip: &str, port: u16) -> bool {
-        if self.is_publishing_to(topic) {
-            false
-        } else {
-            self.publications.insert(topic.to_owned(),
-                                     Publication {
-                                         topic: topic.to_owned(),
-                                         msg_type: msg_type.to_owned(),
-                                         ip: ip.to_owned(),
-                                         port: port,
-                                     });
-            true
+    pub fn add_publication<T>(&mut self, hostname: &str, topic: &str) -> Result<(), tcpros::Error>
+        where T: Message
+    {
+        use std::collections::hash_map::Entry;
+        match self.publications.entry(String::from(topic)) {
+            Entry::Occupied(entry) => {
+                let publisher = entry.get();
+                if publisher.msg_type != T::msg_type() {
+                    Err(tcpros::Error::Mismatch)
+                } else {
+                    Ok(())
+                }
+            }
+            Entry::Vacant(entry) => {
+                let publisher = Publisher::new::<T, _>(format!("{}:0", hostname).as_str(), topic)?;
+                entry.insert(publisher);
+                Ok(())
+            }
         }
     }
 
-    pub fn remove_publication(&mut self, topic: &str) {
-        self.subscriptions.remove(topic);
+    pub fn get_publication<T>(&mut self, topic: &str) -> Option<&Publisher>
+        where T: Message
+    {
+        self.publications.get(topic)
     }
 
-    pub fn is_publishing_to(&mut self, topic: &str) -> bool {
-        self.publications.contains_key(topic)
+    pub fn remove_publication(&mut self, topic: &str) {
+        self.publications.remove(topic);
     }
 
     fn get_publications(&self,
