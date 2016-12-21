@@ -11,7 +11,7 @@ pub enum ServerError {
     Critical(String),
     Serialization(rosxmlrpc::serde::encoder::Error),
     XmlRpc(rosxmlrpc::error::Error),
-    Tcpros(tcpros::error::Error),
+    Tcpros(tcpros::Error),
     Io(std::io::Error),
     Nix(nix::Error),
     FromUTF8(std::string::FromUtf8Error),
@@ -41,8 +41,8 @@ impl From<rosxmlrpc::error::Error> for ServerError {
     }
 }
 
-impl From<tcpros::error::Error> for ServerError {
-    fn from(err: tcpros::error::Error) -> ServerError {
+impl From<tcpros::Error> for ServerError {
+    fn from(err: tcpros::Error) -> ServerError {
         ServerError::Tcpros(err)
     }
 }

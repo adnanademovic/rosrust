@@ -2,7 +2,8 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std;
-use super::{Decoder, Encoder};
+use super::decoder::Decoder;
+use super::encoder::Encoder;
 use super::error::Error;
 
 pub fn decode<T: std::io::Read>(data: &mut T) -> Result<HashMap<String, String>, Error> {

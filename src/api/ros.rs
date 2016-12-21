@@ -98,8 +98,7 @@ impl Ros {
             return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
         }
         let mut publisher =
-            tcpros::publisher::Publisher::new::<T, _>(format!("{}:0", self.hostname).as_str(),
-                                                      topic)?;
+            tcpros::Publisher::new::<T, _>(format!("{}:0", self.hostname).as_str(), topic)?;
         self.slave.add_publication(topic, &T::msg_type(), &publisher.ip, publisher.port);
         match self.master.register_publisher(topic, &T::msg_type()) {
             Ok(_) => {
@@ -128,8 +127,7 @@ fn connect_subscriber<T>(caller_id: &str, publisher: &str, topic: &str, tx: mpsc
         panic!("Protocol does not match");
     }
     let publisher = format!("{}:{}", hostname, port);
-    let subscriber = tcpros::subscriber::Subscriber::<T>::new(publisher.as_str(), caller_id, topic)
-        .unwrap();
+    let subscriber = tcpros::Subscriber::<T>::new(publisher.as_str(), caller_id, topic).unwrap();
     for val in subscriber {
         if let Err(_) = tx.send(val) {
             break;
