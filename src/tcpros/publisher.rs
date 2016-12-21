@@ -1,7 +1,7 @@
 use rustc_serialize::Encodable;
 use std::clone::Clone;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::collections::HashMap;
 use std;
@@ -10,38 +10,34 @@ use super::error::Error;
 use super::header::{encode, decode};
 use super::Message;
 
-pub struct Publisher<T>
-    where T: Message + Encodable + Clone + Send + 'static
-{
-    subscription_requests: mpsc::Receiver<mpsc::Sender<T>>,
-    subscriptions: Vec<mpsc::Sender<T>>,
+pub struct Publisher {
+    subscription_requests: mpsc::Receiver<mpsc::Sender<Arc<Encoder>>>,
+    subscriptions: Vec<mpsc::Sender<Arc<Encoder>>>,
     pub ip: String,
     pub port: u16,
 }
 
-fn handle_stream<T>(topic: String,
-                    mut stream: TcpStream,
-                    rx: mpsc::Receiver<T>)
-                    -> Result<(), Error>
-    where T: Message + Encodable + Clone + Send
-{
-    if !header_matches::<T>(&decode(&mut stream)?, &topic) {
-        return Err(Error::Mismatch);
-    }
-    write_response::<T, TcpStream>(&mut stream)?;
-
-    while let Ok(v) = rx.recv() {
-        let mut encoder = Encoder::new();
-        v.encode(&mut encoder)?;
+fn handle_stream(mut stream: TcpStream, rx: mpsc::Receiver<Arc<Encoder>>) -> Result<(), Error> {
+    while let Ok(encoder) = rx.recv() {
         encoder.write_to(&mut stream)?;
     }
     Ok(())
 }
 
-fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &String) -> bool {
+fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
     fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
     fields.get("message_definition") == Some(&T::msg_definition()) &&
-    fields.get("topic") == Some(topic) && fields.get("callerid") != None
+    fields.get("topic") == Some(&String::from(topic)) && fields.get("callerid") != None
+}
+
+fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U,
+                                              topic: &str)
+                                              -> Result<(), Error> {
+    if header_matches::<T>(&decode(&mut stream)?, topic) {
+        Ok(())
+    } else {
+        Err(Error::Mismatch)
+    }
 }
 
 fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(), Error> {
@@ -51,36 +47,46 @@ fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(
     encode(fields, &mut stream)
 }
 
-fn listen<T>(topic: String,
-             listener: TcpListener,
-             subscription_requests: mpsc::Sender<mpsc::Sender<T>>)
-             -> Result<(), Error>
-    where T: Message + Encodable + Clone + Send + 'static
+fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> bool
+    where T: Message,
+          U: std::io::Write + std::io::Read
 {
+    if read_request::<T, U>(&mut stream, &topic).is_err() {
+        false
+    } else {
+        write_response::<T, U>(&mut stream).is_ok()
+    }
+}
+
+fn listen<T: Message>(topic: String,
+                      listener: TcpListener,
+                      subscription_requests: mpsc::Sender<mpsc::Sender<Arc<Encoder>>>)
+                      -> Result<(), Error> {
     for stream in listener.incoming() {
-        let stream = stream?;
+        let mut stream = stream?;
         let (tx, rx) = mpsc::channel();
         if let Err(_) = subscription_requests.send(tx) {
             // Stop once the corresponding Publisher gets destroyed
             break;
         }
-        let topic = topic.clone();
-        thread::spawn(move || handle_stream(topic, stream, rx));
+        if !exchange_headers::<T, _>(&mut stream, &topic) {
+            continue;
+        }
+        thread::spawn(move || handle_stream(stream, rx));
     }
     Ok(())
 }
 
-impl<T> Publisher<T>
-    where T: Message + Encodable + Clone + Send + 'static
-{
-    pub fn new<U>(address: U, topic: &str) -> Result<Publisher<T>, Error>
-        where U: ToSocketAddrs
+impl Publisher {
+    pub fn new<T, U>(address: U, topic: &str) -> Result<Publisher, Error>
+        where T: Message,
+              U: ToSocketAddrs
     {
         let listener = TcpListener::bind(address)?;
         let (tx_subscription_requests, rx_subscription_requests) = mpsc::channel();
         let socket_address = listener.local_addr()?;
         let topic = String::from(topic);
-        thread::spawn(move || listen(topic, listener, tx_subscription_requests));
+        thread::spawn(move || listen::<T>(topic, listener, tx_subscription_requests));
         Ok(Publisher {
             subscription_requests: rx_subscription_requests,
             subscriptions: Vec::new(),
@@ -89,15 +95,15 @@ impl<T> Publisher<T>
         })
     }
 
-    pub fn send(&mut self, message: T) {
+    pub fn send<T>(&mut self, message: T)
+        where T: Message + Encodable
+    {
         while let Ok(subscriber) = self.subscription_requests.try_recv() {
             self.subscriptions.push(subscriber);
         }
-        // Attempt to send and filter out connections that were stopped
-        self.subscriptions = self.subscriptions
-            .clone()
-            .into_iter()
-            .filter(|subscriber| subscriber.send(message.clone()).is_ok())
-            .collect();
+        let mut encoder = Encoder::new();
+        message.encode(&mut encoder).unwrap();
+        let encoder = Arc::new(encoder);
+        self.subscriptions.retain(|subscriber| subscriber.send(encoder.clone()).is_ok());
     }
 }

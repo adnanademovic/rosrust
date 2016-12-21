@@ -92,13 +92,14 @@ impl Ros {
     }
 
     pub fn publish<T>(&mut self, topic: &str) -> Result<mpsc::Sender<T>, ServerError>
-        where T: Message + Encodable + Clone + Send + 'static
+        where T: Message + Encodable + Send + 'static
     {
         if self.slave.is_publishing_to(topic) {
             return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
         }
         let mut publisher =
-            tcpros::publisher::Publisher::<T>::new(format!("{}:0", self.hostname).as_str(), topic)?;
+            tcpros::publisher::Publisher::new::<T, _>(format!("{}:0", self.hostname).as_str(),
+                                                      topic)?;
         self.slave.add_publication(topic, &T::msg_type(), &publisher.ip, publisher.port);
         match self.master.register_publisher(topic, &T::msg_type()) {
             Ok(_) => {
