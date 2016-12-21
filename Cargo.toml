@@ -10,6 +10,7 @@ version = "0.3.0"
 [dependencies]
 byteorder = "0.5"
 lazy_static = "0.2"
+log = "0.3"
 nix = "0.7"
 regex = "0.1"
 rustc-serialize = "0.3"
