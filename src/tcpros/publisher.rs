@@ -51,13 +51,24 @@ fn listen_for_subscribers<T: Message>(topic: String,
                                       targets: TargetList<TcpStream>)
                                       -> Result<(), Error> {
     for stream in listener.incoming() {
-        let mut stream = stream?;
-        if exchange_headers::<T, _>(&mut stream, &topic).is_err() {
-            continue;
-        }
-
-        if targets.add(stream).is_err() {
-            break;
+        match stream {
+            Ok(mut stream) => {
+                if let Err(err) = exchange_headers::<T, _>(&mut stream, &topic) {
+                    error!("Failed to exchange headers for topic '{}': {}", topic, err);
+                    continue;
+                }
+                if targets.add(stream).is_err() {
+                    // The TCP listener gets shut down when streamfork's thread deallocates
+                    // This happens only when the corresponding Publisher gets deallocated,
+                    // causing streamfork's data channel to shut down
+                    break;
+                }
+            }
+            Err(err) => {
+                error!("TCP connection to subscriber failed on topic '{}': {}",
+                       topic,
+                       err);
+            }
         }
     }
     Ok(())
@@ -82,7 +93,11 @@ impl Publisher {
 
     pub fn send<T: Message + Encodable>(&mut self, message: T) {
         let mut encoder = Encoder::new();
+        // Failure while encoding can only be caused by unsupported data types,
+        // unless using deliberately bad handwritten rosmsg-s, this should never fail
         message.encode(&mut encoder).unwrap();
+        // Subscriptions can only be closed from the Publisher side
+        // There is no way for the streamfork thread to fail by itself
         self.subscriptions.send(encoder).unwrap();
     }
 }
