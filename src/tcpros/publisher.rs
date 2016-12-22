@@ -48,31 +48,27 @@ fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<(), Error>
     write_response::<T, U>(&mut stream)
 }
 
-fn listen_for_subscribers<T: Message>(topic: String,
-                                      listener: TcpListener,
-                                      targets: TargetList<TcpStream>)
-                                      -> Result<(), Error> {
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut stream) => {
-                if let Err(err) = exchange_headers::<T, _>(&mut stream, &topic) {
-                    error!("Failed to exchange headers for topic '{}': {}", topic, err);
-                    continue;
-                }
-                if targets.add(stream).is_err() {
-                    // The TCP listener gets shut down when streamfork's thread deallocates
-                    // This happens only when the corresponding Publisher gets deallocated,
-                    // causing streamfork's data channel to shut down
-                    break;
-                }
-            }
-            Err(err) => {
-                error!("TCP connection to subscriber failed on topic '{}': {}",
-                       topic,
-                       err);
-            }
+fn listen_for_subscribers<T, U, V>(topic: String,
+                                   listener: V,
+                                   targets: TargetList<U>)
+                                   -> Result<(), Error>
+    where T: Message,
+          U: std::io::Read + std::io::Write + Send,
+          V: Iterator<Item = U>
+{
+    for mut stream in listener {
+        if let Err(err) = exchange_headers::<T, _>(&mut stream, &topic) {
+            error!("Failed to exchange headers for topic '{}': {}", topic, err);
+            continue;
+        }
+        if targets.add(stream).is_err() {
+            // The TCP listener gets shut down when streamfork's thread deallocates
+            // This happens only when the corresponding Publisher gets deallocated,
+            // causing streamfork's data channel to shut down
+            break;
         }
     }
+
     Ok(())
 }
 
@@ -83,16 +79,27 @@ impl Publisher {
     {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
+        Ok(Publisher::wrap_stream::<T, _, _>(topic,
+                                             TcpIterator::new(listener, topic),
+                                             &format!("{}", socket_address.ip()),
+                                             socket_address.port()))
+    }
+
+    fn wrap_stream<T, U, V>(topic: &str, listener: V, ip: &str, port: u16) -> Publisher
+        where T: Message,
+              U: std::io::Read + std::io::Write + Send + 'static,
+              V: Iterator<Item = U> + Send + 'static
+    {
         let (targets, data) = fork();
         let topic_name = String::from(topic);
-        thread::spawn(move || listen_for_subscribers::<T>(topic_name, listener, targets));
-        Ok(Publisher {
+        thread::spawn(move || listen_for_subscribers::<T, _, _>(topic_name, listener, targets));
+        Publisher {
             subscriptions: data,
-            ip: format!("{}", socket_address.ip()),
-            port: socket_address.port(),
+            ip: String::from(ip),
+            port: port,
             msg_type: T::msg_type(),
             topic: String::from(topic),
-        })
+        }
     }
 
     pub fn send<T: Message + Encodable>(&mut self, message: T) {
@@ -103,5 +110,35 @@ impl Publisher {
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
         self.subscriptions.send(encoder).unwrap();
+    }
+}
+
+struct TcpIterator {
+    listener: TcpListener,
+    topic: String,
+}
+
+impl TcpIterator {
+    pub fn new(listener: TcpListener, topic: &str) -> TcpIterator {
+        TcpIterator {
+            listener: listener,
+            topic: String::from(topic),
+        }
+    }
+}
+
+impl Iterator for TcpIterator {
+    type Item = TcpStream;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.listener.accept() {
+            Ok((stream, _)) => Some(stream),
+            Err(err) => {
+                error!("TCP connection to subscriber failed on topic '{}': {}",
+                       self.topic,
+                       err);
+                self.next()
+            }
+        }
     }
 }
