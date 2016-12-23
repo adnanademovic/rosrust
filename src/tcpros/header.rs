@@ -2,16 +2,20 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std;
-use super::decoder::Decoder;
+use super::decoder::DecoderSource;
 use super::encoder::Encoder;
 use super::error::Error;
 
 pub fn decode<T: std::io::Read>(data: &mut T) -> Result<HashMap<String, String>, Error> {
-    let mut decoder = Decoder::new(data);
+    let mut decoder = DecoderSource::new(data);
     let length = decoder.pop_length()? as usize;
     let mut result = HashMap::<String, String>::new();
     let mut size_count = 0;
     while length > size_count {
+        let mut decoder = match decoder.next() {
+            Some(decoder) => decoder,
+            None => return Err(Error::Mismatch),
+        };
         let point = String::decode(&mut decoder)?;
         size_count += point.len() + 4;
         let mut point = point.splitn(2, '=');

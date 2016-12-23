@@ -7,7 +7,7 @@ use std;
 use super::error::Error;
 use super::header::{encode, decode};
 use super::Message;
-use super::decoder::Decoder;
+use super::decoder::DecoderSource;
 
 pub struct Subscriber<T>
     where T: Message + Decodable + Send + 'static
@@ -61,8 +61,10 @@ fn decode_stream<T, U>(stream: U, message_sender: mpsc::Sender<T>) -> Result<(),
     where T: Message + Decodable,
           U: std::io::Read
 {
-    let mut stream = Decoder::new(stream);
-    while let Ok(()) = message_sender.send(T::decode(&mut stream)?) {
+    for mut decoder in DecoderSource::new(stream) {
+        if message_sender.send(T::decode(&mut decoder)?).is_err() {
+            break;
+        }
     }
     Ok(())
 }
