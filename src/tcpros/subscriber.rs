@@ -1,42 +1,88 @@
 use rustc_serialize::Decodable;
-use std::net::{TcpStream, ToSocketAddrs};
-use std::sync::mpsc;
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::collections::HashMap;
 use std;
 use super::error::Error;
 use super::header::{encode, decode};
 use super::Message;
-use super::decoder::DecoderSource;
+use super::decoder::{Decoder, DecoderSource};
 
-pub struct Subscriber<T>
-    where T: Message + Decodable + Send + 'static
-{
-    message_stream: mpsc::Receiver<T>,
+pub struct Subscriber {
+    publishers_stream: Sender<SocketAddr>,
+    pub topic: String,
+    pub msg_type: String,
 }
 
-impl<T> Subscriber<T>
-    where T: Message + Decodable + Send + 'static
-{
-    pub fn new<U>(address: U, caller_id: &str, topic: &str) -> Result<Subscriber<T>, Error>
-        where U: ToSocketAddrs
+impl Subscriber {
+    pub fn new<T, F>(caller_id: &str, topic: &str, callback: F) -> Subscriber
+        where T: Message + Decodable,
+              F: Fn(T) -> () + Send + 'static
     {
-        Subscriber::<T>::wrap_stream(TcpStream::connect(address)?, caller_id, topic)
+        let (data_tx, data_rx) = channel();
+        let (pub_tx, pub_rx) = channel();
+        let caller_id = String::from(caller_id);
+        let topic_name = String::from(topic);
+        thread::spawn(move || join_connections::<T>(data_tx, pub_rx, &caller_id, &topic_name));
+        thread::spawn(move || handle_data::<T, F>(data_rx, callback));
+        Subscriber {
+            publishers_stream: pub_tx,
+            topic: String::from(topic),
+            msg_type: T::msg_type(),
+        }
     }
 
-    fn wrap_stream<U>(mut stream: U, caller_id: &str, topic: &str) -> Result<Subscriber<T>, Error>
-        where U: std::io::Read + std::io::Write + Send + 'static
-    {
-        write_request::<T, U>(&mut stream, caller_id, topic)?;
-        if !header_matches::<T>(&decode(&mut stream)?) {
-            return Err(Error::Mismatch);
+    pub fn connect_to<U: ToSocketAddrs>(&mut self, addresses: U) -> std::io::Result<()> {
+        for address in addresses.to_socket_addrs()? {
+            // This should never fail, so it's safe to unwrap
+            // Failure could only be caused by the join_connections
+            // thread not running, which should never happen
+            self.publishers_stream.send(address).unwrap();
         }
+        Ok(())
+    }
+}
 
-        let (tx_message_stream, rx_message_stream) = mpsc::channel();
+fn handle_data<T, F>(data: Receiver<Decoder>, callback: F)
+    where T: Message + Decodable,
+          F: Fn(T) -> ()
+{
+    for mut decoder in data {
+        match T::decode(&mut decoder) {
+            Ok(value) => callback(value),
+            Err(err) => error!("Failed to decode message: {}", err),
+        }
+    }
+}
 
-        thread::spawn(move || decode_stream(stream, tx_message_stream));
-
-        Ok(Subscriber { message_stream: rx_message_stream })
+fn join_connections<T>(data_stream: Sender<Decoder>,
+                       publishers: Receiver<SocketAddr>,
+                       caller_id: &str,
+                       topic: &str)
+    where T: Message
+{
+    for publisher in publishers {
+        let mut stream = match TcpStream::connect(publisher) {
+            Ok(stream) => stream,
+            Err(err) => {
+                error!("Failed to subscribe to topic '{}': {}", topic, err);
+                continue;
+            }
+        };
+        if let Err(err) = exchange_headers::<T, _>(&mut stream, caller_id, topic) {
+            error!("Headers mismatched while subscribing to topic '{}': {}",
+                   topic,
+                   err);
+            continue;
+        }
+        let target = data_stream.clone();
+        thread::spawn(move || {
+            DecoderSource::new(stream)
+                .map(|decoder| target.send(decoder))
+                .collect::<Result<Vec<()>, _>>()
+                .unwrap_err();
+        });
     }
 }
 
@@ -57,24 +103,18 @@ fn header_matches<T: Message>(fields: &HashMap<String, String>) -> bool {
     fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type())
 }
 
-fn decode_stream<T, U>(stream: U, message_sender: mpsc::Sender<T>) -> Result<(), Error>
-    where T: Message + Decodable,
-          U: std::io::Read
-{
-    for mut decoder in DecoderSource::new(stream) {
-        if message_sender.send(T::decode(&mut decoder)?).is_err() {
-            break;
-        }
+fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<(), Error> {
+    if header_matches::<T>(&decode(&mut stream)?) {
+        Ok(())
+    } else {
+        Err(Error::Mismatch)
     }
-    Ok(())
 }
 
-impl<T> std::iter::Iterator for Subscriber<T>
-    where T: Message + Decodable + Send + 'static
+fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, topic: &str) -> Result<(), Error>
+    where T: Message,
+          U: std::io::Write + std::io::Read
 {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.message_stream.recv().ok()
-    }
+    write_request::<T, U>(stream, caller_id, topic)?;
+    read_response::<T, U>(stream)
 }
