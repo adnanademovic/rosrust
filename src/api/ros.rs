@@ -1,10 +1,9 @@
 use rustc_serialize::{Encodable, Decodable};
 use std;
 use nix::unistd::gethostname;
-use super::master::Master;
+use super::master::{Master, MasterResult};
 use super::slave::Slave;
 use super::error::ServerError;
-use rosxmlrpc::error::Error;
 use tcpros::{Message, Publisher};
 
 pub struct Ros {
@@ -33,19 +32,19 @@ impl Ros {
         return self.slave.uri();
     }
 
-    pub fn get_param<T: Decodable>(&self, name: &str) -> Result<T, Error> {
+    pub fn get_param<T: Decodable>(&self, name: &str) -> MasterResult<T> {
         self.master.get_param::<T>(name)
     }
 
-    pub fn set_param<T: Encodable>(&self, name: &str, value: &T) -> Result<(), Error> {
+    pub fn set_param<T: Encodable>(&self, name: &str, value: &T) -> MasterResult<()> {
         self.master.set_param::<T>(name, value).and(Ok(()))
     }
 
-    pub fn has_param(&self, name: &str) -> Result<bool, Error> {
+    pub fn has_param(&self, name: &str) -> MasterResult<bool> {
         self.master.has_param(name)
     }
 
-    pub fn get_param_names(&self) -> Result<Vec<String>, Error> {
+    pub fn get_param_names(&self) -> MasterResult<Vec<String>> {
         self.master.get_param_names()
     }
 
@@ -77,7 +76,7 @@ impl Ros {
             }
             Err(err) => {
                 self.slave.remove_subscription(topic);
-                Err(ServerError::XmlRpc(err))
+                Err(ServerError::from(err))
             }
         }
     }
@@ -94,7 +93,7 @@ impl Ros {
                        error);
                 self.slave.remove_publication(topic);
                 self.master.unregister_publisher(topic)?;
-                Err(ServerError::XmlRpc(error))
+                Err(ServerError::from(error))
             }
         }
     }
