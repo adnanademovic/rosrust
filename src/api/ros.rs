@@ -1,21 +1,16 @@
 use rustc_serialize::{Encodable, Decodable};
-use std::sync::mpsc;
-use std::thread;
 use std;
 use nix::unistd::gethostname;
 use super::master::Master;
 use super::slave::Slave;
 use super::error::ServerError;
 use rosxmlrpc::error::Error;
-use rosxmlrpc;
-use tcpros::message::RosMessage;
-use tcpros;
+use tcpros::{Message, Publisher};
 
 pub struct Ros {
     pub master: Master,
     pub slave: Slave,
     hostname: String,
-    name: String,
 }
 
 impl Ros {
@@ -25,13 +20,12 @@ impl Ros {
         let mut hostname = vec![];
         gethostname(&mut hostname)?;
         let hostname = String::from_utf8(hostname)?;
-        let slave = Slave::new(&master_uri, &format!("{}:0", hostname))?;
+        let slave = Slave::new(&master_uri, &format!("{}:0", hostname), name)?;
         let master = Master::new(&master_uri, name, &slave.uri());
         Ok(Ros {
             master: master,
             slave: slave,
             hostname: hostname,
-            name: name.to_owned(),
         })
     }
 
@@ -59,92 +53,49 @@ impl Ros {
         self.slave.handle_calls()
     }
 
-    pub fn subscribe<T>(&mut self, topic: &str) -> Result<mpsc::Receiver<T>, Error>
-        where T: RosMessage + Decodable + Send + 'static
+    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), ServerError>
+        where T: Message + Decodable,
+              F: Fn(T) -> () + Send + 'static
     {
-        if let Some(rx_publishers) = self.slave.add_subscription(topic, &T::msg_type()) {
-            match self.master.register_subscriber(topic, &T::msg_type()) {
-                Ok(publishers) => {
-                    let (tx, rx) = mpsc::channel::<T>();
-                    let name = self.name.clone();
-                    let topic = topic.to_owned();
-                    thread::spawn(move || {
-                        // Spawn new subscription connection thread for each publisher
-                        for publisher in publishers.into_iter().chain(rx_publishers.into_iter()) {
-                            let tx = tx.clone();
-                            let name = name.clone();
-                            let topic = topic.clone();
-                            thread::spawn(move || {
-                                connect_subscriber(&name, &publisher, &topic, tx)
-                            });
-                        }
-                    });
-                    Ok(rx)
-                }
-                Err(err) => {
-                    self.slave.remove_subscription(topic);
-                    Err(err)
-                }
-            }
-        } else {
-            panic!("Handle this path");
-        }
-    }
+        self.slave
+            .add_subscription::<T, F>(topic, callback)
+            .ok_or(ServerError::Critical(String::from("Could not add duplicate subscription to \
+                                                       topic")))?;
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<mpsc::Sender<T>, ServerError>
-        where T: RosMessage + Encodable + Clone + Send + 'static
-    {
-        if self.slave.is_publishing_to(topic) {
-            return Err(ServerError::Protocol("Already publishing to topic".to_owned()));
-        }
-        let mut publisher =
-            tcpros::publisher::Publisher::<T>::new(format!("{}:0", self.hostname).as_str(), topic)?;
-        self.slave.add_publication(topic, &T::msg_type(), &publisher.ip, publisher.port);
-        match self.master.register_publisher(topic, &T::msg_type()) {
-            Ok(_) => {
-                let (tx, rx) = mpsc::channel::<T>();
-                thread::spawn(move || {
-                    while let Ok(val) = rx.recv() {
-                        publisher.send(val);
+        match self.master.register_subscriber(topic, &T::msg_type()) {
+            Ok(publishers) => {
+                let topic = topic.to_owned();
+                let subscription = self.slave.get_subscription(&topic).unwrap();
+                for publisher in publishers {
+                    if let Err(err) = subscription.connect_to(publisher.as_str()) {
+                        error!("ROS provided illegal publisher name '{}': {}",
+                               publisher,
+                               err);
                     }
-                });
-                Ok(tx)
+                }
+                Ok(())
             }
             Err(err) => {
-                self.slave.remove_publication(topic);
+                self.slave.remove_subscription(topic);
                 Err(ServerError::XmlRpc(err))
             }
         }
     }
-}
 
-fn connect_subscriber<T>(caller_id: &str, publisher: &str, topic: &str, tx: mpsc::Sender<T>)
-    where T: RosMessage + Decodable + Send + 'static
-{
-    let (protocol, hostname, port) = request_topic(publisher, caller_id, topic).unwrap();
-    if protocol != "TCPROS" {
-        // This should never happen, due to the nature of ROS
-        panic!("Protocol does not match");
-    }
-    let publisher = format!("{}:{}", hostname, port);
-    let subscriber = tcpros::subscriber::Subscriber::<T>::new(publisher.as_str(), caller_id, topic)
-        .unwrap();
-    for val in subscriber {
-        if let Err(_) = tx.send(val) {
-            break;
+    pub fn publish<T>(&mut self, topic: &str) -> Result<&Publisher, ServerError>
+        where T: Message + Encodable
+    {
+        self.slave.add_publication::<T>(&self.hostname, topic)?;
+        match self.master.register_publisher(topic, &T::msg_type()) {
+            Ok(_) => Ok(self.slave.get_publication(topic).unwrap()),
+            Err(error) => {
+                error!("Failed to register publisher for topic '{}': {}",
+                       topic,
+                       error);
+                self.slave.remove_publication(topic);
+                self.master.unregister_publisher(topic)?;
+                Err(ServerError::XmlRpc(error))
+            }
         }
     }
-}
-
-fn request_topic(publisher_uri: &str,
-                 caller_id: &str,
-                 topic: &str)
-                 -> Result<(String, String, i32), rosxmlrpc::error::Error> {
-    let mut request = rosxmlrpc::client::Request::new("requestTopic");
-    request.add(&caller_id)?;
-    request.add(&topic)?;
-    request.add(&[["TCPROS"]])?;
-    let client = rosxmlrpc::Client::new(publisher_uri);
-    let protocols = client.request::<(i32, String, (String, String, i32))>(request)?;
-    Ok(protocols.2)
 }

@@ -1,121 +1,144 @@
-use byteorder::{LittleEndian, ReadBytesExt};
 use rustc_serialize::Encodable;
-use std::clone::Clone;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::io::{Read, Write};
-use std::sync::mpsc;
 use std::thread;
+use std::collections::HashMap;
 use std;
 use super::encoder::Encoder;
 use super::error::Error;
 use super::header::{encode, decode};
-use super::message::RosMessage;
+use super::Message;
+use super::streamfork::{fork, TargetList, DataStream};
 
-pub struct Publisher<T>
-    where T: RosMessage + Encodable + Clone + Send + 'static
-{
-    sender_receiver: mpsc::Receiver<mpsc::Sender<T>>,
-    senders: Vec<mpsc::Sender<T>>,
+pub struct Publisher {
+    subscriptions: DataStream,
     pub ip: String,
     pub port: u16,
+    pub msg_type: String,
+    pub topic: String,
 }
 
-fn handle_stream<T>(topic: String,
-                    mut stream: TcpStream,
-                    rx: mpsc::Receiver<T>)
-                    -> Result<(), Error>
-    where T: RosMessage + Encodable + Clone + Send
-{
-    let caller_id: String;
-    {
-        let mut bytes = [0u8; 4];
-        try!(stream.read_exact(&mut bytes));
-        let mut reader = std::io::Cursor::new(bytes);
-        let data_length = try!(reader.read_u32::<LittleEndian>());
-        let mut payload = vec![0u8; data_length as usize];
-        try!(stream.read_exact(&mut payload));
-        let data = bytes.iter().chain(payload.iter()).cloned().collect();
-        let fields = try!(decode(data));
-        if fields.get("md5sum") != Some(&T::md5sum()) {
-            return Err(Error::Mismatch);
-        }
-        if fields.get("type") != Some(&T::msg_type()) {
-            return Err(Error::Mismatch);
-        }
-        if fields.get("message_definition") != Some(&T::msg_definition()) {
-            return Err(Error::Mismatch);
-        }
-        if fields.get("topic") != Some(&topic) {
-            return Err(Error::Mismatch);
-        }
-        match fields.get("callerid") {
-            None => return Err(Error::Mismatch),
-            Some(v) => caller_id = v.to_owned(),
-        }
-    }
-    // TODO: do something smarter with "caller_id" and "topic"
-    {
-        let mut fields = std::collections::HashMap::<String, String>::new();
-        fields.insert("md5sum".to_owned(), T::md5sum());
-        fields.insert("type".to_owned(), T::msg_type());
-        let fields = try!(encode(fields));
-        try!(stream.write_all(&fields));
-    }
-    while let Ok(v) = rx.recv() {
-        let mut encoder = Encoder::new();
-        try!(v.encode(&mut encoder));
-        try!(stream.write_all(&encoder.extract_data()));
-    }
-    Ok(())
+fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
+    fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
+    fields.get("message_definition") == Some(&T::msg_definition()) &&
+    fields.get("topic") == Some(&String::from(topic)) && fields.get("callerid") != None
 }
 
-fn listen<T>(topic: String,
-             listener: TcpListener,
-             tx_sender: mpsc::Sender<mpsc::Sender<T>>)
-             -> Result<(), Error>
-    where T: RosMessage + Encodable + Clone + Send + 'static
+fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U,
+                                              topic: &str)
+                                              -> Result<(), Error> {
+    if header_matches::<T>(&decode(&mut stream)?, topic) {
+        Ok(())
+    } else {
+        Err(Error::Mismatch)
+    }
+}
+
+fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(), Error> {
+    let mut fields = HashMap::<String, String>::new();
+    fields.insert(String::from("md5sum"), T::md5sum());
+    fields.insert(String::from("type"), T::msg_type());
+    encode(fields, &mut stream)
+}
+
+fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<(), Error>
+    where T: Message,
+          U: std::io::Write + std::io::Read
 {
-    for stream in listener.incoming() {
-        let stream = try!(stream);
-        let (tx, rx) = mpsc::channel();
-        if let Err(_) = tx_sender.send(tx) {
-            // Stop once the corresponding Publisher gets destroyed
+    read_request::<T, U>(&mut stream, &topic)?;
+    write_response::<T, U>(&mut stream)
+}
+
+fn listen_for_subscribers<T, U, V>(topic: String,
+                                   listener: V,
+                                   targets: TargetList<U>)
+                                   -> Result<(), Error>
+    where T: Message,
+          U: std::io::Read + std::io::Write + Send,
+          V: Iterator<Item = U>
+{
+    for mut stream in listener {
+        if let Err(err) = exchange_headers::<T, _>(&mut stream, &topic) {
+            error!("Failed to exchange headers for topic '{}': {}", topic, err);
+            continue;
+        }
+        if targets.add(stream).is_err() {
+            // The TCP listener gets shut down when streamfork's thread deallocates
+            // This happens only when the corresponding Publisher gets deallocated,
+            // causing streamfork's data channel to shut down
             break;
         }
-        let topic = topic.clone();
-        thread::spawn(move || handle_stream(topic, stream, rx));
     }
+
     Ok(())
 }
 
-impl<T> Publisher<T>
-    where T: RosMessage + Encodable + Clone + Send + 'static
-{
-    pub fn new<U>(address: U, topic: &str) -> Result<Publisher<T>, Error>
-        where U: ToSocketAddrs
+impl Publisher {
+    pub fn new<T, U>(address: U, topic: &str) -> Result<Publisher, Error>
+        where T: Message,
+              U: ToSocketAddrs
     {
-        let listener = try!(TcpListener::bind(address));
-        let (tx_sender, rx_sender) = mpsc::channel();
-        let socket_address = try!(listener.local_addr());
-        let topic = topic.to_owned();
-        thread::spawn(move || listen(topic, listener, tx_sender));
-        Ok(Publisher {
-            sender_receiver: rx_sender,
-            senders: vec![],
-            ip: format!("{}", socket_address.ip()),
-            port: socket_address.port(),
-        })
+        let listener = TcpListener::bind(address)?;
+        let socket_address = listener.local_addr()?;
+        Ok(Publisher::wrap_stream::<T, _, _>(topic,
+                                             TcpIterator::new(listener, topic),
+                                             &format!("{}", socket_address.ip()),
+                                             socket_address.port()))
     }
 
-    pub fn send(&mut self, message: T) {
-        while let Ok(tx) = self.sender_receiver.try_recv() {
-            self.senders.push(tx);
+    fn wrap_stream<T, U, V>(topic: &str, listener: V, ip: &str, port: u16) -> Publisher
+        where T: Message,
+              U: std::io::Read + std::io::Write + Send + 'static,
+              V: Iterator<Item = U> + Send + 'static
+    {
+        let (targets, data) = fork();
+        let topic_name = String::from(topic);
+        thread::spawn(move || listen_for_subscribers::<T, _, _>(topic_name, listener, targets));
+        Publisher {
+            subscriptions: data,
+            ip: String::from(ip),
+            port: port,
+            msg_type: T::msg_type(),
+            topic: String::from(topic),
         }
-        // Attempt to send and filter out connections that were stopped
-        self.senders = self.senders
-            .clone()
-            .into_iter()
-            .filter(|sender| sender.send(message.clone()).is_ok())
-            .collect();
+    }
+
+    pub fn send<T: Message + Encodable>(&mut self, message: T) {
+        let mut encoder = Encoder::new();
+        // Failure while encoding can only be caused by unsupported data types,
+        // unless using deliberately bad handwritten rosmsg-s, this should never fail
+        message.encode(&mut encoder).unwrap();
+        // Subscriptions can only be closed from the Publisher side
+        // There is no way for the streamfork thread to fail by itself
+        self.subscriptions.send(encoder).unwrap();
+    }
+}
+
+struct TcpIterator {
+    listener: TcpListener,
+    topic: String,
+}
+
+impl TcpIterator {
+    pub fn new(listener: TcpListener, topic: &str) -> TcpIterator {
+        TcpIterator {
+            listener: listener,
+            topic: String::from(topic),
+        }
+    }
+}
+
+impl Iterator for TcpIterator {
+    type Item = TcpStream;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.listener.accept() {
+            Ok((stream, _)) => Some(stream),
+            Err(err) => {
+                error!("TCP connection to subscriber failed on topic '{}': {}",
+                       self.topic,
+                       err);
+                self.next()
+            }
+        }
     }
 }
