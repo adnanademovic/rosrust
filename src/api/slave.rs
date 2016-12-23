@@ -41,7 +41,7 @@ impl Slave {
             server: server,
             subscriptions: HashMap::new(),
             publications: HashMap::new(),
-            master_uri: master_uri.to_owned(),
+            master_uri: String::from(master_uri),
             req: Mutex::new(rx_req),
             res: Mutex::new(tx_res),
             name: String::from(name),
@@ -56,32 +56,30 @@ impl Slave {
                      req: &mut rosxmlrpc::server::ParameterIterator)
                      -> SerdeResult<BusStats> {
         let caller_id = pop::<String>(req)?;
-        if caller_id != "" {
-            // TODO: implement actual stats displaying
-            Ok(BusStats {
-                publish: Vec::new(),
-                subscribe: Vec::new(),
-                service: ServiceStats {
-                    bytes_received: 0,
-                    bytes_sent: 0,
-                    number_of_requests: 0,
-                },
-            })
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
         }
+        // TODO: implement actual stats displaying
+        Ok(BusStats {
+            publish: Vec::new(),
+            subscribe: Vec::new(),
+            service: ServiceStats {
+                bytes_received: 0,
+                bytes_sent: 0,
+                number_of_requests: 0,
+            },
+        })
     }
 
     fn get_bus_info(&self,
                     req: &mut rosxmlrpc::server::ParameterIterator)
                     -> SerdeResult<Vec<BusInfo>> {
         let caller_id = pop::<String>(req)?;
-        if caller_id != "" {
-            // TODO: implement actual info displaying
-            Ok(Vec::new())
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
         }
+        // TODO: implement actual info displaying
+        Ok(Vec::new())
     }
 
     fn encode_response<T: Encodable>(&self,
@@ -101,38 +99,35 @@ impl Slave {
     fn param_update(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         let key = pop::<String>(req)?;
-        let value = req.next()
-            .ok_or(Error::Protocol(String::from("Missing parameter")))?
-            .value();
-        if caller_id != "" && key != "" {
-            // TODO: implement handling of parameter updates
-            println!("{} {} {}", caller_id, key, value);
-            Ok(0)
-        } else {
-            Err(Error::Protocol("Emtpy strings given".to_owned()))
+        // We don't do anything with parameter updates
+        let value = req.next();
+        if let None = value {
+            return Err(Error::Protocol(String::from("Missing parameter")));
         }
+        if caller_id == "" || key == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
+        }
+        Ok(0)
     }
 
     fn get_pid(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
-        if caller_id != "" {
-            Ok(getpid())
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
         }
+        Ok(getpid())
     }
 
     fn shutdown(&mut self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         let message = pop::<String>(req).unwrap_or(String::from(""));
-        if caller_id != "" {
-            println!("Server is shutting down because: {}", message);
-            match self.server.shutdown() {
-                Ok(()) => Ok(0),
-                Err(_) => Err(Error::Critical("Failed to shutdown server".to_owned())),
-            }
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
+        }
+        info!("Server is shutting down because: {}", message);
+        match self.server.shutdown() {
+            Ok(()) => Ok(0),
+            Err(_) => Err(Error::Critical(String::from("Failed to shutdown server"))),
         }
     }
 
@@ -141,9 +136,8 @@ impl Slave {
     {
         use std::collections::hash_map::Entry;
         match self.publications.entry(String::from(topic)) {
-            Entry::Occupied(entry) => {
-                let publisher = entry.get();
-                if publisher.msg_type != T::msg_type() {
+            Entry::Occupied(publisher_entry) => {
+                if publisher_entry.get().msg_type != T::msg_type() {
                     Err(tcpros::Error::Mismatch)
                 } else {
                     Ok(())
@@ -169,19 +163,18 @@ impl Slave {
                         req: &mut rosxmlrpc::server::ParameterIterator)
                         -> SerdeResult<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
-        if caller_id != "" {
-            Ok(self.publications
-                .values()
-                .map(|ref v| {
-                    return Topic {
-                        name: v.topic.clone(),
-                        datatype: v.msg_type.clone(),
-                    };
-                })
-                .collect())
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
         }
+        Ok(self.publications
+            .values()
+            .map(|ref v| {
+                return Topic {
+                    name: v.topic.clone(),
+                    datatype: v.msg_type.clone(),
+                };
+            })
+            .collect())
     }
 
     pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Option<&mut Subscriber>
@@ -213,19 +206,18 @@ impl Slave {
                          req: &mut rosxmlrpc::server::ParameterIterator)
                          -> SerdeResult<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
-        if caller_id != "" {
-            Ok(self.subscriptions
-                .values()
-                .map(|ref v| {
-                    return Topic {
-                        name: v.topic.clone(),
-                        datatype: v.msg_type.clone(),
-                    };
-                })
-                .collect())
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
         }
+        Ok(self.subscriptions
+            .values()
+            .map(|ref v| {
+                return Topic {
+                    name: v.topic.clone(),
+                    datatype: v.msg_type.clone(),
+                };
+            })
+            .collect())
     }
 
     fn publisher_update(&mut self,
@@ -234,30 +226,28 @@ impl Slave {
         let caller_id = pop::<String>(req)?;
         let topic = pop::<String>(req)?;
         let publishers = pop::<Vec<String>>(req)?;
-        if caller_id != "" && topic != "" && publishers.iter().all(|ref x| x.as_str() != "") {
-            if let Some(mut subscription) = self.subscriptions.get_mut(&topic) {
-                for publisher in publishers {
-                    if let Err(err) = connect_to_publisher(&mut subscription,
-                                                           &self.name,
-                                                           &publisher,
-                                                           &topic) {
-                        return Err(err);
-                    }
+        if caller_id == "" || topic == "" || publishers.iter().any(|ref x| x.as_str() == "") {
+            return Err(Error::Protocol(String::from("Empty strings given")));
+        }
+        if let Some(mut subscription) = self.subscriptions.get_mut(&topic) {
+            for publisher in publishers {
+                if let Err(err) = connect_to_publisher(&mut subscription,
+                                                       &self.name,
+                                                       &publisher,
+                                                       &topic) {
+                    return Err(err);
                 }
             }
-            Ok(0)
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
         }
+        Ok(0)
     }
 
     fn get_master_uri(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<&str> {
         let caller_id = pop::<String>(req)?;
-        if caller_id != "" {
-            Ok(&self.master_uri)
-        } else {
-            Err(Error::Protocol("Empty strings given".to_owned()))
+        if caller_id == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
         }
+        Ok(&self.master_uri)
     }
 
     fn request_topic(&self,
@@ -270,29 +260,29 @@ impl Slave {
             .value();
         let publisher = self.publications
             .get(&topic)
-            .ok_or(Error::Protocol("Requested topic not published by node".to_owned()))?;
-        if caller_id != "" && topic != "" {
-            if let XmlRpcValue::Array(protocols) = protocols {
-                let mut has_tcpros = false;
-                for protocol in protocols {
-                    if let XmlRpcValue::Array(protocol) = protocol {
-                        if let Some(&XmlRpcValue::String(ref name)) = protocol.get(0) {
-                            has_tcpros |= name == "TCPROS";
-                        }
-                    }
-                }
-                if has_tcpros {
-                    Ok(("TCPROS".to_owned(), publisher.ip.clone(), publisher.port as i32))
-                } else {
-                    Err(Error::Protocol("No matching protocols available".to_owned()))
-                }
-            } else {
-                Err(Error::Protocol("Protocols need to be provided as [ [String, \
-                                     XmlRpcLegalValue] ]"
-                    .to_owned()))
+            .ok_or(Error::Protocol(String::from("Requested topic not published by node")))?;
+        if caller_id == "" || topic == "" {
+            return Err(Error::Protocol(String::from("Empty strings given")));
+        }
+        let protocols = match protocols {
+            XmlRpcValue::Array(protocols) => protocols,
+            _ => {
+                return Err(Error::Protocol(String::from("Protocols need to be provided as [ \
+                                                         [String, XmlRpcLegalValue] ]")))
             }
+        };
+        let mut has_tcpros = false;
+        for protocol in protocols {
+            if let XmlRpcValue::Array(protocol) = protocol {
+                if let Some(&XmlRpcValue::String(ref name)) = protocol.get(0) {
+                    has_tcpros |= name == "TCPROS";
+                }
+            }
+        }
+        if has_tcpros {
+            Ok((String::from("TCPROS"), publisher.ip.clone(), publisher.port as i32))
         } else {
-            Err(Error::Protocol("Empty parameters given".to_owned()))
+            Err(Error::Protocol(String::from("No matching protocols available")))
         }
     }
 
@@ -369,7 +359,7 @@ impl rosxmlrpc::server::XmlRpcServer for SlaveHandler {
               req: rosxmlrpc::server::ParameterIterator)
               -> rosxmlrpc::server::Answer {
         println!("CALLED METHOD: {}", method_name);
-        self.req.lock().unwrap().send((method_name.to_owned(), req)).unwrap();
+        self.req.lock().unwrap().send((String::from(method_name), req)).unwrap();
         self.res.lock().unwrap().recv().unwrap()
     }
 }
