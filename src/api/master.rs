@@ -1,4 +1,6 @@
 use rosxmlrpc;
+use rosxmlrpc::error::Error;
+use rosxmlrpc::serde::decoder::Error as DecoderError;
 use rustc_serialize::{Decodable, Decoder, Encodable};
 use super::value::Topic;
 
@@ -7,6 +9,8 @@ pub struct Master {
     client_id: String,
     caller_api: String,
 }
+
+const MISMATCHED_FORMAT: Error = Error::Deserialization(DecoderError::MismatchedDataFormat);
 
 impl Master {
     pub fn new(master_uri: &str, client_id: &str, caller_api: &str) -> Master {
@@ -23,32 +27,34 @@ impl Master {
 
     fn remove_tree_wrap(data: MasterResult<rosxmlrpc::XmlRpcValue>)
                         -> MasterResult<rosxmlrpc::XmlRpcValue> {
-        if let rosxmlrpc::XmlRpcValue::Array(values) = data? {
-            if values.len() != 3 {
-                return Err(rosxmlrpc::error::Error::Deserialization(
-                    rosxmlrpc::serde::decoder::Error::MismatchedDataFormat));
-            }
-            let mut values = values.into_iter();
-            if let Some(rosxmlrpc::XmlRpcValue::Int(code)) = values.next() {
-                if let Some(rosxmlrpc::XmlRpcValue::String(message)) = values.next() {
-                    if let Some(value) = values.next() {
-                        return match code {
-                            0 | -1 => {
-                                Err(rosxmlrpc::error::Error::Deserialization(
-                                    rosxmlrpc::serde::decoder::Error::Other(message)))
-                            }
-                            1 => Ok(value),
-                            _ => {
-                                Err(rosxmlrpc::error::Error::Deserialization(
-                                    rosxmlrpc::serde::decoder::Error::Other(
-                                        String::from("Invalid response code returned by ROS"))))
-                            }
-                        };
-                    }
-                }
+        let values = match data? {
+            rosxmlrpc::XmlRpcValue::Array(values) => values,
+            _ => return Err(MISMATCHED_FORMAT),
+        };
+        if values.len() != 3 {
+            return Err(MISMATCHED_FORMAT);
+        }
+        let mut values = values.into_iter();
+        let code = match values.next() {
+            Some(rosxmlrpc::XmlRpcValue::Int(v)) => v,
+            _ => return Err(MISMATCHED_FORMAT),
+        };
+        let message = match values.next() {
+            Some(rosxmlrpc::XmlRpcValue::String(v)) => v,
+            _ => return Err(MISMATCHED_FORMAT),
+        };
+        let value = values.next()
+            .ok_or(rosxmlrpc::serde::decoder::Error::MismatchedDataFormat)?;
+        match code {
+            0 | -1 => Err(rosxmlrpc::serde::decoder::Error::Other(message))?,
+            1 => Ok(value),
+            v => {
+                warn!("ROS Master returned '{}' response code (only -1, 0, 1 legal)",
+                      v);
+                Err(rosxmlrpc::serde::decoder::Error::Other(String::from("Invalid response \
+                                                                          code returned by ROS")))?
             }
         }
-        Err(rosxmlrpc::serde::decoder::Error::MismatchedDataFormat)?
     }
 
     fn request<T: Decodable>(&self, function_name: &str, parameters: &[&str]) -> MasterResult<T> {
@@ -166,8 +172,6 @@ impl Master {
         self.request("getParamNames", &[self.client_id.as_str()])
     }
 }
-
-pub type Error = rosxmlrpc::error::Error;
 
 pub type MasterResult<T> = Result<T, Error>;
 
