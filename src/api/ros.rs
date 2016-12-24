@@ -63,14 +63,11 @@ impl Ros {
 
         match self.master.register_subscriber(topic, &T::msg_type()) {
             Ok(publishers) => {
-                let topic = topic.to_owned();
-                let subscription = self.slave.get_subscription(&topic).unwrap();
-                for publisher in publishers {
-                    if let Err(err) = subscription.connect_to(publisher.as_str()) {
-                        error!("ROS provided illegal publisher name '{}': {}",
-                               publisher,
-                               err);
-                    }
+                if let Err(err) = self.slave
+                    .add_publishers_to_subscription(topic, publishers.into_iter()) {
+                    error!("Failed to subscribe to all publishers of topic '{}': {}",
+                           topic,
+                           err);
                 }
                 Ok(())
             }

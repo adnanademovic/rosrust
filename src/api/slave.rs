@@ -198,6 +198,28 @@ impl Slave {
         self.subscriptions.get_mut(topic)
     }
 
+    pub fn add_publishers_to_subscription<T>(&mut self,
+                                             topic: &str,
+                                             publishers: T)
+                                             -> SerdeResult<()>
+        where T: Iterator<Item = String>
+    {
+        if let Some(mut subscription) = self.subscriptions.get_mut(topic) {
+            for publisher in publishers {
+                if let Err(err) = connect_to_publisher(&mut subscription,
+                                                       &self.name,
+                                                       &publisher,
+                                                       &topic) {
+                    error!("ROS provided illegal publisher name '{}': {}",
+                           publisher,
+                           err);
+                    return Err(err);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn remove_subscription(&mut self, topic: &str) {
         self.subscriptions.remove(topic);
     }
@@ -229,17 +251,7 @@ impl Slave {
         if caller_id == "" || topic == "" || publishers.iter().any(|ref x| x.as_str() == "") {
             return Err(Error::Protocol(String::from("Empty strings given")));
         }
-        if let Some(mut subscription) = self.subscriptions.get_mut(&topic) {
-            for publisher in publishers {
-                if let Err(err) = connect_to_publisher(&mut subscription,
-                                                       &self.name,
-                                                       &publisher,
-                                                       &topic) {
-                    return Err(err);
-                }
-            }
-        }
-        Ok(0)
+        self.add_publishers_to_subscription(&topic, publishers.into_iter()).and(Ok(0))
     }
 
     fn get_master_uri(&self, req: &mut rosxmlrpc::server::ParameterIterator) -> SerdeResult<&str> {
