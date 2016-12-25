@@ -5,3 +5,4 @@ mod error;
 mod master;
 mod slave;
 mod ros;
+mod slavehandler;

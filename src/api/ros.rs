@@ -48,10 +48,6 @@ impl Ros {
         self.master.get_param_names()
     }
 
-    pub fn spin(&mut self) -> Result<(), String> {
-        self.slave.handle_calls()
-    }
-
     pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), ServerError>
         where T: Message + Decodable,
               F: Fn(T) -> () + Send + 'static
