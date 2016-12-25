@@ -4,6 +4,7 @@ use rosxmlrpc::server::{Answer, ParameterIterator, XmlRpcServer};
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use super::error::ServerError as Error;
 use super::value::Topic;
 use tcpros::{Publisher, Subscriber};
@@ -13,6 +14,7 @@ type SerdeResult<T> = Result<T, Error>;
 pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
     pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
+    shutdown_signal: Arc<Mutex<Sender<()>>>,
     master_uri: String,
     name: String,
 }
@@ -32,12 +34,13 @@ impl XmlRpcServer for SlaveHandler {
 }
 
 impl SlaveHandler {
-    pub fn new(master_uri: &str, name: &str) -> SlaveHandler {
+    pub fn new(master_uri: &str, name: &str, shutdown_signal: Sender<()>) -> SlaveHandler {
         SlaveHandler {
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             publications: Arc::new(Mutex::new(HashMap::new())),
             master_uri: String::from(master_uri),
             name: String::from(name),
+            shutdown_signal: Arc::new(Mutex::new(shutdown_signal)),
         }
     }
 
@@ -120,8 +123,10 @@ impl SlaveHandler {
             return Err(Error::Protocol(String::from("Empty strings given")));
         }
         info!("Server is shutting down because: {}", message);
-        Err(Error::Critical(String::from("Cannot shutdown server: \
-                                          https://github.com/hyperium/hyper/issues/338")))
+        match self.shutdown_signal.lock().unwrap().send(()) {
+            Ok(..) => Ok(0),
+            Err(..) => Err(Error::Critical(String::from("Slave API is down already"))),
+        }
     }
 
     fn get_publications(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<Topic>> {

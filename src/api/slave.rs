@@ -2,13 +2,15 @@ use rosxmlrpc;
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::channel;
+use std::thread;
 use super::error::ServerError as Error;
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
 use tcpros::{self, Message, Publisher, PublisherStream, Subscriber};
 
 pub struct Slave {
     name: String,
-    server: rosxmlrpc::Server,
+    uri: String,
     publications: Arc<Mutex<HashMap<String, Publisher>>>,
     subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
 }
@@ -17,20 +19,31 @@ type SerdeResult<T> = Result<T, Error>;
 
 impl Slave {
     pub fn new(master_uri: &str, server_uri: &str, name: &str) -> Result<Slave, Error> {
-        let handler = SlaveHandler::new(master_uri, name);
+        let (shutdown_tx, shutdown_rx) = channel();
+        let handler = SlaveHandler::new(master_uri, name, shutdown_tx);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
-        let server = rosxmlrpc::Server::new(server_uri, handler)?;
+        let mut server = rosxmlrpc::Server::new(server_uri, handler)?;
+        let uri = server.uri.clone();
+        thread::spawn(move || {
+            match shutdown_rx.recv() {
+                Ok(..) => info!("ROS Slave API shutdown by remote request"),
+                Err(..) => info!("ROS Slave API shutdown by ROS client destruction"),
+            };
+            if let Err(err) = server.shutdown() {
+                info!("Error during ROS Slave API shutdown: {}", err);
+            }
+        });
         Ok(Slave {
             name: String::from(name),
-            server: server,
+            uri: uri,
             publications: pubs,
             subscriptions: subs,
         })
     }
 
     pub fn uri(&self) -> &str {
-        return &self.server.uri;
+        return &self.uri;
     }
 
     pub fn add_publishers_to_subscription<T>(&mut self,
