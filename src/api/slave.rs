@@ -20,7 +20,7 @@ impl Slave {
         let handler = SlaveHandler::new(master_uri, name);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
-        let server = rosxmlrpc::Server::new(server_uri, SlaveHandler::new(master_uri, name))?;
+        let server = rosxmlrpc::Server::new(server_uri, handler)?;
         Ok(Slave {
             name: String::from(name),
             server: server,
