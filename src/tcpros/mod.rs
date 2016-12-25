@@ -1,4 +1,4 @@
-pub use self::publisher::Publisher;
+pub use self::publisher::{Publisher, PublisherStream};
 pub use self::subscriber::Subscriber;
 pub use self::error::Error;
 

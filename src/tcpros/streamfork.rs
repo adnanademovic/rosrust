@@ -37,6 +37,7 @@ impl<T: Write + Send + 'static> TargetList<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct DataStream(Sender<Encoder>);
 
 impl DataStream {

@@ -9,7 +9,7 @@ use std::error::Error as ErrorTrait;
 use nix::unistd::getpid;
 use super::error::ServerError as Error;
 use super::value::Topic;
-use tcpros::{self, Message, Publisher, Subscriber};
+use tcpros::{self, Message, Publisher, PublisherStream, Subscriber};
 
 pub struct Slave {
     server: rosxmlrpc::Server,
@@ -131,28 +131,20 @@ impl Slave {
         }
     }
 
-    pub fn add_publication<T>(&mut self, hostname: &str, topic: &str) -> Result<(), tcpros::Error>
-        where T: Message
+    pub fn add_publication<T>(&mut self,
+                              hostname: &str,
+                              topic: &str)
+                              -> Result<PublisherStream<T>, tcpros::Error>
+        where T: Message + Encodable
     {
         use std::collections::hash_map::Entry;
         match self.publications.entry(String::from(topic)) {
-            Entry::Occupied(publisher_entry) => {
-                if publisher_entry.get().msg_type != T::msg_type() {
-                    Err(tcpros::Error::Mismatch)
-                } else {
-                    Ok(())
-                }
-            }
+            Entry::Occupied(publisher_entry) => publisher_entry.get().stream(),
             Entry::Vacant(entry) => {
                 let publisher = Publisher::new::<T, _>(format!("{}:0", hostname).as_str(), topic)?;
-                entry.insert(publisher);
-                Ok(())
+                entry.insert(publisher).stream()
             }
         }
-    }
-
-    pub fn get_publication(&mut self, topic: &str) -> Option<&Publisher> {
-        self.publications.get(topic)
     }
 
     pub fn remove_publication(&mut self, topic: &str) {
@@ -177,7 +169,7 @@ impl Slave {
             .collect())
     }
 
-    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Option<&mut Subscriber>
+    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<(), Error>
         where T: Message + Decodable,
               F: Fn(T) -> () + Send + 'static
     {
@@ -185,17 +177,14 @@ impl Slave {
         match self.subscriptions.entry(String::from(topic)) {
             Entry::Occupied(..) => {
                 error!("Duplicate subscription to topic '{}' attempted", topic);
-                None
+                Err(Error::Critical(String::from("Could not add duplicate subscription to topic")))
             }
             Entry::Vacant(entry) => {
                 let subscriber = Subscriber::new::<T, F>(&self.name, topic, callback);
-                Some(entry.insert(subscriber))
+                entry.insert(subscriber);
+                Ok(())
             }
         }
-    }
-
-    pub fn get_subscription(&mut self, topic: &str) -> Option<&mut Subscriber> {
-        self.subscriptions.get_mut(topic)
     }
 
     pub fn add_publishers_to_subscription<T>(&mut self,

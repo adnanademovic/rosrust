@@ -102,14 +102,38 @@ impl Publisher {
         }
     }
 
-    pub fn send<T: Message + Encodable>(&mut self, message: T) {
+    pub fn stream<T>(&self) -> Result<PublisherStream<T>, Error>
+        where T: Message + Encodable
+    {
+        PublisherStream::new(self)
+    }
+}
+
+pub struct PublisherStream<T: Message + Encodable> {
+    stream: DataStream,
+    datatype: std::marker::PhantomData<T>,
+}
+
+impl<T: Message + Encodable> PublisherStream<T> {
+    pub fn new(publisher: &Publisher) -> Result<PublisherStream<T>, Error> {
+        if publisher.msg_type == T::msg_type() {
+            Ok(PublisherStream {
+                stream: publisher.subscriptions.clone(),
+                datatype: std::marker::PhantomData,
+            })
+        } else {
+            Err(Error::Mismatch)
+        }
+    }
+
+    pub fn send(&mut self, message: T) {
         let mut encoder = Encoder::new();
         // Failure while encoding can only be caused by unsupported data types,
         // unless using deliberately bad handwritten rosmsg-s, this should never fail
         message.encode(&mut encoder).unwrap();
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
-        self.subscriptions.send(encoder).unwrap();
+        self.stream.send(encoder).unwrap();
     }
 }
 

@@ -4,7 +4,7 @@ use nix::unistd::gethostname;
 use super::master::{Master, MasterResult};
 use super::slave::Slave;
 use super::error::ServerError;
-use tcpros::{Message, Publisher};
+use tcpros::{Message, PublisherStream};
 
 pub struct Ros {
     pub master: Master,
@@ -56,10 +56,7 @@ impl Ros {
         where T: Message + Decodable,
               F: Fn(T) -> () + Send + 'static
     {
-        self.slave
-            .add_subscription::<T, F>(topic, callback)
-            .ok_or(ServerError::Critical(String::from("Could not add duplicate subscription to \
-                                                       topic")))?;
+        self.slave.add_subscription::<T, F>(topic, callback)?;
 
         match self.master.register_subscriber(topic, &T::msg_type()) {
             Ok(publishers) => {
@@ -78,12 +75,12 @@ impl Ros {
         }
     }
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<&Publisher, ServerError>
+    pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>, ServerError>
         where T: Message + Encodable
     {
-        self.slave.add_publication::<T>(&self.hostname, topic)?;
+        let stream = self.slave.add_publication::<T>(&self.hostname, topic)?;
         match self.master.register_publisher(topic, &T::msg_type()) {
-            Ok(_) => Ok(self.slave.get_publication(topic).unwrap()),
+            Ok(_) => Ok(stream),
             Err(error) => {
                 error!("Failed to register publisher for topic '{}': {}",
                        topic,
