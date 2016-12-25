@@ -1,14 +1,16 @@
 use rustc_serialize::{Encodable, Decodable};
 use std;
 use nix::unistd::gethostname;
-use super::master::{Master, MasterResult};
+use super::master::{self, Master, MasterResult};
 use super::slave::Slave;
 use super::error::ServerError;
+use super::value::Topic;
 use tcpros::{Message, PublisherStream};
+use rosxmlrpc::serde::XmlRpcValue;
 
 pub struct Ros {
-    pub master: Master,
-    pub slave: Slave,
+    master: Master,
+    slave: Slave,
     hostname: String,
 }
 
@@ -32,20 +34,23 @@ impl Ros {
         return self.slave.uri();
     }
 
-    pub fn get_param<T: Decodable>(&self, name: &str) -> MasterResult<T> {
-        self.master.get_param::<T>(name)
+    pub fn param<'a, 'b>(&'a self, name: &'b str) -> Parameter<'a, 'b> {
+        Parameter {
+            master: &self.master,
+            name: name,
+        }
     }
 
-    pub fn set_param<T: Encodable>(&self, name: &str, value: &T) -> MasterResult<()> {
-        self.master.set_param::<T>(name, value).and(Ok(()))
-    }
-
-    pub fn has_param(&self, name: &str) -> MasterResult<bool> {
-        self.master.has_param(name)
-    }
-
-    pub fn get_param_names(&self) -> MasterResult<Vec<String>> {
+    pub fn parameters(&self) -> MasterResult<Vec<String>> {
         self.master.get_param_names()
+    }
+
+    pub fn state(&self) -> MasterResult<master::SystemState> {
+        self.master.get_system_state()
+    }
+
+    pub fn topics(&self) -> MasterResult<Vec<Topic>> {
+        self.master.get_topic_types()
     }
 
     pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), ServerError>
@@ -66,6 +71,7 @@ impl Ros {
             }
             Err(err) => {
                 self.slave.remove_subscription(topic);
+                self.master.unregister_subscriber(topic)?;
                 Err(ServerError::from(err))
             }
         }
@@ -86,5 +92,36 @@ impl Ros {
                 Err(ServerError::from(error))
             }
         }
+    }
+}
+
+pub struct Parameter<'a, 'b> {
+    master: &'a Master,
+    name: &'b str,
+}
+
+impl<'a, 'b> Parameter<'a, 'b> {
+    pub fn get<T: Decodable>(&self) -> MasterResult<T> {
+        self.master.get_param::<T>(self.name)
+    }
+
+    pub fn get_raw(&self) -> MasterResult<XmlRpcValue> {
+        self.master.get_param_any(self.name)
+    }
+
+    pub fn set<T: Encodable>(&self, value: &T) -> MasterResult<()> {
+        self.master.set_param::<T>(self.name, value).and(Ok(()))
+    }
+
+    pub fn delete(&self) -> MasterResult<()> {
+        self.master.delete_param(self.name).and(Ok(()))
+    }
+
+    pub fn exists(&self) -> MasterResult<bool> {
+        self.master.has_param(self.name)
+    }
+
+    pub fn search(&self) -> MasterResult<String> {
+        self.master.search_param(self.name)
     }
 }

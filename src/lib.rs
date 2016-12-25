@@ -14,8 +14,8 @@ pub use rosxmlrpc::XmlRpcValue;
 
 mod api;
 pub mod build_tools;
-pub mod rosxmlrpc;
-pub mod tcpros;
+mod rosxmlrpc;
+mod tcpros;
 
 #[cfg(test)]
 mod tests {
