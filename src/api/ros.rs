@@ -5,6 +5,7 @@ use super::master::{self, Master, MasterResult};
 use super::slave::Slave;
 use super::error::ServerError;
 use super::value::Topic;
+use super::naming::Resolver;
 use tcpros::{Message, PublisherStream};
 use rosxmlrpc::serde::XmlRpcValue;
 
@@ -12,21 +13,32 @@ pub struct Ros {
     master: Master,
     slave: Slave,
     hostname: String,
+    resolver: Resolver,
 }
 
 impl Ros {
     pub fn new(name: &str) -> Result<Ros, ServerError> {
+        let namespace = std::env::var("ROS_NAMESPACE").unwrap_or(String::from(""));
+        Ros::new_raw(&namespace, name)
+    }
+
+    pub fn new_raw(namespace: &str, name: &str) -> Result<Ros, ServerError> {
         let master_uri = std::env::var("ROS_MASTER_URI")
-            .unwrap_or("http://localhost:11311/".to_owned());
+            .unwrap_or(String::from("http://localhost:11311/"));
         let mut hostname = vec![];
         gethostname(&mut hostname)?;
         let hostname = String::from_utf8(hostname)?;
         let slave = Slave::new(&master_uri, &format!("{}:0", hostname), name)?;
         let master = Master::new(&master_uri, name, &slave.uri());
+        let resolver = match Resolver::new(&format!("{}/{}", namespace, name)) {
+            Ok(v) => v,
+            Err(()) => return Err(ServerError::Critical(String::from("Bad name provided"))),
+        };
         Ok(Ros {
             master: master,
             slave: slave,
             hostname: hostname,
+            resolver: resolver,
         })
     }
 
@@ -34,10 +46,15 @@ impl Ros {
         return self.slave.uri();
     }
 
-    pub fn param<'a, 'b>(&'a self, name: &'b str) -> Parameter<'a, 'b> {
-        Parameter {
-            master: &self.master,
-            name: name,
+    pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
+        match self.resolver.translate(name) {
+            Ok(v) => {
+                Some(Parameter {
+                    master: &self.master,
+                    name: v,
+                })
+            }
+            Err(()) => None,
         }
     }
 
@@ -57,21 +74,25 @@ impl Ros {
         where T: Message + Decodable,
               F: Fn(T) -> () + Send + 'static
     {
-        self.slave.add_subscription::<T, F>(topic, callback)?;
+        let name = match self.resolver.translate(topic) {
+            Ok(v) => v,
+            Err(()) => return Err(ServerError::Critical(String::from("Bad name provided"))),
+        };
+        self.slave.add_subscription::<T, F>(&name, callback)?;
 
-        match self.master.register_subscriber(topic, &T::msg_type()) {
+        match self.master.register_subscriber(&name, &T::msg_type()) {
             Ok(publishers) => {
                 if let Err(err) = self.slave
-                    .add_publishers_to_subscription(topic, publishers.into_iter()) {
+                    .add_publishers_to_subscription(&name, publishers.into_iter()) {
                     error!("Failed to subscribe to all publishers of topic '{}': {}",
-                           topic,
+                           name,
                            err);
                 }
                 Ok(())
             }
             Err(err) => {
-                self.slave.remove_subscription(topic);
-                self.master.unregister_subscriber(topic)?;
+                self.slave.remove_subscription(&name);
+                self.master.unregister_subscriber(&name)?;
                 Err(ServerError::from(err))
             }
         }
@@ -80,48 +101,52 @@ impl Ros {
     pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>, ServerError>
         where T: Message + Encodable
     {
-        let stream = self.slave.add_publication::<T>(&self.hostname, topic)?;
-        match self.master.register_publisher(topic, &T::msg_type()) {
+        let name = match self.resolver.translate(topic) {
+            Ok(v) => v,
+            Err(()) => return Err(ServerError::Critical(String::from("Bad name provided"))),
+        };
+        let stream = self.slave.add_publication::<T>(&self.hostname, &name)?;
+        match self.master.register_publisher(&name, &T::msg_type()) {
             Ok(_) => Ok(stream),
             Err(error) => {
                 error!("Failed to register publisher for topic '{}': {}",
-                       topic,
+                       name,
                        error);
-                self.slave.remove_publication(topic);
-                self.master.unregister_publisher(topic)?;
+                self.slave.remove_publication(&name);
+                self.master.unregister_publisher(&name)?;
                 Err(ServerError::from(error))
             }
         }
     }
 }
 
-pub struct Parameter<'a, 'b> {
+pub struct Parameter<'a> {
     master: &'a Master,
-    name: &'b str,
+    name: String,
 }
 
-impl<'a, 'b> Parameter<'a, 'b> {
+impl<'a> Parameter<'a> {
     pub fn get<T: Decodable>(&self) -> MasterResult<T> {
-        self.master.get_param::<T>(self.name)
+        self.master.get_param::<T>(&self.name)
     }
 
     pub fn get_raw(&self) -> MasterResult<XmlRpcValue> {
-        self.master.get_param_any(self.name)
+        self.master.get_param_any(&self.name)
     }
 
     pub fn set<T: Encodable>(&self, value: &T) -> MasterResult<()> {
-        self.master.set_param::<T>(self.name, value).and(Ok(()))
+        self.master.set_param::<T>(&self.name, value).and(Ok(()))
     }
 
     pub fn delete(&self) -> MasterResult<()> {
-        self.master.delete_param(self.name).and(Ok(()))
+        self.master.delete_param(&self.name).and(Ok(()))
     }
 
     pub fn exists(&self) -> MasterResult<bool> {
-        self.master.has_param(self.name)
+        self.master.has_param(&self.name)
     }
 
     pub fn search(&self) -> MasterResult<String> {
-        self.master.search_param(self.name)
+        self.master.search_param(&self.name)
     }
 }
