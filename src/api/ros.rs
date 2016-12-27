@@ -30,10 +30,7 @@ impl Ros {
         let hostname = String::from_utf8(hostname)?;
         let slave = Slave::new(&master_uri, &format!("{}:0", hostname), name)?;
         let master = Master::new(&master_uri, name, &slave.uri());
-        let resolver = match Resolver::new(&format!("{}/{}", namespace, name)) {
-            Ok(v) => v,
-            Err(()) => return Err(ServerError::Critical(String::from("Bad name provided"))),
-        };
+        let resolver = Resolver::new(&format!("{}/{}", namespace, name))?;
         Ok(Ros {
             master: master,
             slave: slave,
@@ -42,20 +39,21 @@ impl Ros {
         })
     }
 
+    pub fn map(&mut self, source: &str, destination: &str) -> Result<(), ServerError> {
+        self.resolver.map(source, destination).map_err(|v| ServerError::Naming(v))
+    }
+
     pub fn node_uri(&self) -> &str {
         return self.slave.uri();
     }
 
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
-        match self.resolver.translate(name) {
-            Ok(v) => {
-                Some(Parameter {
-                    master: &self.master,
-                    name: v,
-                })
+        self.resolver.translate(name).ok().map(|v| {
+            Parameter {
+                master: &self.master,
+                name: v,
             }
-            Err(()) => None,
-        }
+        })
     }
 
     pub fn parameters(&self) -> MasterResult<Vec<String>> {
@@ -74,10 +72,7 @@ impl Ros {
         where T: Message + Decodable,
               F: Fn(T) -> () + Send + 'static
     {
-        let name = match self.resolver.translate(topic) {
-            Ok(v) => v,
-            Err(()) => return Err(ServerError::Critical(String::from("Bad name provided"))),
-        };
+        let name = self.resolver.translate(topic)?;
         self.slave.add_subscription::<T, F>(&name, callback)?;
 
         match self.master.register_subscriber(&name, &T::msg_type()) {
@@ -101,10 +96,7 @@ impl Ros {
     pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>, ServerError>
         where T: Message + Encodable
     {
-        let name = match self.resolver.translate(topic) {
-            Ok(v) => v,
-            Err(()) => return Err(ServerError::Critical(String::from("Bad name provided"))),
-        };
+        let name = self.resolver.translate(topic)?;
         let stream = self.slave.add_publication::<T>(&self.hostname, &name)?;
         match self.master.register_publisher(&name, &T::msg_type()) {
             Ok(_) => Ok(stream),

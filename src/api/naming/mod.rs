@@ -1,24 +1,36 @@
 use self::path::Path;
+use self::mapper::Mapper;
+pub use self::error::Error;
 
 mod path;
+mod mapper;
+mod error;
 
 pub struct Resolver {
     path: path::Buffer,
     namespace: path::Buffer,
+    mapper: Mapper,
 }
 
 impl Resolver {
-    pub fn new(name: &str) -> Result<Resolver, ()> {
+    pub fn new(name: &str) -> Result<Resolver, Error> {
         let path = name.parse::<path::Buffer>()?;
-        let namespace = path.parent().ok_or(())?.take();
+        let namespace = path.parent().ok_or(Error::IllegalPath)?.take();
         Ok(Resolver {
             path: path,
             namespace: namespace,
+            mapper: Mapper::new(),
         })
     }
 
-    pub fn resolve(&self, name: &str) -> Result<path::Buffer, ()> {
-        let first_char = *name.as_bytes().get(0).ok_or(())?;
+    pub fn map(&mut self, source: &str, destination: &str) -> Result<(), Error> {
+        let source = self.resolve(source)?;
+        let destination = self.resolve(destination)?;
+        self.mapper.add(source.get(), destination)
+    }
+
+    fn resolve(&self, name: &str) -> Result<path::Buffer, Error> {
+        let first_char = *name.as_bytes().get(0).ok_or(Error::IllegalPath)?;
         if first_char == b'/' {
             return name.parse();
         }
@@ -29,8 +41,12 @@ impl Resolver {
         })
     }
 
-    pub fn translate(&self, name: &str) -> Result<String, ()> {
-        Ok(format!("{}", self.resolve(name)?))
+    pub fn translate(&self, name: &str) -> Result<String, Error> {
+        let path = self.resolve(name)?;
+        match self.mapper.translate(path.get()) {
+            Some(v) => Ok(format!("{}", v)),
+            None => Ok(format!("{}", path)),
+        }
     }
 }
 
@@ -121,5 +137,23 @@ mod tests {
                    r.translate("f1_aA/Ba02/Xx").unwrap());
         assert_eq!(String::from("/some/long/path/f1_aA/Ba02/Xx"),
                    r.translate("~f1_aA/Ba02/Xx").unwrap());
+    }
+
+    #[test]
+    fn supports_remapping() {
+        let mut r = Resolver::new("/some/long/path").unwrap();
+        r.map("a", "/d").unwrap();
+        r.map("~x", "/e").unwrap();
+        r.map("/z", "/f").unwrap();
+        r.map("/a1", "g").unwrap();
+        r.map("a2", "~g").unwrap();
+        assert_eq!(String::from("/d"), r.translate("/some/long/a").unwrap());
+        assert_eq!(String::from("/e"), r.translate("path/x").unwrap());
+        assert_eq!(String::from("/f"), r.translate("/z").unwrap());
+        assert_eq!(String::from("/some/long/g"), r.translate("/a1").unwrap());
+        assert_eq!(String::from("/some/long/path/g"),
+                   r.translate("/some/long/a2").unwrap());
+        assert_eq!(String::from("/some/long/other"),
+                   r.translate("other").unwrap());
     }
 }

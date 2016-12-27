@@ -1,6 +1,7 @@
 use std;
 use std::ops::{Add, AddAssign};
 use std::fmt;
+use super::Error;
 
 pub trait Path {
     fn get(&self) -> &[String];
@@ -88,11 +89,9 @@ impl<T: Path> AddAssign<T> for Buffer {
 }
 
 impl std::str::FromStr for Buffer {
-    type Err = ();
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // ^(/[a-zA-Z][0-9a-zA-Z_]*)$
-
         let mut word_iter = s.split('/');
         if let Some("") = word_iter.next() {
             let words = word_iter.map(|v| String::from(v)).collect::<Vec<String>>();
@@ -102,7 +101,7 @@ impl std::str::FromStr for Buffer {
                 }
             }
         }
-        Err(())
+        Err(Error::MappingSourceExists)
     }
 }
 
