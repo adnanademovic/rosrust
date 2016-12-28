@@ -6,13 +6,14 @@ use std::sync::mpsc::channel;
 use std::thread;
 use super::error::ServerError as Error;
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
-use tcpros::{self, Message, Publisher, PublisherStream, Subscriber};
+use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service};
 
 pub struct Slave {
     name: String,
     uri: String,
     publications: Arc<Mutex<HashMap<String, Publisher>>>,
     subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
+    services: Arc<Mutex<HashMap<String, Service>>>,
 }
 
 type SerdeResult<T> = Result<T, Error>;
@@ -23,6 +24,7 @@ impl Slave {
         let handler = SlaveHandler::new(master_uri, name, shutdown_tx);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
+        let services = handler.services.clone();
         let mut server = rosxmlrpc::Server::new(server_uri, handler)?;
         let uri = server.uri.clone();
         thread::spawn(move || {
@@ -39,6 +41,7 @@ impl Slave {
             uri: uri,
             publications: pubs,
             subscriptions: subs,
+            services: services,
         })
     }
 
@@ -56,6 +59,37 @@ impl Slave {
                                        &self.name,
                                        topic,
                                        publishers)
+    }
+
+    pub fn add_service<Treq, Tres, F>(&mut self,
+                                      hostname: &str,
+                                      service: &str,
+                                      handler: F)
+                                      -> SerdeResult<String>
+        where Treq: Message + Decodable,
+              Tres: Message + Encodable,
+              F: Fn(Treq) -> Tres + Copy + Send + 'static
+    {
+        use std::collections::hash_map::Entry;
+        match self.services.lock().unwrap().entry(String::from(service)) {
+            Entry::Occupied(..) => {
+                error!("Duplicate initiation of service '{}' attempted", service);
+                Err(Error::Critical(String::from("Could not add duplicate service")))
+            }
+            Entry::Vacant(entry) => {
+                let service = Service::new::<Treq, Tres, _, _>(format!("{}:0", hostname).as_str(),
+                                                               service,
+                                                               &self.name,
+                                                               handler)?;
+                let api = format!("{}:{}", service.ip, service.port);
+                entry.insert(service);
+                Ok(api)
+            }
+        }
+    }
+
+    pub fn remove_service(&mut self, service: &str) {
+        self.services.lock().unwrap().remove(service);
     }
 
     pub fn add_publication<T>(&mut self,

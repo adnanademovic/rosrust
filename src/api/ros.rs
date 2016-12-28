@@ -68,6 +68,23 @@ impl Ros {
         self.master.get_topic_types()
     }
 
+    pub fn service<Treq, Tres, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
+        where Treq: Message + Decodable,
+              Tres: Message + Encodable,
+              F: Fn(Treq) -> Tres + Copy + Send + 'static
+    {
+        let name = self.resolver.translate(service)?;
+        let api = self.slave.add_service::<Treq, Tres, F>(&self.hostname, &name, handler)?;
+
+        if let Err(err) = self.master.register_service(&name, &api) {
+            self.slave.remove_service(&name);
+            self.master.unregister_service(&name, &api)?;
+            Err(ServerError::from(err))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), ServerError>
         where T: Message + Decodable,
               F: Fn(T) -> () + Send + 'static

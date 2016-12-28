@@ -7,13 +7,14 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use super::error::ServerError as Error;
 use super::value::Topic;
-use tcpros::{Publisher, Subscriber};
+use tcpros::{Publisher, Subscriber, Service};
 
 type SerdeResult<T> = Result<T, Error>;
 
 pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
     pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
+    pub services: Arc<Mutex<HashMap<String, Service>>>,
     shutdown_signal: Arc<Mutex<Sender<()>>>,
     master_uri: String,
     name: String,
@@ -38,6 +39,7 @@ impl SlaveHandler {
         SlaveHandler {
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             publications: Arc::new(Mutex::new(HashMap::new())),
+            services: Arc::new(Mutex::new(HashMap::new())),
             master_uri: String::from(master_uri),
             name: String::from(name),
             shutdown_signal: Arc::new(Mutex::new(shutdown_signal)),
