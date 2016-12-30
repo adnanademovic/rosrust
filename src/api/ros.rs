@@ -7,6 +7,7 @@ use super::error::ServerError;
 use super::value::Topic;
 use super::naming::Resolver;
 use tcpros::{Message, PublisherStream};
+use tcpros::Client;
 use rosxmlrpc::serde::XmlRpcValue;
 
 pub struct Ros {
@@ -14,6 +15,7 @@ pub struct Ros {
     slave: Slave,
     hostname: String,
     resolver: Resolver,
+    name: String,
 }
 
 impl Ros {
@@ -36,6 +38,7 @@ impl Ros {
             slave: slave,
             hostname: hostname,
             resolver: resolver,
+            name: String::from(name),
         })
     }
 
@@ -66,6 +69,15 @@ impl Ros {
 
     pub fn topics(&self) -> MasterResult<Vec<Topic>> {
         self.master.get_topic_types()
+    }
+
+    pub fn client<Treq, Tres>(&self, service: &str) -> Result<Client<Treq, Tres>, ServerError>
+        where Treq: Message,
+              Tres: Message
+    {
+        let name = self.resolver.translate(service)?;
+        let uri = self.master.lookup_service(&name)?;
+        Ok(Client::new(&self.name, &uri, &name))
     }
 
     pub fn service<Treq, Tres, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
