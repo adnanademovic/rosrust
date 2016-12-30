@@ -5,7 +5,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 use super::error::ServerError as Error;
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
-use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service};
+use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service, ServicePair};
 
 pub struct Slave {
     name: String,
@@ -60,14 +60,13 @@ impl Slave {
                                        publishers)
     }
 
-    pub fn add_service<Treq, Tres, F>(&mut self,
-                                      hostname: &str,
-                                      service: &str,
-                                      handler: F)
-                                      -> SerdeResult<String>
-        where Treq: Message,
-              Tres: Message,
-              F: Fn(Treq) -> Tres + Copy + Send + 'static
+    pub fn add_service<T, F>(&mut self,
+                             hostname: &str,
+                             service: &str,
+                             handler: F)
+                             -> SerdeResult<String>
+        where T: ServicePair,
+              F: Fn(T::Request) -> T::Response + Copy + Send + 'static
     {
         use std::collections::hash_map::Entry;
         match self.services.lock().unwrap().entry(String::from(service)) {
@@ -76,10 +75,10 @@ impl Slave {
                 Err(Error::Critical(String::from("Could not add duplicate service")))
             }
             Entry::Vacant(entry) => {
-                let service = Service::new::<Treq, Tres, _, _>(format!("{}:0", hostname).as_str(),
-                                                               service,
-                                                               &self.name,
-                                                               handler)?;
+                let service = Service::new::<T, _, _>(format!("{}:0", hostname).as_str(),
+                                                      service,
+                                                      &self.name,
+                                                      handler)?;
                 let api = format!("{}:{}", service.ip, service.port);
                 entry.insert(service);
                 Ok(api)

@@ -6,8 +6,7 @@ use super::slave::Slave;
 use super::error::ServerError;
 use super::value::Topic;
 use super::naming::Resolver;
-use tcpros::{Message, PublisherStream};
-use tcpros::Client;
+use tcpros::{Client, Message, PublisherStream, ServicePair};
 use rosxmlrpc::serde::XmlRpcValue;
 
 pub struct Ros {
@@ -71,22 +70,18 @@ impl Ros {
         self.master.get_topic_types()
     }
 
-    pub fn client<Treq, Tres>(&self, service: &str) -> Result<Client<Treq, Tres>, ServerError>
-        where Treq: Message,
-              Tres: Message
-    {
+    pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>, ServerError> {
         let name = self.resolver.translate(service)?;
         let uri = self.master.lookup_service(&name)?;
         Ok(Client::new(&self.name, &uri, &name))
     }
 
-    pub fn service<Treq, Tres, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
-        where Treq: Message,
-              Tres: Message,
-              F: Fn(Treq) -> Tres + Copy + Send + 'static
+    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
+        where T: ServicePair,
+              F: Fn(T::Request) -> T::Response + Copy + Send + 'static
     {
         let name = self.resolver.translate(service)?;
-        let api = self.slave.add_service::<Treq, Tres, F>(&self.hostname, &name, handler)?;
+        let api = self.slave.add_service::<T, F>(&self.hostname, &name, handler)?;
 
         if let Err(err) = self.master.register_service(&name, &api) {
             self.slave.remove_service(&name);

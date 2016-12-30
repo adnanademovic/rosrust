@@ -20,3 +20,10 @@ pub trait Message: Decodable + Encodable + Send + 'static {
     fn md5sum() -> String;
     fn msg_type() -> String;
 }
+
+pub trait ServicePair: Message {
+    type Request: Encodable + Decodable + Send + 'static;
+    type Response: Encodable + Decodable + Send + 'static;
+    fn request(&self) -> &Self::Request;
+    fn response(&self) -> &Self::Response;
+}
