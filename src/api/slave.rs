@@ -1,5 +1,4 @@
 use rosxmlrpc;
-use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
@@ -66,8 +65,8 @@ impl Slave {
                                       service: &str,
                                       handler: F)
                                       -> SerdeResult<String>
-        where Treq: Message + Decodable,
-              Tres: Message + Encodable,
+        where Treq: Message,
+              Tres: Message,
               F: Fn(Treq) -> Tres + Copy + Send + 'static
     {
         use std::collections::hash_map::Entry;
@@ -96,7 +95,7 @@ impl Slave {
                               hostname: &str,
                               topic: &str)
                               -> Result<PublisherStream<T>, tcpros::Error>
-        where T: Message + Encodable
+        where T: Message
     {
         use std::collections::hash_map::Entry;
         match self.publications.lock().unwrap().entry(String::from(topic)) {
@@ -113,7 +112,7 @@ impl Slave {
     }
 
     pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<(), Error>
-        where T: Message + Decodable,
+        where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
         use std::collections::hash_map::Entry;

@@ -1,4 +1,3 @@
-use rustc_serialize::Decodable;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
@@ -17,7 +16,7 @@ pub struct Subscriber {
 
 impl Subscriber {
     pub fn new<T, F>(caller_id: &str, topic: &str, callback: F) -> Subscriber
-        where T: Message + Decodable,
+        where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
         let (data_tx, data_rx) = channel();
@@ -45,7 +44,7 @@ impl Subscriber {
 }
 
 fn handle_data<T, F>(data: Receiver<Decoder>, callback: F)
-    where T: Message + Decodable,
+    where T: Message,
           F: Fn(T) -> ()
 {
     for mut decoder in data {

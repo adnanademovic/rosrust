@@ -1,4 +1,3 @@
-use rustc_serialize::{Decodable, Encodable};
 use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
@@ -17,10 +16,7 @@ pub struct Client<Treq: Message, Tres: Message> {
 }
 
 impl<Treq: Message, Tres: Message> Client<Treq, Tres> {
-    pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<Treq, Tres>
-        where Treq: Message + Encodable,
-              Tres: Message + Decodable
-    {
+    pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<Treq, Tres> {
         Client {
             caller_id: String::from(caller_id),
             uri: String::from(uri),

@@ -15,7 +15,7 @@ mod streamfork;
 mod service;
 mod client;
 
-pub trait Message: Decodable + Encodable + Send + Sync + Clone + 'static {
+pub trait Message: Decodable + Encodable + Send + 'static {
     fn msg_definition() -> String;
     fn md5sum() -> String;
     fn msg_type() -> String;

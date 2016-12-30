@@ -81,8 +81,8 @@ impl Ros {
     }
 
     pub fn service<Treq, Tres, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
-        where Treq: Message + Decodable,
-              Tres: Message + Encodable,
+        where Treq: Message,
+              Tres: Message,
               F: Fn(Treq) -> Tres + Copy + Send + 'static
     {
         let name = self.resolver.translate(service)?;
@@ -98,7 +98,7 @@ impl Ros {
     }
 
     pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), ServerError>
-        where T: Message + Decodable,
+        where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
         let name = self.resolver.translate(topic)?;
@@ -123,7 +123,7 @@ impl Ros {
     }
 
     pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>, ServerError>
-        where T: Message + Encodable
+        where T: Message
     {
         let name = self.resolver.translate(topic)?;
         let stream = self.slave.add_publication::<T>(&self.hostname, &name)?;

@@ -1,4 +1,3 @@
-use rustc_serialize::Encodable;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
@@ -102,19 +101,17 @@ impl Publisher {
         }
     }
 
-    pub fn stream<T>(&self) -> Result<PublisherStream<T>, Error>
-        where T: Message + Encodable
-    {
+    pub fn stream<T: Message>(&self) -> Result<PublisherStream<T>, Error> {
         PublisherStream::new(self)
     }
 }
 
-pub struct PublisherStream<T: Message + Encodable> {
+pub struct PublisherStream<T: Message> {
     stream: DataStream,
     datatype: std::marker::PhantomData<T>,
 }
 
-impl<T: Message + Encodable> PublisherStream<T> {
+impl<T: Message> PublisherStream<T> {
     pub fn new(publisher: &Publisher) -> Result<PublisherStream<T>, Error> {
         if publisher.msg_type == T::msg_type() {
             Ok(PublisherStream {

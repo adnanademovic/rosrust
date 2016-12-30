@@ -1,4 +1,3 @@
-use rustc_serialize::{Decodable, Encodable};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
@@ -50,8 +49,8 @@ fn listen_for_clients<Treq, Tres, U, V, F>(service: String,
                                            handler: F,
                                            listener: V)
                                            -> Result<(), Error>
-    where Treq: Message + Decodable,
-          Tres: Message + Encodable,
+    where Treq: Message,
+          Tres: Message,
           U: std::io::Read + std::io::Write + Send + 'static,
           V: Iterator<Item = U>,
           F: Fn(Treq) -> Tres + Copy + Send + 'static
@@ -70,8 +69,8 @@ fn listen_for_clients<Treq, Tres, U, V, F>(service: String,
 }
 
 fn respond_to<Treq, Tres, U, F>(mut stream: U, handler: F)
-    where Treq: Message + Decodable,
-          Tres: Message + Encodable,
+    where Treq: Message,
+          Tres: Message,
           U: std::io::Read + std::io::Write + Send,
           F: Fn(Treq) -> Tres + Copy + Send + 'static
 {
@@ -90,8 +89,8 @@ impl Service {
                                  node_name: &str,
                                  handler: F)
                                  -> Result<Service, Error>
-        where Treq: Message + Decodable,
-              Tres: Message + Encodable,
+        where Treq: Message,
+              Tres: Message,
               U: ToSocketAddrs,
               F: Fn(Treq) -> Tres + Copy + Send + 'static
     {
@@ -112,8 +111,8 @@ impl Service {
                                         ip: &str,
                                         port: u16)
                                         -> Service
-        where Treq: Message + Decodable,
-              Tres: Message + Encodable,
+        where Treq: Message,
+              Tres: Message,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static,
               F: Fn(Treq) -> Tres + Copy + Send + 'static
