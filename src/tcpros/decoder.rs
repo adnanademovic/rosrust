@@ -63,10 +63,6 @@ impl Decoder {
     }
 }
 
-macro_rules! match_length {
-    ($s:expr, $x:expr) => (if $x != $s.pop_length()? {return Err(Error::Mismatch)});
-}
-
 impl rustc_serialize::Decoder for Decoder {
     type Error = Error;
 
@@ -79,22 +75,18 @@ impl rustc_serialize::Decoder for Decoder {
     }
 
     fn read_u64(&mut self) -> Result<u64, Self::Error> {
-        match_length!(self, 8);
         Ok(self.input.read_u64::<LittleEndian>()?)
     }
 
     fn read_u32(&mut self) -> Result<u32, Self::Error> {
-        match_length!(self, 4);
         Ok(self.input.read_u32::<LittleEndian>()?)
     }
 
     fn read_u16(&mut self) -> Result<u16, Self::Error> {
-        match_length!(self, 2);
         Ok(self.input.read_u16::<LittleEndian>()?)
     }
 
     fn read_u8(&mut self) -> Result<u8, Self::Error> {
-        match_length!(self, 1);
         Ok(self.input.read_u8()?)
     }
 
@@ -103,37 +95,30 @@ impl rustc_serialize::Decoder for Decoder {
     }
 
     fn read_i64(&mut self) -> Result<i64, Self::Error> {
-        match_length!(self, 8);
         Ok(self.input.read_i64::<LittleEndian>()?)
     }
 
     fn read_i32(&mut self) -> Result<i32, Self::Error> {
-        match_length!(self, 4);
         Ok(self.input.read_i32::<LittleEndian>()?)
     }
 
     fn read_i16(&mut self) -> Result<i16, Self::Error> {
-        match_length!(self, 2);
         Ok(self.input.read_i16::<LittleEndian>()?)
     }
 
     fn read_i8(&mut self) -> Result<i8, Self::Error> {
-        match_length!(self, 1);
         Ok(self.input.read_i8()?)
     }
 
     fn read_bool(&mut self) -> Result<bool, Self::Error> {
-        match_length!(self, 1);
         Ok(self.input.read_u8()? != 0)
     }
 
     fn read_f64(&mut self) -> Result<f64, Self::Error> {
-        match_length!(self, 8);
         Ok(self.input.read_f64::<LittleEndian>()?)
     }
 
     fn read_f32(&mut self) -> Result<f32, Self::Error> {
-        match_length!(self, 4);
         Ok(self.input.read_f32::<LittleEndian>()?)
     }
 
@@ -366,8 +351,7 @@ mod tests {
 
     #[test]
     fn reads_array() {
-        let mut decoder = push_data(vec![28, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 7, 0, 2, 0, 0, 0,
-                                         1, 4, 2, 0, 0, 0, 33, 0, 2, 0, 0, 0, 57, 0]);
+        let mut decoder = push_data(vec![12, 0, 0, 0, 4, 0, 0, 0, 7, 0, 1, 4, 33, 0, 57, 0]);
         assert_eq!(vec![7, 1025, 33, 57],
                    Vec::<i16>::decode(&mut decoder.next().unwrap()).unwrap());
     }
@@ -390,10 +374,8 @@ mod tests {
             d: String::from("ABC012"),
             e: vec![true, false, false, true],
         };
-        let mut decoder = push_data(vec![54, 0, 0, 0, 2, 0, 0, 0, 2, 8, 1, 0, 0, 0, 1, 1, 0, 0,
-                                         0, 7, 6, 0, 0, 0, 65, 66, 67, 48, 49, 50, 24, 0, 0, 0,
-                                         4, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                                         1, 0, 0, 0, 1]);
+        let mut decoder = push_data(vec![26, 0, 0, 0, 2, 8, 1, 7, 6, 0, 0, 0, 65, 66, 67, 48, 49,
+                                         50, 8, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 1]);
         assert_eq!(v,
                    TestStructOne::decode(&mut decoder.next().unwrap()).unwrap());
     }
@@ -429,11 +411,10 @@ mod tests {
             a: parts,
             b: String::from("EEe"),
         };
-        let mut decoder = push_data(vec![66, 0, 0, 0, 55, 0, 0, 0, 3, 0, 0, 0, 12, 0, 0, 0, 3, 0,
-                                         0, 0, 65, 66, 67, 1, 0, 0, 0, 1, 14, 0, 0, 0, 5, 0, 0,
-                                         0, 49, 33, 33, 33, 33, 1, 0, 0, 0, 1, 13, 0, 0, 0, 4, 0,
-                                         0, 0, 50, 51, 52, 98, 1, 0, 0, 0, 0, 3, 0, 0, 0, 69, 69,
-                                         101]);
+        let mut decoder = push_data(vec![54, 0, 0, 0, 43, 0, 0, 0, 3, 0, 0, 0, 8, 0, 0, 0, 3, 0,
+                                         0, 0, 65, 66, 67, 1, 10, 0, 0, 0, 5, 0, 0, 0, 49, 33,
+                                         33, 33, 33, 1, 9, 0, 0, 0, 4, 0, 0, 0, 50, 51, 52, 98,
+                                         0, 3, 0, 0, 0, 69, 69, 101]);
         assert_eq!(v,
                    TestStructBig::decode(&mut decoder.next().unwrap()).unwrap());
     }

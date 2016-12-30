@@ -33,7 +33,6 @@ impl Encoder {
     }
 
     fn write_variable(&mut self, buffer: Vec<u8>) -> Result<(), Error> {
-        self.write_size(buffer.len())?;
         self.output.push(buffer);
         Ok(())
     }
@@ -130,7 +129,9 @@ impl rustc_serialize::Encoder for Encoder {
     }
 
     fn emit_str(&mut self, v: &str) -> Result<(), Self::Error> {
-        self.write_variable(v.as_bytes().to_vec())
+        let data = v.as_bytes().to_vec();
+        self.write_size(data.len())?;
+        self.write_variable(data)
     }
 
     fn emit_enum<F>(&mut self, _: &str, _: F) -> Result<(), Self::Error>
@@ -285,28 +286,28 @@ mod tests {
     fn writes_u8() {
         let mut encoder = Encoder::new();
         150u8.encode(&mut encoder).unwrap();
-        assert_eq!(vec![1, 0, 0, 0, 150], pull_data(&encoder));
+        assert_eq!(vec![150], pull_data(&encoder));
     }
 
     #[test]
     fn writes_u16() {
         let mut encoder = Encoder::new();
         0xA234u16.encode(&mut encoder).unwrap();
-        assert_eq!(vec![2, 0, 0, 0, 0x34, 0xA2], pull_data(&encoder));
+        assert_eq!(vec![0x34, 0xA2], pull_data(&encoder));
     }
 
     #[test]
     fn writes_u32() {
         let mut encoder = Encoder::new();
         0xCD012345u32.encode(&mut encoder).unwrap();
-        assert_eq!(vec![4, 0, 0, 0, 0x45, 0x23, 1, 0xCD], pull_data(&encoder));
+        assert_eq!(vec![0x45, 0x23, 1, 0xCD], pull_data(&encoder));
     }
 
     #[test]
     fn writes_u64() {
         let mut encoder = Encoder::new();
         0xAB9876543210AABBu64.encode(&mut encoder).unwrap();
-        assert_eq!(vec![8, 0, 0, 0, 0xBB, 0xAA, 0x10, 0x32, 0x54, 0x76, 0x98, 0xAB],
+        assert_eq!(vec![0xBB, 0xAA, 0x10, 0x32, 0x54, 0x76, 0x98, 0xAB],
                    pull_data(&encoder));
     }
 
@@ -314,29 +315,28 @@ mod tests {
     fn writes_i8() {
         let mut encoder = Encoder::new();
         (-100i8).encode(&mut encoder).unwrap();
-        assert_eq!(vec![1, 0, 0, 0, 156], pull_data(&encoder));
+        assert_eq!(vec![156], pull_data(&encoder));
     }
 
     #[test]
     fn writes_i16() {
         let mut encoder = Encoder::new();
         (-30000i16).encode(&mut encoder).unwrap();
-        assert_eq!(vec![2, 0, 0, 0, 0xD0, 0x8A], pull_data(&encoder));
+        assert_eq!(vec![0xD0, 0x8A], pull_data(&encoder));
     }
 
     #[test]
     fn writes_i32() {
         let mut encoder = Encoder::new();
         (-2000000000i32).encode(&mut encoder).unwrap();
-        assert_eq!(vec![4, 0, 0, 0, 0x00, 0x6C, 0xCA, 0x88],
-                   pull_data(&encoder));
+        assert_eq!(vec![0x00, 0x6C, 0xCA, 0x88], pull_data(&encoder));
     }
 
     #[test]
     fn writes_i64() {
         let mut encoder = Encoder::new();
         (-9000000000000000000i64).encode(&mut encoder).unwrap();
-        assert_eq!(vec![8, 0, 0, 0, 0x00, 0x00, 0x7c, 0x1d, 0xaf, 0x93, 0x19, 0x83],
+        assert_eq!(vec![0x00, 0x00, 0x7c, 0x1d, 0xaf, 0x93, 0x19, 0x83],
                    pull_data(&encoder));
     }
 
@@ -344,15 +344,14 @@ mod tests {
     fn writes_f32() {
         let mut encoder = Encoder::new();
         (1005.75f32).encode(&mut encoder).unwrap();
-        assert_eq!(vec![4, 0, 0, 0, 0x00, 0x70, 0x7b, 0x44],
-                   pull_data(&encoder));
+        assert_eq!(vec![0x00, 0x70, 0x7b, 0x44], pull_data(&encoder));
     }
 
     #[test]
     fn writes_f64() {
         let mut encoder = Encoder::new();
         (1005.75f64).encode(&mut encoder).unwrap();
-        assert_eq!(vec![8, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x8f, 0x40],
+        assert_eq!(vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x8f, 0x40],
                    pull_data(&encoder));
     }
 
@@ -360,10 +359,10 @@ mod tests {
     fn writes_bool() {
         let mut encoder = Encoder::new();
         true.encode(&mut encoder).unwrap();
-        assert_eq!(vec![1, 0, 0, 0, 1], pull_data(&encoder));
+        assert_eq!(vec![1], pull_data(&encoder));
         let mut encoder = Encoder::new();
         false.encode(&mut encoder).unwrap();
-        assert_eq!(vec![1, 0, 0, 0, 0], pull_data(&encoder));
+        assert_eq!(vec![0], pull_data(&encoder));
     }
 
     #[test]
@@ -381,8 +380,7 @@ mod tests {
     fn writes_array() {
         let mut encoder = Encoder::new();
         [7i16, 1025, 33, 57].encode(&mut encoder).unwrap();
-        assert_eq!(vec![28, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 7, 0, 2, 0, 0, 0, 1, 4, 2, 0, 0, 0,
-                        33, 0, 2, 0, 0, 0, 57, 0],
+        assert_eq!(vec![12, 0, 0, 0, 4, 0, 0, 0, 7, 0, 1, 4, 33, 0, 57, 0],
                    pull_data(&encoder));
     }
 
@@ -392,9 +390,8 @@ mod tests {
         (2050i16, true, 7u8, "ABC012", vec![true, false, false, true])
             .encode(&mut encoder)
             .unwrap();
-        assert_eq!(vec![54, 0, 0, 0, 2, 0, 0, 0, 2, 8, 1, 0, 0, 0, 1, 1, 0, 0, 0, 7, 6, 0, 0, 0,
-                        65, 66, 67, 48, 49, 50, 24, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0,
-                        0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+        assert_eq!(vec![26, 0, 0, 0, 2, 8, 1, 7, 6, 0, 0, 0, 65, 66, 67, 48, 49, 50, 8, 0, 0, 0,
+                        4, 0, 0, 0, 1, 0, 0, 1],
                    pull_data(&encoder));
     }
 
@@ -419,9 +416,8 @@ mod tests {
             }
             .encode(&mut encoder)
             .unwrap();
-        assert_eq!(vec![54, 0, 0, 0, 2, 0, 0, 0, 2, 8, 1, 0, 0, 0, 1, 1, 0, 0, 0, 7, 6, 0, 0, 0,
-                        65, 66, 67, 48, 49, 50, 24, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0,
-                        0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+        assert_eq!(vec![26, 0, 0, 0, 2, 8, 1, 7, 6, 0, 0, 0, 65, 66, 67, 48, 49, 50, 8, 0, 0, 0,
+                        4, 0, 0, 0, 1, 0, 0, 1],
                    pull_data(&encoder));
     }
 
@@ -459,11 +455,10 @@ mod tests {
             }
             .encode(&mut encoder)
             .unwrap();
-        assert_eq!(vec![66, 0, 0, 0, 55, 0, 0, 0, 3, 0, 0, 0, 12, 0, 0, 0, 3, 0, 0, 0, 65, 66,
-                        67, 1, 0, 0, 0, 1, 14, 0, 0, 0, 5, 0, 0, 0, 49, 33, 33, 33, 33, 1, 0, 0,
-                        0, 1, 13, 0, 0, 0, 4, 0, 0, 0, 50, 51, 52, 98, 1, 0, 0, 0, 0, 3, 0, 0, 0,
-                        69, 69, 101],
+        assert_eq!(vec![54, 0, 0, 0, 43, 0, 0, 0, 3, 0, 0, 0, 8, 0, 0, 0, 3, 0, 0, 0, 65, 66, 67,
+                        1, 10, 0, 0, 0, 5, 0, 0, 0, 49, 33, 33, 33, 33, 1, 9, 0, 0, 0, 4, 0, 0,
+                        0, 50, 51, 52, 98, 0, 3, 0, 0, 0, 69, 69, 101],
                    pull_data(&encoder));
-        assert_eq!(70, encoder.len());
+        assert_eq!(58, encoder.len());
     }
 }
