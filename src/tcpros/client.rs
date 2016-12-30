@@ -52,9 +52,13 @@ impl<T: ServicePair> Client<T> {
         encoder.write_to(&mut stream)?;
 
         let mut decoder = DecoderSource::new(&mut stream);
+        let success = decoder.pop_verification_byte()?;
         let mut decoder = decoder.next().ok_or(Error::Mismatch)?;
-        T::Response::decode(&mut decoder)
-
+        if success {
+            T::Response::decode(&mut decoder)
+        } else {
+            String::decode(&mut decoder).and_then(|v| Err(Error::Other(v)))
+        }
     }
 }
 
@@ -71,7 +75,7 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
 }
 
 fn header_matches(fields: &HashMap<String, String>) -> bool {
-    fields.get("caller_id") != None
+    fields.get("callerid") != None
 }
 
 fn read_response<T, U>(mut stream: &mut U) -> Result<(), Error>

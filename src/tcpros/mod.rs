@@ -24,6 +24,4 @@ pub trait Message: Decodable + Encodable + Send + 'static {
 pub trait ServicePair: Message {
     type Request: Encodable + Decodable + Send + 'static;
     type Response: Encodable + Decodable + Send + 'static;
-    fn request(&self) -> &Self::Request;
-    fn response(&self) -> &Self::Response;
 }

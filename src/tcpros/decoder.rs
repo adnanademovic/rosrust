@@ -17,6 +17,10 @@ impl<T> DecoderSource<T>
         DecoderSource { input: data }
     }
 
+    pub fn pop_verification_byte(&mut self) -> Result<bool, std::io::Error> {
+        self.input.read_u8().map(|v| v != 0)
+    }
+
     pub fn pop_length(&mut self) -> Result<u32, std::io::Error> {
         self.input.read_u32::<LittleEndian>()
     }

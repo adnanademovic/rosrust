@@ -11,7 +11,8 @@ extern crate xml;
 
 pub use api::Ros;
 pub use rosxmlrpc::XmlRpcValue;
-pub use tcpros::{Message, ServicePair};
+pub use tcpros::Message;
+pub use tcpros::ServicePair as Service;
 
 mod api;
 pub mod build_tools;

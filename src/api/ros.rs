@@ -77,7 +77,7 @@ impl Ros {
     pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>, ServerError> {
         let name = self.resolver.translate(service)?;
         let uri = self.master.lookup_service(&name)?;
-        Ok(Client::new(&self.name, &uri, &name))
+        Ok(Client::new(&self.name, uri.trim_left_matches("rosrpc://"), &name))
     }
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
