@@ -10,13 +10,13 @@ use super::streamfork::{fork, TargetList, DataStream};
 
 pub struct Publisher {
     subscriptions: DataStream,
-    pub ip: String,
     pub port: u16,
     pub msg_type: String,
     pub topic: String,
 }
 
 fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
+    println!("{:?}", fields);
     fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
     fields.get("message_definition") == Some(&T::msg_definition()) &&
     fields.get("topic") == Some(&String::from(topic)) && fields.get("callerid") != None
@@ -80,11 +80,10 @@ impl Publisher {
         let socket_address = listener.local_addr()?;
         Ok(Publisher::wrap_stream::<T, _, _>(topic,
                                              TcpIterator::new(listener, topic),
-                                             &format!("{}", socket_address.ip()),
                                              socket_address.port()))
     }
 
-    fn wrap_stream<T, U, V>(topic: &str, listener: V, ip: &str, port: u16) -> Publisher
+    fn wrap_stream<T, U, V>(topic: &str, listener: V, port: u16) -> Publisher
         where T: Message,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static
@@ -94,7 +93,6 @@ impl Publisher {
         thread::spawn(move || listen_for_subscribers::<T, _, _>(topic_name, listener, targets));
         Publisher {
             subscriptions: data,
-            ip: String::from(ip),
             port: port,
             msg_type: T::msg_type(),
             topic: String::from(topic),

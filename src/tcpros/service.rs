@@ -10,7 +10,6 @@ use super::header::{encode, decode};
 use super::ServicePair;
 
 pub struct Service {
-    pub ip: String,
     pub port: u16,
     pub msg_type: String,
     pub service: String,
@@ -99,7 +98,6 @@ impl Service {
                                               node_name,
                                               handler,
                                               TcpIterator::new(listener, service),
-                                              &format!("{}", socket_address.ip()),
                                               socket_address.port()))
     }
 
@@ -107,7 +105,6 @@ impl Service {
                                node_name: &str,
                                handler: F,
                                listener: V,
-                               ip: &str,
                                port: u16)
                                -> Service
         where T: ServicePair,
@@ -121,7 +118,6 @@ impl Service {
             listen_for_clients::<T, _, _, _>(service_name, node_name, handler, listener)
         });
         Service {
-            ip: String::from(ip),
             port: port,
             msg_type: T::msg_type(),
             service: String::from(service),

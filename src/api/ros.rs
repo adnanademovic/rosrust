@@ -33,7 +33,7 @@ impl Ros {
             hostname.into_iter().take_while(|&v| *v != 0u8).map(|v| *v).collect::<Vec<_>>();
         let hostname = String::from_utf8(hostname)?;
 
-        let slave = Slave::new(&master_uri, &format!("{}:0", hostname), name)?;
+        let slave = Slave::new(&master_uri, &hostname, &format!("{}:0", hostname), name)?;
         let master = Master::new(&master_uri, name, &slave.uri());
         let resolver = Resolver::new(&format!("{}/{}", namespace, name))?;
         Ok(Ros {

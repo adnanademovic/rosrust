@@ -15,6 +15,7 @@ pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
     pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
     pub services: Arc<Mutex<HashMap<String, Service>>>,
+    hostname: String,
     shutdown_signal: Arc<Mutex<Sender<()>>>,
     master_uri: String,
     name: String,
@@ -35,12 +36,17 @@ impl XmlRpcServer for SlaveHandler {
 }
 
 impl SlaveHandler {
-    pub fn new(master_uri: &str, name: &str, shutdown_signal: Sender<()>) -> SlaveHandler {
+    pub fn new(master_uri: &str,
+               hostname: &str,
+               name: &str,
+               shutdown_signal: Sender<()>)
+               -> SlaveHandler {
         SlaveHandler {
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             publications: Arc::new(Mutex::new(HashMap::new())),
             services: Arc::new(Mutex::new(HashMap::new())),
             master_uri: String::from(master_uri),
+            hostname: String::from(hostname),
             name: String::from(name),
             shutdown_signal: Arc::new(Mutex::new(shutdown_signal)),
         }
@@ -199,7 +205,7 @@ impl SlaveHandler {
             .lock()
             .unwrap()
             .get(&topic) {
-            Some(publisher) => (publisher.ip.clone(), publisher.port as i32),
+            Some(publisher) => (self.hostname.clone(), publisher.port as i32),
             None => {
                 return Err(Error::Protocol(String::from("Requested topic not published by node")))
             }

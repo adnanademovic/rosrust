@@ -18,9 +18,13 @@ pub struct Slave {
 type SerdeResult<T> = Result<T, Error>;
 
 impl Slave {
-    pub fn new(master_uri: &str, server_uri: &str, name: &str) -> Result<Slave, Error> {
+    pub fn new(master_uri: &str,
+               hostname: &str,
+               server_uri: &str,
+               name: &str)
+               -> Result<Slave, Error> {
         let (shutdown_tx, shutdown_rx) = channel();
-        let handler = SlaveHandler::new(master_uri, name, shutdown_tx);
+        let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
         let services = handler.services.clone();
@@ -79,7 +83,7 @@ impl Slave {
                                                       service,
                                                       &self.name,
                                                       handler)?;
-                let api = format!("{}:{}", service.ip, service.port);
+                let api = format!("{}:{}", hostname, service.port);
                 entry.insert(service);
                 Ok(api)
             }
