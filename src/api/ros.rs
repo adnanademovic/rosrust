@@ -26,9 +26,13 @@ impl Ros {
     pub fn new_raw(namespace: &str, name: &str) -> Result<Ros, ServerError> {
         let master_uri = std::env::var("ROS_MASTER_URI")
             .unwrap_or(String::from("http://localhost:11311/"));
-        let mut hostname = vec![];
+
+        let mut hostname = [0u8; 50];
         gethostname(&mut hostname)?;
+        let hostname =
+            hostname.into_iter().take_while(|&v| *v != 0u8).map(|v| *v).collect::<Vec<_>>();
         let hostname = String::from_utf8(hostname)?;
+
         let slave = Slave::new(&master_uri, &format!("{}:0", hostname), name)?;
         let master = Master::new(&master_uri, name, &slave.uri());
         let resolver = Resolver::new(&format!("{}/{}", namespace, name))?;

@@ -187,13 +187,13 @@ impl<T: Decodable> Decodable for ResponseData<T> {
     }
 }
 
-#[derive(RustcDecodable)]
+#[derive(Debug,RustcDecodable)]
 pub struct TopicData {
     pub name: String,
     pub connections: Vec<String>,
 }
 
-#[derive(RustcDecodable)]
+#[derive(Debug,RustcDecodable)]
 pub struct SystemState {
     pub publishers: Vec<TopicData>,
     pub subscribers: Vec<TopicData>,
