@@ -1,6 +1,7 @@
 use rustc_serialize::{Encodable, Decodable};
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::thread;
+use std::sync::Arc;
 use std::collections::HashMap;
 use std;
 use super::decoder::DecoderSource;
@@ -16,24 +17,23 @@ pub struct Service {
 }
 
 fn header_matches<T: ServicePair>(fields: &HashMap<String, String>, service: &str) -> bool {
-    fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
-    fields.get("service") == Some(&String::from(service)) && fields.get("callerid") != None
-}
-
-fn read_request<T, U>(mut stream: &mut U, service: &str) -> Result<(), Error>
-    where T: ServicePair,
-          U: std::io::Read
-{
-    if header_matches::<T>(&decode(&mut stream)?, service) {
-        Ok(())
-    } else {
-        Err(Error::Mismatch)
+    if fields.get("service") != Some(&String::from(service)) && fields.get("callerid") == None {
+        return false;
     }
+    if fields.get("probe") == Some(&String::from("1")) {
+        return true;
+    }
+    fields.get("md5sum") == Some(&T::md5sum())
 }
 
-fn write_response<U: std::io::Write>(mut stream: &mut U, node_name: &str) -> Result<(), Error> {
+fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<(), Error>
+    where T: ServicePair,
+          U: std::io::Write
+{
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("callerid"), String::from(node_name));
+    fields.insert(String::from("md5sum"), T::md5sum());
+    fields.insert(String::from("type"), T::msg_type());
     encode(fields, &mut stream)
 }
 
@@ -41,8 +41,11 @@ fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) ->
     where T: ServicePair,
           U: std::io::Write + std::io::Read
 {
-    read_request::<T, U>(&mut stream, service)?;
-    write_response::<U>(&mut stream, node_name)
+    if header_matches::<T>(&decode(stream)?, service) {
+        write_response::<T, U>(stream, node_name)
+    } else {
+        Err(Error::Mismatch)
+    }
 }
 
 fn listen_for_clients<T, U, V, F>(service: String,
@@ -53,8 +56,9 @@ fn listen_for_clients<T, U, V, F>(service: String,
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send + 'static,
           V: Iterator<Item = U>,
-          F: Fn(T::Request) -> T::Response + Copy + Send + 'static
+          F: Fn(T::Request) -> T::Response + Send + Sync + 'static
 {
+    let handler = Arc::new(handler);
     for mut stream in listener {
         if let Err(err) = exchange_headers::<T, _>(&mut stream, &service, &node_name) {
             error!("Failed to exchange headers for service '{}': {}",
@@ -62,24 +66,37 @@ fn listen_for_clients<T, U, V, F>(service: String,
                    err);
             continue;
         }
-        thread::spawn(move || respond_to::<T, U, F>(stream, handler));
+        let h = handler.clone();
+        thread::spawn(move || respond_to::<T, U, F>(stream, h));
     }
 
     Ok(())
 }
 
-fn respond_to<T, U, F>(mut stream: U, handler: F)
+fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send,
-          F: Fn(T::Request) -> T::Response + Copy + Send + 'static
+          F: Fn(T::Request) -> T::Response
 {
     loop {
-        let req = T::Request::decode(&mut DecoderSource::new(&mut stream).next().unwrap()).unwrap();
-        let res = handler(req);
         let mut encoder = Encoder::new();
+        let mut decoder = match DecoderSource::new(&mut stream).next() {
+            Some(decoder) => decoder,
+            None => break,
+        };
+        let req = match T::Request::decode(&mut decoder) {
+            Ok(req) => req,
+            Err(_) => break,
+        };
+        let res = handler(req);
+        true.encode(&mut encoder).unwrap();
         res.encode(&mut encoder).unwrap();
         encoder.write_to(&mut stream).unwrap();
     }
+    let mut encoder = Encoder::new();
+    false.encode(&mut encoder).unwrap();
+    "Failed to parse passed arguments".encode(&mut encoder).unwrap();
+    encoder.write_to(&mut stream).unwrap();
 }
 
 impl Service {
@@ -90,7 +107,7 @@ impl Service {
                         -> Result<Service, Error>
         where T: ServicePair,
               U: ToSocketAddrs,
-              F: Fn(T::Request) -> T::Response + Copy + Send + 'static
+              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
     {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
@@ -110,7 +127,7 @@ impl Service {
         where T: ServicePair,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static,
-              F: Fn(T::Request) -> T::Response + Copy + Send + 'static
+              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
     {
         let service_name = String::from(service);
         let node_name = String::from(node_name);

@@ -82,12 +82,12 @@ impl Ros {
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
         where T: ServicePair,
-              F: Fn(T::Request) -> T::Response + Copy + Send + 'static
+              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
     {
         let name = self.resolver.translate(service)?;
         let api = self.slave.add_service::<T, F>(&self.hostname, &name, handler)?;
 
-        if let Err(err) = self.master.register_service(&name, &api) {
+        if let Err(err) = self.master.register_service(&name, &format!("rosrpc://{}", api)) {
             self.slave.remove_service(&name);
             self.master.unregister_service(&name, &api)?;
             Err(ServerError::from(err))
