@@ -29,11 +29,11 @@ impl Ros {
         Ok(ros)
     }
 
-    pub fn new_raw(master_uri: &str,
-                   hostname: &str,
-                   namespace: &str,
-                   name: &str)
-                   -> Result<Ros, ServerError> {
+    fn new_raw(master_uri: &str,
+               hostname: &str,
+               namespace: &str,
+               name: &str)
+               -> Result<Ros, ServerError> {
         let namespace = namespace.trim_right_matches("/");
 
         if name.contains("/") {
@@ -54,11 +54,11 @@ impl Ros {
         })
     }
 
-    pub fn map(&mut self, source: &str, destination: &str) -> Result<(), ServerError> {
+    fn map(&mut self, source: &str, destination: &str) -> Result<(), ServerError> {
         self.resolver.map(source, destination).map_err(|v| ServerError::Naming(v))
     }
 
-    pub fn node_uri(&self) -> &str {
+    pub fn uri(&self) -> &str {
         return self.slave.uri();
     }
 
