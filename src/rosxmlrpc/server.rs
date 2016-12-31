@@ -11,12 +11,12 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new<T>(server_uri: &str, responder: T) -> Result<Server, Error>
+    pub fn new<T>(hostname: &str, port: u16, responder: T) -> Result<Server, Error>
         where T: 'static + XmlRpcServer + Send + Sync
     {
-        let listener = hyper::Server::http(server_uri)?
+        let listener = hyper::Server::http((hostname, port))?
             .handle(XmlRpcHandler::new(responder))?;
-        let uri = format!("http://{}/", listener.socket);
+        let uri = format!("http://{}:{}/", hostname, listener.socket.port());
         Ok(Server {
             listener: listener,
             uri: uri,

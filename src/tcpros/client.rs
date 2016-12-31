@@ -20,7 +20,7 @@ impl<T: ServicePair> Client<T> {
     pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
         Client {
             caller_id: String::from(caller_id),
-            uri: String::from(uri),
+            uri: String::from(uri.trim_left_matches("rosrpc://")),
             service: String::from(service),
             phantom: std::marker::PhantomData,
         }

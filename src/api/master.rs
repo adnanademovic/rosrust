@@ -103,10 +103,12 @@ impl Master {
         request!(self; unregisterPublisher; topic, self.caller_api)
     }
 
+    #[allow(dead_code)]
     pub fn lookup_node(&self, node_name: &str) -> MasterResult<String> {
         request!(self; lookupNode; node_name)
     }
 
+    #[allow(dead_code)]
     pub fn get_published_topics(&self, subgraph: &str) -> MasterResult<Vec<(String, String)>> {
         request!(self; getPublishedTopics; subgraph)
     }
@@ -119,6 +121,7 @@ impl Master {
         request!(self; getSystemState;)
     }
 
+    #[allow(dead_code)]
     pub fn get_uri(&self) -> MasterResult<String> {
         request!(self; getUri;)
     }
@@ -147,14 +150,17 @@ impl Master {
         request!(self; searchParam; key)
     }
 
+    #[allow(dead_code)]
     pub fn subscribe_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
         request!(self; subscribeParam; self.caller_api, key)
     }
 
+    #[allow(dead_code)]
     pub fn subscribe_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
         request_tree!(self; subscribeParam; self.caller_api, key)
     }
 
+    #[allow(dead_code)]
     pub fn unsubscribe_param(&self, key: &str) -> MasterResult<i32> {
         request!(self; unsubscribeParam; self.caller_api, key)
     }

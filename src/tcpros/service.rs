@@ -1,5 +1,5 @@
 use rustc_serialize::{Encodable, Decodable};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ use super::header::{encode, decode};
 use super::ServicePair;
 
 pub struct Service {
-    pub port: u16,
+    pub api: String,
     pub msg_type: String,
     pub service: String,
 }
@@ -100,29 +100,30 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
 }
 
 impl Service {
-    pub fn new<T, U, F>(address: U,
-                        service: &str,
-                        node_name: &str,
-                        handler: F)
-                        -> Result<Service, Error>
+    pub fn new<T, F>(hostname: &str,
+                     port: u16,
+                     service: &str,
+                     node_name: &str,
+                     handler: F)
+                     -> Result<Service, Error>
         where T: ServicePair,
-              U: ToSocketAddrs,
               F: Fn(T::Request) -> T::Response + Send + Sync + 'static
     {
-        let listener = TcpListener::bind(address)?;
+        let listener = TcpListener::bind((hostname, port))?;
         let socket_address = listener.local_addr()?;
+        let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
         Ok(Service::wrap_stream::<T, _, _, _>(service,
                                               node_name,
                                               handler,
                                               TcpIterator::new(listener, service),
-                                              socket_address.port()))
+                                              &api))
     }
 
     fn wrap_stream<T, U, V, F>(service: &str,
                                node_name: &str,
                                handler: F,
                                listener: V,
-                               port: u16)
+                               api: &str)
                                -> Service
         where T: ServicePair,
               U: std::io::Read + std::io::Write + Send + 'static,
@@ -135,7 +136,7 @@ impl Service {
             listen_for_clients::<T, _, _, _>(service_name, node_name, handler, listener)
         });
         Service {
-            port: port,
+            api: String::from(api),
             msg_type: T::msg_type(),
             service: String::from(service),
         }

@@ -33,15 +33,17 @@ impl Ros {
             hostname.into_iter().take_while(|&v| *v != 0u8).map(|v| *v).collect::<Vec<_>>();
         let hostname = String::from_utf8(hostname)?;
 
-        let slave = Slave::new(&master_uri, &hostname, &format!("{}:0", hostname), name)?;
-        let master = Master::new(&master_uri, name, &slave.uri());
-        let resolver = Resolver::new(&format!("{}/{}", namespace, name))?;
+        let name = format!("{}/{}", namespace, name);
+        let resolver = Resolver::new(&name)?;
+
+        let slave = Slave::new(&master_uri, &hostname, 0, &name)?;
+        let master = Master::new(&master_uri, &name, &slave.uri());
         Ok(Ros {
             master: master,
             slave: slave,
             hostname: hostname,
             resolver: resolver,
-            name: String::from(name),
+            name: name,
         })
     }
 
@@ -77,7 +79,7 @@ impl Ros {
     pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>, ServerError> {
         let name = self.resolver.translate(service)?;
         let uri = self.master.lookup_service(&name)?;
-        Ok(Client::new(&self.name, uri.trim_left_matches("rosrpc://"), &name))
+        Ok(Client::new(&self.name, &uri, &name))
     }
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
@@ -87,7 +89,7 @@ impl Ros {
         let name = self.resolver.translate(service)?;
         let api = self.slave.add_service::<T, F>(&self.hostname, &name, handler)?;
 
-        if let Err(err) = self.master.register_service(&name, &format!("rosrpc://{}", api)) {
+        if let Err(err) = self.master.register_service(&name, &api) {
             self.slave.remove_service(&name);
             self.master.unregister_service(&name, &api)?;
             Err(ServerError::from(err))

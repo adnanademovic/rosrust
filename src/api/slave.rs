@@ -18,17 +18,13 @@ pub struct Slave {
 type SerdeResult<T> = Result<T, Error>;
 
 impl Slave {
-    pub fn new(master_uri: &str,
-               hostname: &str,
-               server_uri: &str,
-               name: &str)
-               -> Result<Slave, Error> {
+    pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave, Error> {
         let (shutdown_tx, shutdown_rx) = channel();
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
         let services = handler.services.clone();
-        let mut server = rosxmlrpc::Server::new(server_uri, handler)?;
+        let mut server = rosxmlrpc::Server::new(hostname, port, handler)?;
         let uri = server.uri.clone();
         thread::spawn(move || {
             match shutdown_rx.recv() {
@@ -79,11 +75,8 @@ impl Slave {
                 Err(Error::Critical(String::from("Could not add duplicate service")))
             }
             Entry::Vacant(entry) => {
-                let service = Service::new::<T, _, _>(format!("{}:0", hostname).as_str(),
-                                                      service,
-                                                      &self.name,
-                                                      handler)?;
-                let api = format!("{}:{}", hostname, service.port);
+                let service = Service::new::<T, _>(hostname, 0, service, &self.name, handler)?;
+                let api = service.api.clone();
                 entry.insert(service);
                 Ok(api)
             }
