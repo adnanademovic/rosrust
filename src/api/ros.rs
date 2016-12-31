@@ -22,7 +22,11 @@ impl Ros {
         let master_uri = resolve::master();
         let hostname = resolve::hostname();
         let name = resolve::name(name);
-        Ros::new_raw(&master_uri, &hostname, &namespace, &name)
+        let mut ros = Ros::new_raw(&master_uri, &hostname, &namespace, &name)?;
+        for (src, dest) in resolve::mappings() {
+            ros.map(&src, &dest)?;
+        }
+        Ok(ros)
     }
 
     pub fn new_raw(master_uri: &str,
@@ -151,6 +155,10 @@ pub struct Parameter<'a> {
 }
 
 impl<'a> Parameter<'a> {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn get<T: Decodable>(&self) -> MasterResult<T> {
         self.master.get_param::<T>(&self.name)
     }

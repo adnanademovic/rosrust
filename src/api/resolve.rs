@@ -34,6 +34,25 @@ pub fn name(default: &str) -> String {
     find_with_prefix("__name:=").unwrap_or(String::from(default))
 }
 
+pub fn mappings() -> Vec<(String, String)> {
+    args()
+        .skip(1)
+        .filter(|v| !v.starts_with("__"))
+        .map(|v| v.split(":=").map(String::from).collect::<Vec<String>>())
+        .filter(|v| v.len() == 2)
+        .map(|v| v.into_iter().map(fix_prefix))
+        .map(|mut v| (v.next().unwrap(), v.next().unwrap()))
+        .collect()
+}
+
+fn fix_prefix(v: String) -> String {
+    if v.starts_with("_") {
+        format!("~{}", v.trim_left_matches("_"))
+    } else {
+        v
+    }
+}
+
 fn find_with_prefix(prefix: &str) -> Option<String> {
     args()
         .skip(1)
@@ -88,6 +107,36 @@ mod tests {
         for &arg in args {
             data.push(String::from(arg));
         }
+    }
+
+    #[test]
+    #[allow(unused_variables)]
+    fn mappings_default_to_empty_vector() {
+        let testcase = TESTCASE.lock().unwrap();
+        set_args(&vec![]);
+        assert_eq!(Vec::<(String, String)>::new(), mappings());
+    }
+
+    #[test]
+    #[allow(unused_variables)]
+    fn maps_good_and_ignores_everything_else() {
+        let testcase = TESTCASE.lock().unwrap();
+        set_args(&vec![]);
+        assert_eq!(Vec::<(String, String)>::new(), mappings());
+        set_args(&vec!["a:=x",
+                       "b=e",
+                       "/c:=d",
+                       "e:=/f_g",
+                       "__name:=something",
+                       "a:=b:=c",
+                       "_oo_e:=/ab_c",
+                       "/x_y:=_i"]);
+        assert_eq!(vec![(String::from("a"), String::from("x")),
+                        (String::from("/c"), String::from("d")),
+                        (String::from("e"), String::from("/f_g")),
+                        (String::from("~oo_e"), String::from("/ab_c")),
+                        (String::from("/x_y"), String::from("~i"))],
+                   mappings());
     }
 
     #[test]
