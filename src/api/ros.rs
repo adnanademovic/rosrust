@@ -24,6 +24,7 @@ impl Ros {
     }
 
     pub fn new_raw(namespace: &str, name: &str) -> Result<Ros, ServerError> {
+        let namespace = namespace.trim_right_matches("/");
         let master_uri = std::env::var("ROS_MASTER_URI")
             .unwrap_or(String::from("http://localhost:11311/"));
 
