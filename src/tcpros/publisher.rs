@@ -1,4 +1,3 @@
-use rustc_serialize::Encodable;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
@@ -11,13 +10,13 @@ use super::streamfork::{fork, TargetList, DataStream};
 
 pub struct Publisher {
     subscriptions: DataStream,
-    pub ip: String,
     pub port: u16,
     pub msg_type: String,
     pub topic: String,
 }
 
 fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
+    println!("{:?}", fields);
     fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
     fields.get("message_definition") == Some(&T::msg_definition()) &&
     fields.get("topic") == Some(&String::from(topic)) && fields.get("callerid") != None
@@ -81,11 +80,10 @@ impl Publisher {
         let socket_address = listener.local_addr()?;
         Ok(Publisher::wrap_stream::<T, _, _>(topic,
                                              TcpIterator::new(listener, topic),
-                                             &format!("{}", socket_address.ip()),
                                              socket_address.port()))
     }
 
-    fn wrap_stream<T, U, V>(topic: &str, listener: V, ip: &str, port: u16) -> Publisher
+    fn wrap_stream<T, U, V>(topic: &str, listener: V, port: u16) -> Publisher
         where T: Message,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static
@@ -95,21 +93,42 @@ impl Publisher {
         thread::spawn(move || listen_for_subscribers::<T, _, _>(topic_name, listener, targets));
         Publisher {
             subscriptions: data,
-            ip: String::from(ip),
             port: port,
             msg_type: T::msg_type(),
             topic: String::from(topic),
         }
     }
 
-    pub fn send<T: Message + Encodable>(&mut self, message: T) {
+    pub fn stream<T: Message>(&self) -> Result<PublisherStream<T>, Error> {
+        PublisherStream::new(self)
+    }
+}
+
+pub struct PublisherStream<T: Message> {
+    stream: DataStream,
+    datatype: std::marker::PhantomData<T>,
+}
+
+impl<T: Message> PublisherStream<T> {
+    pub fn new(publisher: &Publisher) -> Result<PublisherStream<T>, Error> {
+        if publisher.msg_type == T::msg_type() {
+            Ok(PublisherStream {
+                stream: publisher.subscriptions.clone(),
+                datatype: std::marker::PhantomData,
+            })
+        } else {
+            Err(Error::Mismatch)
+        }
+    }
+
+    pub fn send(&mut self, message: T) {
         let mut encoder = Encoder::new();
         // Failure while encoding can only be caused by unsupported data types,
         // unless using deliberately bad handwritten rosmsg-s, this should never fail
         message.encode(&mut encoder).unwrap();
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
-        self.subscriptions.send(encoder).unwrap();
+        self.stream.send(encoder).unwrap();
     }
 }
 

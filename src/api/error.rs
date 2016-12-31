@@ -2,6 +2,8 @@ use nix;
 use std;
 use rosxmlrpc;
 use tcpros;
+use super::naming::Error as NamingError;
+use super::master::{MasterError, FailureType};
 
 #[derive(Debug)]
 pub enum ServerError {
@@ -15,6 +17,8 @@ pub enum ServerError {
     Io(std::io::Error),
     Nix(nix::Error),
     FromUTF8(std::string::FromUtf8Error),
+    ApiFail(FailureType, String),
+    Naming(NamingError),
 }
 
 impl From<rosxmlrpc::serde::value::DecodeError> for ServerError {
@@ -65,6 +69,21 @@ impl From<std::string::FromUtf8Error> for ServerError {
     }
 }
 
+impl From<MasterError> for ServerError {
+    fn from(err: MasterError) -> ServerError {
+        match err {
+            MasterError::XmlRpc(v) => ServerError::from(v),
+            MasterError::ApiError(t, m) => ServerError::ApiFail(t, m),
+        }
+    }
+}
+
+impl From<NamingError> for ServerError {
+    fn from(err: NamingError) -> ServerError {
+        ServerError::Naming(err)
+    }
+}
+
 impl std::fmt::Display for ServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -78,6 +97,8 @@ impl std::fmt::Display for ServerError {
             ServerError::Io(ref err) => write!(f, "IO error: {}", err),
             ServerError::Nix(ref err) => write!(f, "NIX error: {}", err),
             ServerError::FromUTF8(ref err) => write!(f, "From UTF-8 error: {}", err),
+            ServerError::ApiFail(ref t, ref m) => write!(f, "{} in Master API: {}", t, m),
+            ServerError::Naming(ref err) => write!(f, "Naming error: {}", err),
         }
     }
 }
@@ -95,6 +116,8 @@ impl std::error::Error for ServerError {
             ServerError::Io(ref err) => err.description(),
             ServerError::Nix(ref err) => err.description(),
             ServerError::FromUTF8(ref err) => err.description(),
+            ServerError::ApiFail(.., ref m) => m,
+            ServerError::Naming(ref err) => err.description(),
         }
     }
 
@@ -110,6 +133,8 @@ impl std::error::Error for ServerError {
             ServerError::Io(ref err) => Some(err),
             ServerError::Nix(ref err) => Some(err),
             ServerError::FromUTF8(ref err) => Some(err),
+            ServerError::ApiFail(..) => None,
+            ServerError::Naming(ref err) => Some(err),
         }
     }
 }
