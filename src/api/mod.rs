@@ -7,3 +7,4 @@ mod slave;
 mod ros;
 mod slavehandler;
 mod naming;
+mod resolve;

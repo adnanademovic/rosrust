@@ -1,11 +1,10 @@
 use rustc_serialize::{Encodable, Decodable};
-use std;
-use nix::unistd::gethostname;
 use super::master::{self, Master, MasterResult};
 use super::slave::Slave;
 use super::error::ServerError;
 use super::value::Topic;
-use super::naming::Resolver;
+use super::naming::{self, Resolver};
+use super::resolve;
 use tcpros::{Client, Message, PublisherStream, ServicePair};
 use rosxmlrpc::serde::XmlRpcValue;
 
@@ -19,20 +18,23 @@ pub struct Ros {
 
 impl Ros {
     pub fn new(name: &str) -> Result<Ros, ServerError> {
-        let namespace = std::env::var("ROS_NAMESPACE").unwrap_or(String::from(""));
-        Ros::new_raw(&namespace, name)
+        let namespace = resolve::namespace();
+        let master_uri = resolve::master();
+        let hostname = resolve::hostname();
+        let name = resolve::name(name);
+        Ros::new_raw(&master_uri, &hostname, &namespace, &name)
     }
 
-    pub fn new_raw(namespace: &str, name: &str) -> Result<Ros, ServerError> {
+    pub fn new_raw(master_uri: &str,
+                   hostname: &str,
+                   namespace: &str,
+                   name: &str)
+                   -> Result<Ros, ServerError> {
         let namespace = namespace.trim_right_matches("/");
-        let master_uri = std::env::var("ROS_MASTER_URI")
-            .unwrap_or(String::from("http://localhost:11311/"));
 
-        let mut hostname = [0u8; 50];
-        gethostname(&mut hostname)?;
-        let hostname =
-            hostname.into_iter().take_while(|&v| *v != 0u8).map(|v| *v).collect::<Vec<_>>();
-        let hostname = String::from_utf8(hostname)?;
+        if name.contains("/") {
+            return Err(ServerError::Naming(naming::Error::IllegalPath));
+        }
 
         let name = format!("{}/{}", namespace, name);
         let resolver = Resolver::new(&name)?;
@@ -42,7 +44,7 @@ impl Ros {
         Ok(Ros {
             master: master,
             slave: slave,
-            hostname: hostname,
+            hostname: String::from(hostname),
             resolver: resolver,
             name: name,
         })
