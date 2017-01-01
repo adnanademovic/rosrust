@@ -6,8 +6,8 @@ use super::encoder::Encoder;
 
 pub fn decode<T: std::io::Read>
     (data: &mut T)
-     -> Result<HashMap<String, String>, super::decoder::error::Error> {
-    use super::decoder::error::{ErrorKind, ResultExt};
+     -> Result<HashMap<String, String>, super::error::decoder::Error> {
+    use super::error::decoder::{ErrorKind, ResultExt};
     let mut decoder = DecoderSource::new(data);
     let length = decoder.pop_length().chain_err(|| ErrorKind::EndOfBuffer)? as usize;
     let mut result = HashMap::<String, String>::new();
@@ -36,9 +36,9 @@ pub fn decode<T: std::io::Read>
     Ok(result)
 }
 
-pub fn encode(data: HashMap<String, String>) -> Result<Encoder, super::encoder::error::Error> {
+pub fn encode(data: HashMap<String, String>) -> Result<Encoder, super::error::encoder::Error> {
     use rustc_serialize::Encoder as EncoderTrait;
-    use super::encoder::error::{ErrorKind, ResultExt};
+    use super::error::encoder::{ErrorKind, ResultExt};
     let mut encoder = Encoder::new();
     encoder.emit_tuple(data.len(), |e| {
             for (key, value) in data {

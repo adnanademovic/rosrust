@@ -8,7 +8,7 @@ pub use self::error::Error;
 mod decoder;
 mod encoder;
 mod header;
-mod error;
+pub mod error;
 mod publisher;
 mod subscriber;
 mod streamfork;

@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize;
 use std;
-use self::error::{Error, ErrorKind, ResultExt};
+use super::error::encoder::{Error, ErrorKind, ResultExt};
 
 #[derive(Debug)]
 pub struct Encoder {
@@ -269,17 +269,6 @@ impl rustc_serialize::Encoder for Encoder {
         where F: FnOnce(&mut Self) -> EncoderResult
     {
         bail!(ErrorKind::UnsupportedDataType("map element value".into()))
-    }
-}
-
-pub mod error {
-    error_chain! {
-        errors {
-            UnsupportedDataType(t: String) {
-                description("Datatype is not supported")
-                display("Datatype is not supported, issue within {}", t)
-            }
-        }
     }
 }
 
