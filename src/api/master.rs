@@ -1,6 +1,7 @@
 use regex::Regex;
 use rosxmlrpc;
-use rosxmlrpc::error::Error;
+use rosxmlrpc::error::{Error as ReError, ErrorKind as ReErrorKind};
+use rosxmlrpc::serde::{Error as SeError, ErrorKind as SeErrorKind};
 use rustc_serialize::{Decodable, Decoder, Encodable};
 use std;
 use super::value::Topic;
@@ -43,43 +44,43 @@ impl Master {
         }
     }
 
-    fn remove_tree_wrap(data: Result<rosxmlrpc::XmlRpcValue, Error>)
+    fn remove_tree_wrap(data: Result<rosxmlrpc::XmlRpcValue, ReError>)
                         -> MasterResult<rosxmlrpc::XmlRpcValue> {
         let values = match data? {
             rosxmlrpc::XmlRpcValue::Array(values) => values,
-            _ => return Err(MasterError::XmlRpc(Error::Serde(
-        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
-            "while handling request".into()).into()))),
+            _ => return Err(MasterError::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into())).into())),
         };
         if values.len() != 3 {
-            return Err(MasterError::XmlRpc(Error::Serde(
-        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
-            "while handling request".into()).into())));
+            return Err(MasterError::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into())).into()));
         }
         let mut values = values.into_iter();
         let code = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::Int(v)) => v,
-            _ => return Err(MasterError::XmlRpc(Error::Serde(
-        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
-            "while handling request".into()).into()))),
+            _ => return Err(MasterError::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into())).into())),
         };
         let message = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::String(v)) => v,
-            _ => return Err(MasterError::XmlRpc(Error::Serde(
-        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
-            "while handling request".into()).into()))),
+            _ => return Err(MasterError::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into())).into())),
         };
         let value = values.next()
-            .ok_or(MasterError::XmlRpc(Error::Serde(
-        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
-            "while handling request".into()).into())))?;
+            .ok_or(MasterError::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into())).into()))?;
         match code {
-            0 | -1 => Err(rosxmlrpc::serde::Error::from(message))?,
+            0 | -1 => Err(SeError::from(message))?,
             1 => Ok(value),
             v => {
                 warn!("ROS Master returned '{}' response code (only -1, 0, 1 legal)",
                       v);
-                Err(rosxmlrpc::serde::Error::from("Invalid response code returned by ROS"))?
+                Err(SeError::from("Invalid response code returned by ROS"))?
             }
         }
     }
@@ -219,14 +220,13 @@ pub enum FailureType {
 
 #[derive(Debug)]
 pub enum MasterError {
-    XmlRpc(Error),
+    XmlRpc(ReError),
     ApiError(FailureType, String),
 }
 
-impl From<Error> for MasterError {
-    fn from(err: Error) -> MasterError {
-        if let Error::Serde(rosxmlrpc::serde::Error(rosxmlrpc::serde::ErrorKind::Msg(ref v), _)) =
-            err {
+impl From<ReError> for MasterError {
+    fn from(err: ReError) -> MasterError {
+        if let ReError(ReErrorKind::Serde(SeErrorKind::Msg(ref v)), _) = err {
             lazy_static!{
                 static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$").unwrap();
             }
@@ -244,9 +244,9 @@ impl From<Error> for MasterError {
     }
 }
 
-impl From<rosxmlrpc::serde::Error> for MasterError {
-    fn from(err: rosxmlrpc::serde::Error) -> MasterError {
-        MasterError::from(MasterError::XmlRpc(Error::Serde(err)))
+impl From<SeError> for MasterError {
+    fn from(err: SeError) -> MasterError {
+        MasterError::XmlRpc(err.into())
     }
 }
 

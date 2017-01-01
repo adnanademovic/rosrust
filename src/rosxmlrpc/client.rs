@@ -1,6 +1,6 @@
 use hyper;
 use rustc_serialize::{Encodable, Decodable};
-use super::error::Error;
+use super::error::{ErrorKind, Result as ClientResult};
 use super::serde;
 
 pub struct Client {
@@ -27,10 +27,10 @@ impl Client {
             .send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
-
-        Ok(res.pop()
-            .ok_or(Error::Serde(serde::ErrorKind::Decoding("request tree".into()).into()))?
-            .value())
+        match res.pop() {
+            Some(v) => Ok(v.value()),
+            None => bail!(ErrorKind::Serde(serde::ErrorKind::Decoding("request tree".into()))),
+        }
     }
 
     pub fn request<T: Decodable>(&self, request: Request) -> ClientResult<T> {
@@ -44,9 +44,11 @@ impl Client {
             .send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
-
-        Ok(T::decode(&mut res.pop()
-            .ok_or(Error::Serde(serde::ErrorKind::Decoding("request".into()).into()))?)?)
+        let mut value = match res.pop() {
+            Some(v) => v,
+            None => bail!(ErrorKind::Serde(serde::ErrorKind::Decoding("request".into()))),
+        };
+        T::decode(&mut value).map_err(|v| v.into())
     }
 }
 
@@ -67,5 +69,3 @@ impl Request {
         parameter.encode(&mut self.encoder)
     }
 }
-
-pub type ClientResult<T> = Result<T, Error>;
