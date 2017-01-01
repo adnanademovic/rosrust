@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::error::Error;
+use super::error::{Error, ErrorKind};
 use super::header::{encode, decode};
 use super::ServicePair;
 use super::decoder::DecoderSource;
@@ -53,11 +53,14 @@ impl<T: ServicePair> Client<T> {
 
         let mut decoder = DecoderSource::new(&mut stream);
         let success = decoder.pop_verification_byte()?;
-        let mut decoder = decoder.next().ok_or(Error::Mismatch)?;
+        let mut decoder = match decoder.next() {
+            Some(v) => v,
+            None => bail!(ErrorKind::Mismatch),
+        };
         if success {
             T::Response::decode(&mut decoder)
         } else {
-            String::decode(&mut decoder).and_then(|v| Err(Error::Other(v)))
+            String::decode(&mut decoder).and_then(|v| Err(v.into()))
         }
     }
 }
@@ -85,7 +88,7 @@ fn read_response<T, U>(mut stream: &mut U) -> Result<(), Error>
     if header_matches(&decode(&mut stream)?) {
         Ok(())
     } else {
-        Err(Error::Mismatch)
+        Err(ErrorKind::Mismatch.into())
     }
 }
 

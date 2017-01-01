@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize;
 use std;
-use super::error::Error;
+use super::error::{Error, ErrorKind};
 
 #[derive(Debug)]
 pub struct Encoder {
@@ -24,169 +24,8 @@ impl Encoder {
         Ok(())
     }
 
-    fn write_size(&mut self, v: usize) -> Result<(), Error> {
-        let v = v as u32;
-        let mut buffer = vec![];
-        buffer.write_u32::<LittleEndian>(v)?;
-        self.output.push(buffer);
-        Ok(())
-    }
-
-    fn write_variable(&mut self, buffer: Vec<u8>) -> Result<(), Error> {
-        self.output.push(buffer);
-        Ok(())
-    }
-
-    fn write_size_in_middle(&mut self, position: usize, v: usize) -> Result<(), Error> {
-        let v = v as u32;
-        self.output
-            .get_mut(position)
-            .unwrap()
-            .write_u32::<LittleEndian>(v)
-            .map_err(|v| Error::Io(v))
-    }
-}
-
-impl rustc_serialize::Encoder for Encoder {
-    type Error = Error;
-
-    fn emit_nil(&mut self) -> Result<(), Self::Error> {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_usize(&mut self, _: usize) -> Result<(), Self::Error> {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_u64(&mut self, v: u64) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_u64::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_u32(&mut self, v: u32) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_u32::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_u16(&mut self, v: u16) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_u16::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_u8(&mut self, v: u8) -> Result<(), Self::Error> {
-        self.write_variable(vec![v])
-    }
-
-    fn emit_isize(&mut self, _: isize) -> Result<(), Self::Error> {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_i64(&mut self, v: i64) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_i64::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_i32(&mut self, v: i32) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_i32::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_i16(&mut self, v: i16) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_i16::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_i8(&mut self, v: i8) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_i8(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_bool(&mut self, v: bool) -> Result<(), Self::Error> {
-        self.write_variable(vec![if v { 1u8 } else { 0u8 }])
-    }
-
-    fn emit_f64(&mut self, v: f64) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_f64::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_f32(&mut self, v: f32) -> Result<(), Self::Error> {
-        let mut buffer = vec![];
-        buffer.write_f32::<LittleEndian>(v)?;
-        self.write_variable(buffer)
-    }
-
-    fn emit_char(&mut self, _: char) -> Result<(), Self::Error> {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_str(&mut self, v: &str) -> Result<(), Self::Error> {
-        let data = v.as_bytes().to_vec();
-        self.write_size(data.len())?;
-        self.write_variable(data)
-    }
-
-    fn emit_enum<F>(&mut self, _: &str, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_enum_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_enum_variant_arg<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_enum_struct_variant<F>(&mut self,
-                                   _: &str,
-                                   _: usize,
-                                   _: usize,
-                                   _: F)
-                                   -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_enum_struct_variant_field<F>(&mut self,
-                                         _: &str,
-                                         _: usize,
-                                         _: F)
-                                         -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_struct<F>(&mut self, _: &str, len: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        self.emit_tuple(len, f)
-    }
-
-    fn emit_struct_field<F>(&mut self, _: &str, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
-    {
-        f(self)
-    }
-
-    fn emit_tuple<F>(&mut self, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_helper<F>(&mut self, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
         self.output.push(Vec::new());
         let position = self.output.len();
@@ -195,42 +34,202 @@ impl rustc_serialize::Encoder for Encoder {
         self.write_size_in_middle(position - 1, length)
     }
 
-    fn emit_tuple_arg<F>(&mut self, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn write_size(&mut self, v: usize) -> EncoderResult {
+        let v = v as u32;
+        let mut buffer = vec![];
+        buffer.write_u32::<LittleEndian>(v)?;
+        self.output.push(buffer);
+        Ok(())
+    }
+
+    fn write_variable(&mut self, buffer: Vec<u8>) -> EncoderResult {
+        self.output.push(buffer);
+        Ok(())
+    }
+
+    fn write_size_in_middle(&mut self, position: usize, v: usize) -> EncoderResult {
+        let v = v as u32;
+        self.output
+            .get_mut(position)
+            .unwrap()
+            .write_u32::<LittleEndian>(v)
+            .map_err(|v| v.into())
+    }
+}
+
+type EncoderResult = Result<(), Error>;
+
+impl rustc_serialize::Encoder for Encoder {
+    type Error = Error;
+
+    fn emit_nil(&mut self) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("nil".into()))
+    }
+
+    fn emit_usize(&mut self, _: usize) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("usize".into()))
+    }
+
+    fn emit_u64(&mut self, v: u64) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_u64::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_u32(&mut self, v: u32) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_u32::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_u16(&mut self, v: u16) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_u16::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_u8(&mut self, v: u8) -> EncoderResult {
+        self.write_variable(vec![v])
+    }
+
+    fn emit_isize(&mut self, _: isize) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("isize".into()))
+    }
+
+    fn emit_i64(&mut self, v: i64) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_i64::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_i32(&mut self, v: i32) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_i32::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_i16(&mut self, v: i16) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_i16::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_i8(&mut self, v: i8) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_i8(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_bool(&mut self, v: bool) -> EncoderResult {
+        self.write_variable(vec![if v { 1u8 } else { 0u8 }])
+    }
+
+    fn emit_f64(&mut self, v: f64) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_f64::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_f32(&mut self, v: f32) -> EncoderResult {
+        let mut buffer = vec![];
+        buffer.write_f32::<LittleEndian>(v)?;
+        self.write_variable(buffer)
+    }
+
+    fn emit_char(&mut self, _: char) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("char".into()))
+    }
+
+    fn emit_str(&mut self, v: &str) -> EncoderResult {
+        let data = v.as_bytes().to_vec();
+        self.write_size(data.len())?;
+        self.write_variable(data)
+    }
+
+    fn emit_enum<F>(&mut self, _: &str, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("enum".into()))
+    }
+
+    fn emit_enum_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
+    }
+
+    fn emit_enum_variant_arg<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
+    }
+
+    fn emit_enum_struct_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
+    }
+
+    fn emit_enum_struct_variant_field<F>(&mut self, _: &str, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
+    }
+
+    fn emit_struct<F>(&mut self, _: &str, _: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        self.emit_tuple_helper(f)
+    }
+
+    fn emit_struct_field<F>(&mut self, _: &str, _: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
         f(self)
     }
 
-    fn emit_tuple_struct<F>(&mut self, _: &str, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple<F>(&mut self, _: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        self.emit_tuple_helper(f)
     }
 
-    fn emit_tuple_struct_arg<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_arg<F>(&mut self, _: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        f(self)
     }
 
-    fn emit_option<F>(&mut self, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_struct<F>(&mut self, _: &str, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        bail!(ErrorKind::UnsupportedDataType("tuple structure".into()))
     }
 
-    fn emit_option_none(&mut self) -> Result<(), Self::Error> {
-        Err(Error::UnsupportedData)
-    }
-
-    fn emit_option_some<F>(&mut self, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_struct_arg<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        bail!(ErrorKind::UnsupportedDataType("tuple structure argument".into()))
     }
 
-    fn emit_seq<F>(&mut self, len: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_option<F>(&mut self, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("option".into()))
+    }
+
+    fn emit_option_none(&mut self) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("option none".into()))
+    }
+
+    fn emit_option_some<F>(&mut self, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
+    {
+        bail!(ErrorKind::UnsupportedDataType("option some".into()))
+    }
+
+    fn emit_seq<F>(&mut self, len: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
         self.output.push(Vec::new());
         let position = self.output.len();
@@ -240,28 +239,28 @@ impl rustc_serialize::Encoder for Encoder {
         self.write_size_in_middle(position - 1, length)
     }
 
-    fn emit_seq_elt<F>(&mut self, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_seq_elt<F>(&mut self, _: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
         f(self)
     }
 
-    fn emit_map<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_map<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
-    fn emit_map_elt_key<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_map_elt_key<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
-    fn emit_map_elt_val<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_map_elt_val<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error::UnsupportedData)
+        bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }
 }
 

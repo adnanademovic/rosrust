@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std;
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
-use super::error::Error;
+use super::error::{Error, ErrorKind};
 use super::header::{encode, decode};
 use super::ServicePair;
 
@@ -44,7 +44,7 @@ fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) ->
     if header_matches::<T>(&decode(stream)?, service) {
         write_response::<T, U>(stream, node_name)
     } else {
-        Err(Error::Mismatch)
+        Err(ErrorKind::Mismatch.into())
     }
 }
 

@@ -3,7 +3,7 @@ use std::thread;
 use std::collections::HashMap;
 use std;
 use super::encoder::Encoder;
-use super::error::Error;
+use super::error::{Error, ErrorKind};
 use super::header::{encode, decode};
 use super::Message;
 use super::streamfork::{fork, TargetList, DataStream};
@@ -28,7 +28,7 @@ fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U,
     if header_matches::<T>(&decode(&mut stream)?, topic) {
         Ok(())
     } else {
-        Err(Error::Mismatch)
+        Err(ErrorKind::Mismatch.into())
     }
 }
 
@@ -117,7 +117,7 @@ impl<T: Message> PublisherStream<T> {
                 datatype: std::marker::PhantomData,
             })
         } else {
-            Err(Error::Mismatch)
+            Err(ErrorKind::Mismatch.into())
         }
     }
 

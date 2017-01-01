@@ -3,7 +3,7 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::error::Error;
+use super::error::{Error, ErrorKind};
 use super::header::{encode, decode};
 use super::Message;
 use super::decoder::{Decoder, DecoderSource};
@@ -106,7 +106,7 @@ fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<(),
     if header_matches::<T>(&decode(&mut stream)?) {
         Ok(())
     } else {
-        Err(Error::Mismatch)
+        Err(ErrorKind::Mismatch.into())
     }
 }
 

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std;
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
-use super::error::Error;
+use super::error::{Error, ErrorKind};
 
 pub fn decode<T: std::io::Read>(data: &mut T) -> Result<HashMap<String, String>, Error> {
     let mut decoder = DecoderSource::new(data);
@@ -14,13 +14,19 @@ pub fn decode<T: std::io::Read>(data: &mut T) -> Result<HashMap<String, String>,
     while length > size_count {
         let mut decoder = match decoder.next() {
             Some(decoder) => decoder,
-            None => return Err(Error::Mismatch),
+            None => bail!(ErrorKind::Mismatch),
         };
         let point = String::decode(&mut decoder)?;
         size_count += point.len() + 4;
         let mut point = point.splitn(2, '=');
-        let key = point.next().ok_or(Error::UnsupportedData)?;
-        let value = point.next().ok_or(Error::UnsupportedData)?;
+        let key = match point.next() {
+            Some(v) => v,
+            None => bail!(ErrorKind::Mismatch),
+        };
+        let value = match point.next() {
+            Some(v) => v,
+            None => bail!(ErrorKind::Mismatch),
+        };
         result.insert(String::from(key), String::from(value));
     }
     Ok(result)
@@ -34,7 +40,7 @@ pub fn encode<T: std::io::Write>(data: HashMap<String, String>,
         [key, value].join("=").encode(&mut encoder)?;
     }
     buffer.write_u32::<LittleEndian>(encoder.len() as u32)?;
-    encoder.write_to(buffer).map_err(|v| Error::Io(v))
+    Ok(encoder.write_to(buffer)?)
 }
 
 #[cfg(test)]
