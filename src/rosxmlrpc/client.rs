@@ -29,7 +29,7 @@ impl Client {
         let mut res = serde::Decoder::new_response(res)?;
 
         Ok(res.pop()
-            .ok_or(Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?
+            .ok_or(Error::Serde(serde::ErrorKind::Decoding("request tree".into()).into()))?
             .value())
     }
 
@@ -46,7 +46,7 @@ impl Client {
         let mut res = serde::Decoder::new_response(res)?;
 
         Ok(T::decode(&mut res.pop()
-            .ok_or(Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?)?)
+            .ok_or(Error::Serde(serde::ErrorKind::Decoding("request".into()).into()))?)?)
     }
 }
 

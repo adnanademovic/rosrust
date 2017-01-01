@@ -1,8 +1,6 @@
 use std;
-use std::error::Error;
 use xml;
-use self::error::Result as ErrorResult;
-use self::error::{ErrorKind, ResultExt};
+use self::error::{ErrorKind, Result, ResultExt};
 
 #[derive(Clone,Debug,PartialEq)]
 pub enum XmlRpcValue {
@@ -79,7 +77,7 @@ impl std::fmt::Display for XmlRpcResponse {
 }
 
 impl XmlRpcRequest {
-    pub fn new<T: std::io::Read>(body: T) -> ErrorResult<XmlRpcRequest> {
+    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcRequest> {
         let tree = Tree::new(body).chain_err(|| "Failed to transform XML data into tree")?;
         let (key, mut children) = match tree {
             Tree::Node(key, children) => (key, children),
@@ -109,19 +107,19 @@ impl XmlRpcRequest {
 }
 
 impl XmlRpcResponse {
-    pub fn new<T: std::io::Read>(body: T) -> ErrorResult<XmlRpcResponse> {
+    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcResponse> {
         extract_parameters(Tree::new(body).chain_err(|| "Failed to transform XML data into tree")?
                 .peel_layer("methodResponse")?)
             .map(|parameters| XmlRpcResponse { parameters: parameters })
     }
 }
 
-fn extract_parameters(parameters: Tree) -> ErrorResult<Vec<XmlRpcValue>> {
+fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>> {
     if let Tree::Node(key, parameters) = parameters {
         if key == "params" {
             return parameters.into_iter()
                 .map(XmlRpcValue::from_parameter)
-                .collect::<Result<_, _>>()
+                .collect::<Result<_>>()
                 .chain_err(|| "Failed to parse parameters");
         }
     }
@@ -129,12 +127,12 @@ fn extract_parameters(parameters: Tree) -> ErrorResult<Vec<XmlRpcValue>> {
 }
 
 impl XmlRpcValue {
-    pub fn new<T: std::io::Read>(body: T) -> ErrorResult<XmlRpcValue> {
+    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcValue> {
         XmlRpcValue::from_tree(Tree::new(body)
                                .chain_err(|| "Couldn't generate XML tree to form value")?)
     }
 
-    fn read_member(tree: Tree) -> ErrorResult<(String, XmlRpcValue)> {
+    fn read_member(tree: Tree) -> Result<(String, XmlRpcValue)> {
         let (key, mut children) = match tree {
             Tree::Node(key, children) => (key, children),
             Tree::Leaf(_) => {
@@ -161,13 +159,13 @@ impl XmlRpcValue {
             .map(|v| (name, v))
     }
 
-    fn from_parameter(tree: Tree) -> ErrorResult<XmlRpcValue> {
+    fn from_parameter(tree: Tree) -> Result<XmlRpcValue> {
         XmlRpcValue::from_tree(tree.peel_layer("param")
                 .chain_err(|| "Parameters should be contained within node 'param'")?)
             .chain_err(|| "Failed to parse XML RPC parameter")
     }
 
-    fn from_tree(tree: Tree) -> ErrorResult<XmlRpcValue> {
+    fn from_tree(tree: Tree) -> Result<XmlRpcValue> {
         let (key, mut values) = match tree.peel_layer("value")? {
             Tree::Node(key, values) => (key, values),
             Tree::Leaf(_) => bail!("Value node should contain one node representing its data type"),
@@ -175,7 +173,7 @@ impl XmlRpcValue {
         if key == "struct" {
             return Ok(XmlRpcValue::Struct(values.into_iter()
                 .map(XmlRpcValue::read_member)
-                .collect::<ErrorResult<Vec<(String, XmlRpcValue)>>>()
+                .collect::<Result<Vec<(String, XmlRpcValue)>>>()
                 .chain_err(|| "Couldn't parse struct")?));
         }
         if values.len() > 1 {
@@ -189,7 +187,7 @@ impl XmlRpcValue {
                 }
                 Ok(XmlRpcValue::Array(children.into_iter()
                     .map(XmlRpcValue::from_tree)
-                    .collect::<Result<_, _>>()
+                    .collect::<Result<_>>()
                     .chain_err(|| "Failed to parse array's children")?))
             } else {
                 bail!("Node 'array' must contain 'data' node with child values");
@@ -225,13 +223,13 @@ enum Tree {
 }
 
 impl Tree {
-    fn new<T: std::io::Read>(body: T) -> ErrorResult<Tree> {
+    fn new<T: std::io::Read>(body: T) -> Result<Tree> {
         parse_tree(&mut xml::EventReader::new(body))
             ?
             .ok_or("XML data started with a closing tag".into())
     }
 
-    fn peel_layer(self, name: &str) -> ErrorResult<Tree> {
+    fn peel_layer(self, name: &str) -> Result<Tree> {
         if let Tree::Node(key, mut children) = self {
             if key == name && children.len() == 1 {
                 // Popping element from a vector of length 1 cannot fail
@@ -248,7 +246,7 @@ enum Node {
     Close(String),
 }
 
-fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> ErrorResult<Option<Tree>> {
+fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Option<Tree>> {
     match next_node(reader).chain_err(|| "Unexpected end of XML data")? {
         Node::Close(..) => Ok(None),
         Node::Data(value) => Ok(Some(Tree::Leaf(value))),
@@ -263,7 +261,7 @@ fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> ErrorResult
     }
 }
 
-fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> ErrorResult<Node> {
+fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Node> {
     match reader.next().chain_err(|| "Couldn't obtain XML token")? {
         xml::reader::XmlEvent::StartElement { name, .. } => Ok(Node::Open(name.local_name)),
         xml::reader::XmlEvent::Characters(value) => Ok(Node::Data(value)),
@@ -279,61 +277,6 @@ mod error {
                 description("Error while building tree out of XML data")
                 display("XML tree building error within node {}", node_name)
             }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum DecodeError {
-    BadXmlStructure,
-    XmlRead(xml::reader::Error),
-    UnsupportedDataFormat,
-}
-
-impl From<xml::reader::Error> for DecodeError {
-    fn from(err: xml::reader::Error) -> DecodeError {
-        DecodeError::XmlRead(err)
-    }
-}
-
-impl From<std::num::ParseIntError> for DecodeError {
-    fn from(_: std::num::ParseIntError) -> DecodeError {
-        DecodeError::BadXmlStructure
-    }
-}
-
-impl From<std::num::ParseFloatError> for DecodeError {
-    fn from(_: std::num::ParseFloatError) -> DecodeError {
-        DecodeError::BadXmlStructure
-    }
-}
-
-impl std::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DecodeError::XmlRead(ref err) => write!(f, "XML reading error: {}", err),
-            DecodeError::BadXmlStructure |
-            DecodeError::UnsupportedDataFormat => write!(f, "{}", self.description()),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {
-    fn description(&self) -> &str {
-        match *self {
-            DecodeError::BadXmlStructure => "XML data provided didn't have XML-RPC format",
-            DecodeError::XmlRead(ref err) => err.description(),
-            DecodeError::UnsupportedDataFormat => {
-                "Data provided within XML-RPC call is not supported"
-            }
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            DecodeError::XmlRead(ref err) => Some(err),
-            DecodeError::BadXmlStructure |
-            DecodeError::UnsupportedDataFormat => None,
         }
     }
 }

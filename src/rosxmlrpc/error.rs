@@ -8,7 +8,6 @@ pub enum Error {
     Io(std::io::Error),
     Utf8(std::string::FromUtf8Error),
     Serde(serde::Error),
-    Decoding(serde::value::DecodeError),
 }
 
 impl From<hyper::error::Error> for Error {
@@ -35,12 +34,6 @@ impl From<serde::Error> for Error {
     }
 }
 
-impl From<serde::value::DecodeError> for Error {
-    fn from(err: serde::value::DecodeError) -> Error {
-        Error::Decoding(err)
-    }
-}
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -48,7 +41,6 @@ impl std::fmt::Display for Error {
             Error::Io(ref err) => write!(f, "IO error: {}", err),
             Error::Utf8(ref err) => write!(f, "UTF8 error: {}", err),
             Error::Serde(ref err) => write!(f, "Serialization error: {}", err),
-            Error::Decoding(ref err) => write!(f, "Decoding error: {}", err),
         }
     }
 }
@@ -60,7 +52,6 @@ impl std::error::Error for Error {
             Error::Io(ref err) => err.description(),
             Error::Utf8(ref err) => err.description(),
             Error::Serde(ref err) => err.description(),
-            Error::Decoding(ref err) => err.description(),
         }
     }
 
@@ -70,7 +61,6 @@ impl std::error::Error for Error {
             Error::Io(ref err) => Some(err),
             Error::Utf8(ref err) => Some(err),
             Error::Serde(ref err) => Some(err),
-            Error::Decoding(ref err) => Some(err),
         }
     }
 }

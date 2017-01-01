@@ -7,7 +7,6 @@ use super::master::{MasterError, FailureType};
 
 #[derive(Debug)]
 pub enum ServerError {
-    Deserialization(rosxmlrpc::serde::value::DecodeError),
     XmlRpcSerde(rosxmlrpc::serde::Error),
     Protocol(String),
     Critical(String),
@@ -18,12 +17,6 @@ pub enum ServerError {
     FromUTF8(std::string::FromUtf8Error),
     ApiFail(FailureType, String),
     Naming(NamingError),
-}
-
-impl From<rosxmlrpc::serde::value::DecodeError> for ServerError {
-    fn from(err: rosxmlrpc::serde::value::DecodeError) -> ServerError {
-        ServerError::Deserialization(err)
-    }
 }
 
 impl From<rosxmlrpc::serde::Error> for ServerError {
@@ -80,7 +73,6 @@ impl From<NamingError> for ServerError {
 impl std::fmt::Display for ServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ServerError::Deserialization(ref err) => write!(f, "Deserialization error: {}", err),
             ServerError::Protocol(ref err) => write!(f, "Protocol error: {}", err),
             ServerError::Critical(ref err) => write!(f, "Critical error: {}", err),
             ServerError::XmlRpcSerde(ref err) => write!(f, "Serialization error: {}", err),
@@ -98,7 +90,6 @@ impl std::fmt::Display for ServerError {
 impl std::error::Error for ServerError {
     fn description(&self) -> &str {
         match *self {
-            ServerError::Deserialization(ref err) => err.description(),
             ServerError::Protocol(ref err) => &err,
             ServerError::Critical(ref err) => &err,
             ServerError::XmlRpcSerde(ref err) => err.description(),
@@ -114,7 +105,6 @@ impl std::error::Error for ServerError {
 
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
-            ServerError::Deserialization(ref err) => Some(err),
             ServerError::Protocol(..) => None,
             ServerError::Critical(..) => None,
             ServerError::XmlRpcSerde(ref err) => Some(err),
