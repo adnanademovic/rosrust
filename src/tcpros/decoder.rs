@@ -2,7 +2,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use rustc_serialize;
 use std;
 use std::io::Read;
-use super::error::{Error, ErrorKind, ResultExt};
+use self::error::{Error, ErrorKind, ResultExt};
 
 pub struct DecoderSource<T>
     where T: std::io::Read
@@ -255,6 +255,25 @@ impl rustc_serialize::Decoder for Decoder {
 
     fn error(&mut self, err: &str) -> Self::Error {
         err.into()
+    }
+}
+
+pub mod error {
+    error_chain! {
+        errors {
+            UnsupportedDataType(t: String) {
+                description("Datatype is not supported")
+                display("Datatype is not supported, issue within {}", t)
+            }
+            FailedToDecode(t: String) {
+                description("Failed to decode")
+                display("Failed to decode {}", t)
+            }
+            EndOfBuffer {
+                description("Reached end of memory buffer")
+                display("Reached end of memory buffer while reading data")
+            }
+        }
     }
 }
 

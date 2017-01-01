@@ -58,9 +58,9 @@ impl<T: ServicePair> Client<T> {
             None => bail!(ErrorKind::Mismatch),
         };
         if success {
-            T::Response::decode(&mut decoder)
+            T::Response::decode(&mut decoder).map_err(|err| err.into())
         } else {
-            String::decode(&mut decoder).and_then(|v| Err(v.into()))
+            String::decode(&mut decoder).map_err(|err| err.into()).and_then(|v| Err(v.into()))
         }
     }
 }
