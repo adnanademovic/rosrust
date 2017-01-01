@@ -13,10 +13,6 @@ impl Encoder {
         Encoder { output: Vec::<Vec<u8>>::new() }
     }
 
-    pub fn len(&self) -> usize {
-        self.output.iter().fold(0, |accum, ref v| accum + v.len())
-    }
-
     pub fn write_to<T: std::io::Write>(&self, output: &mut T) -> Result<(), std::io::Error> {
         for ref v in &self.output {
             output.write_all(&v)?;
@@ -301,7 +297,7 @@ mod tests {
 
     #[test]
     fn starts_empty() {
-        assert_eq!(0, Encoder::new().len());
+        assert_eq!(Vec::<u8>::new(), pull_data(&Encoder::new()));
     }
 
     #[test]
@@ -481,6 +477,5 @@ mod tests {
                         1, 10, 0, 0, 0, 5, 0, 0, 0, 49, 33, 33, 33, 33, 1, 9, 0, 0, 0, 4, 0, 0,
                         0, 50, 51, 52, 98, 0, 3, 0, 0, 0, 69, 69, 101],
                    pull_data(&encoder));
-        assert_eq!(58, encoder.len());
     }
 }

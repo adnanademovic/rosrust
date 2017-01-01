@@ -74,7 +74,8 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
     fields.insert(String::from("service"), String::from(service));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields, &mut stream)
+    encode(fields)?.write_to(&mut stream)?;
+    Ok(())
 }
 
 fn header_matches(fields: &HashMap<String, String>) -> bool {

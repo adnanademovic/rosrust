@@ -34,7 +34,8 @@ fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<(), Error
     fields.insert(String::from("callerid"), String::from(node_name));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields, &mut stream)
+    encode(fields)?.write_to(&mut stream)?;
+    Ok(())
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) -> Result<(), Error>

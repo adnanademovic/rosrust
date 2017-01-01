@@ -25,22 +25,15 @@ impl<T> DecoderSource<T>
         self.input.read_u32::<LittleEndian>()
     }
 
-    fn pop_decoder(&mut self) -> Result<Option<Decoder>, std::io::Error> {
+    pub fn pop_decoder(&mut self) -> Result<Decoder, std::io::Error> {
         self.pop_length()
             .and_then(|length| {
                 let mut data = vec![0u8; length as usize];
                 self.input.read_exact(&mut data)?;
-                Ok(Some(Decoder {
+                Ok(Decoder {
                     input: std::io::Cursor::new(data),
                     extra: Some(length),
-                }))
-            })
-            .or_else(|err| {
-                if err.kind() == std::io::ErrorKind::UnexpectedEof {
-                    Ok(None)
-                } else {
-                    Err(err)
-                }
+                })
             })
     }
 }
@@ -51,7 +44,7 @@ impl<T> Iterator for DecoderSource<T>
     type Item = Decoder;
 
     fn next(&mut self) -> Option<Decoder> {
-        self.pop_decoder().unwrap_or(None)
+        self.pop_decoder().ok()
     }
 }
 
