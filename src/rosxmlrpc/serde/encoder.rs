@@ -7,8 +7,6 @@ pub struct Encoder {
     data: Vec<(XmlRpcValue, usize)>,
 }
 
-// TODO: add error chaining for IO errors
-
 impl Encoder {
     pub fn new() -> Encoder {
         Encoder { data: vec![] }

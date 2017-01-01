@@ -1,14 +1,12 @@
 use rustc_serialize;
 use std;
-use super::error::{Error, ErrorKind};
+use super::error::{Error, ErrorKind, ResultExt};
 use super::value;
 
 pub struct Decoder {
     value: value::XmlRpcValue,
     chain: std::vec::IntoIter<(value::XmlRpcValue, usize)>,
 }
-
-// TODO: add error chaining
 
 impl Decoder {
     pub fn new(body: value::XmlRpcValue) -> Decoder {
@@ -20,19 +18,34 @@ impl Decoder {
         }
     }
 
-    pub fn new_request<T: std::io::Read>(body: T)
-                                         -> Result<(String, Vec<Decoder>), value::DecodeError> {
-        let value = value::XmlRpcRequest::new(body)?;
-        Ok((value.method, value.parameters.into_iter().map(Decoder::new).collect()))
+    pub fn new_request<T: std::io::Read>(body: T) -> Result<(String, Vec<Decoder>), Error> {
+        value::XmlRpcRequest::new(body)
+            .chain_err(|| ErrorKind::XmlRpcReading("request".into()))
+            .map(|value| (value.method, value.parameters.into_iter().map(Decoder::new).collect()))
     }
 
-    pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>, value::DecodeError> {
-        let value = value::XmlRpcResponse::new(body)?;
-        Ok(value.parameters.into_iter().map(Decoder::new).collect())
+    pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>, Error> {
+        value::XmlRpcResponse::new(body)
+            .chain_err(|| ErrorKind::XmlRpcReading("response".into()))
+            .map(|value| value.parameters.into_iter().map(Decoder::new).collect())
     }
 
     pub fn value(self) -> value::XmlRpcValue {
         self.value
+    }
+
+    fn read_tuple_helper<T, F>(&mut self, l: usize, f: F) -> Result<T, Error>
+        where F: FnOnce(&mut Self) -> Result<T, Error>
+    {
+        if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
+            if l == len {
+                f(self)
+            } else {
+                Err(ErrorKind::MismatchedDataFormat(format!("an array of length {}", len)).into())
+            }
+        } else {
+            Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
+        }
     }
 }
 
@@ -164,48 +177,49 @@ impl rustc_serialize::Decoder for Decoder {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
     }
 
-    fn read_struct<T, F>(&mut self, _: &str, size: usize, f: F) -> Result<T, Self::Error>
+    fn read_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        self.read_tuple(size, f)
+        use super::error::ResultExt;
+        self.read_tuple_helper(size, f)
+            .chain_err(|| ErrorKind::Decoding(format!("struct {}", name)))
     }
 
-    fn read_struct_field<T, F>(&mut self, _: &str, _: usize, f: F) -> Result<T, Self::Error>
+    fn read_struct_field<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::Decoding(format!("field {}", name)))
     }
 
-    fn read_tuple<T, F>(&mut self, l: usize, f: F) -> Result<T, Self::Error>
+    fn read_tuple<T, F>(&mut self, size: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
-            if l == len {
-                f(self)
-            } else {
-                Err(ErrorKind::MismatchedDataFormat(format!("an array of length {}", len)).into())
-            }
-        } else {
-            Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
-        }
+        use super::error::ResultExt;
+        self.read_tuple_helper(size, f)
+            .chain_err(|| ErrorKind::Decoding("tuple".into()))
     }
 
-    fn read_tuple_arg<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
+    fn read_tuple_arg<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::Decoding(format!("field number {}", n)))
     }
 
-    fn read_tuple_struct<T, F>(&mut self, _: &str, size: usize, f: F) -> Result<T, Self::Error>
+    fn read_tuple_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        self.read_tuple(size, f)
+        use super::error::ResultExt;
+        self.read_tuple_helper(size, f)
+            .chain_err(|| ErrorKind::Decoding(format!("tuple struct {}", name)))
     }
 
-    fn read_tuple_struct_arg<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
+    fn read_tuple_struct_arg<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::Decoding(format!("field number {}", n)))
     }
 
     fn read_option<T, F>(&mut self, _: F) -> Result<T, Self::Error>
@@ -217,17 +231,19 @@ impl rustc_serialize::Decoder for Decoder {
     fn read_seq<T, F>(&mut self, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
     {
+        use super::error::ResultExt;
         if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
-            f(self, len)
+            f(self, len).chain_err(|| ErrorKind::Decoding("array".into()))
         } else {
             Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
         }
     }
 
-    fn read_seq_elt<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
+    fn read_seq_elt<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::Decoding(format!("element number {}", n)))
     }
 
     fn read_map<T, F>(&mut self, _: F) -> Result<T, Self::Error>
