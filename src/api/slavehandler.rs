@@ -272,7 +272,7 @@ fn pop<T: Decodable>(req: &mut ParameterIterator) -> SerdeResult<T> {
     req.next()
         .ok_or(Error::Protocol(String::from("Missing parameter")))?
         .read()
-        .map_err(|v| Error::Decoding(v))
+        .map_err(|v| Error::XmlRpcSerde(v))
 }
 
 fn connect_to_publisher(subscriber: &mut Subscriber,

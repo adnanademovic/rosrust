@@ -70,7 +70,7 @@ impl Answer {
         Answer { encoder: serde::Encoder::new() }
     }
 
-    pub fn add<T: Encodable>(&mut self, data: &T) -> Result<(), serde::encoder::Error> {
+    pub fn add<T: Encodable>(&mut self, data: &T) -> Result<(), serde::Error> {
         data.encode(&mut self.encoder)
     }
 
@@ -89,7 +89,7 @@ impl Parameter {
         Parameter { decoder: decoder }
     }
 
-    pub fn read<T: Decodable>(mut self) -> Result<T, serde::decoder::Error> {
+    pub fn read<T: Decodable>(mut self) -> Result<T, serde::Error> {
         T::decode(&mut self.decoder)
     }
 

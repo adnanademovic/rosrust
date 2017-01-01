@@ -1,12 +1,14 @@
 use rustc_serialize;
 use std;
-use std::error::Error as ErrorTrait;
+use super::error::{Error, ErrorKind};
 use super::value;
 
 pub struct Decoder {
     value: value::XmlRpcValue,
     chain: std::vec::IntoIter<(value::XmlRpcValue, usize)>,
 }
+
+// TODO: add error chaining
 
 impl Decoder {
     pub fn new(body: value::XmlRpcValue) -> Decoder {
@@ -49,58 +51,58 @@ impl rustc_serialize::Decoder for Decoder {
     type Error = Error;
 
     fn read_nil(&mut self) -> Result<(), Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("nil".into()))
     }
 
     fn read_usize(&mut self) -> Result<usize, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("usize".into()))
     }
 
     fn read_u64(&mut self) -> Result<u64, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("u64".into()))
     }
 
     fn read_u32(&mut self) -> Result<u32, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("u32".into()))
     }
 
     fn read_u16(&mut self) -> Result<u16, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("u16".into()))
     }
 
     fn read_u8(&mut self) -> Result<u8, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("u8".into()))
     }
 
     fn read_isize(&mut self) -> Result<isize, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("isize".into()))
     }
 
     fn read_i64(&mut self) -> Result<i64, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("i64".into()))
     }
 
     fn read_i32(&mut self) -> Result<i32, Self::Error> {
         if let Some((value::XmlRpcValue::Int(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(Error::MismatchedDataFormat)
+            Err(ErrorKind::MismatchedDataFormat("an integer (i32) field".into()).into())
         }
     }
 
     fn read_i16(&mut self) -> Result<i16, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("i16".into()))
     }
 
     fn read_i8(&mut self) -> Result<i8, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("i8".into()))
     }
 
     fn read_bool(&mut self) -> Result<bool, Self::Error> {
         if let Some((value::XmlRpcValue::Bool(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(Error::MismatchedDataFormat)
+            Err(ErrorKind::MismatchedDataFormat("a boolean field".into()).into())
         }
     }
 
@@ -108,48 +110,48 @@ impl rustc_serialize::Decoder for Decoder {
         if let Some((value::XmlRpcValue::Double(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(Error::MismatchedDataFormat)
+            Err(ErrorKind::MismatchedDataFormat("a double (f64) field".into()).into())
         }
     }
 
     fn read_f32(&mut self) -> Result<f32, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("f32".into()))
     }
 
     fn read_char(&mut self) -> Result<char, Self::Error> {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("char".into()))
     }
 
     fn read_str(&mut self) -> Result<String, Self::Error> {
         if let Some((value::XmlRpcValue::String(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(Error::MismatchedDataFormat)
+            Err(ErrorKind::MismatchedDataFormat("a string field".into()).into())
         }
     }
 
     fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("enum".into()))
     }
 
     fn read_enum_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T, Self::Error>
         where F: FnMut(&mut Self, usize) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
     }
 
     fn read_enum_variant_arg<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
     }
 
     fn read_enum_struct_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T, Self::Error>
         where F: FnMut(&mut Self, usize) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
     }
 
     fn read_enum_struct_variant_field<T, F>(&mut self,
@@ -159,7 +161,7 @@ impl rustc_serialize::Decoder for Decoder {
                                             -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
     }
 
     fn read_struct<T, F>(&mut self, _: &str, size: usize, f: F) -> Result<T, Self::Error>
@@ -181,10 +183,10 @@ impl rustc_serialize::Decoder for Decoder {
             if l == len {
                 f(self)
             } else {
-                Err(Error::MismatchedDataFormat)
+                Err(ErrorKind::MismatchedDataFormat(format!("an array of length {}", len)).into())
             }
         } else {
-            Err(Error::MismatchedDataFormat)
+            Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
         }
     }
 
@@ -209,7 +211,7 @@ impl rustc_serialize::Decoder for Decoder {
     fn read_option<T, F>(&mut self, _: F) -> Result<T, Self::Error>
         where F: FnMut(&mut Self, bool) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("option".into()))
     }
 
     fn read_seq<T, F>(&mut self, f: F) -> Result<T, Self::Error>
@@ -218,7 +220,7 @@ impl rustc_serialize::Decoder for Decoder {
         if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
             f(self, len)
         } else {
-            Err(Error::MismatchedDataFormat)
+            Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
         }
     }
 
@@ -231,52 +233,23 @@ impl rustc_serialize::Decoder for Decoder {
     fn read_map<T, F>(&mut self, _: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
     fn read_map_elt_key<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
     fn read_map_elt_val<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
         where F: FnOnce(&mut Self) -> Result<T, Self::Error>
     {
-        Err(Error::UnsupportedDataFormat)
+        bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }
 
     fn error(&mut self, s: &str) -> Self::Error {
-        Error::Other(String::from(s))
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Other(String),
-    MismatchedDataFormat,
-    UnsupportedDataFormat,
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.description())
-    }
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::Other(ref err) => err,
-            Error::MismatchedDataFormat => "Given XML-RPC value tree does not match target format",
-            Error::UnsupportedDataFormat => {
-                "Decoder does not support all members of given data structure"
-            }
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        None
+        s.into()
     }
 }
 
@@ -475,14 +448,12 @@ mod tests {
         let (method, mut parameters) = Decoder::new_request(&mut cursor).unwrap();
         assert_eq!("mytype.mymethod", method);
         assert_eq!(2, parameters.len());
-        assert_eq!(XmlRpcValue::Array(vec![
-            XmlRpcValue::Int(41),
-            XmlRpcValue::Bool(true),
-            XmlRpcValue::Array(vec![
+        assert_eq!(XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                           XmlRpcValue::Bool(true),
+                                           XmlRpcValue::Array(vec![
                 XmlRpcValue::String(String::from("Hello")),
                 XmlRpcValue::Double(0.5),
-            ]),
-        ]),
+            ])]),
                    parameters.pop().unwrap().value());
         assert_eq!(XmlRpcValue::Int(33), parameters.pop().unwrap().value());
     }

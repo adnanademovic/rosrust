@@ -1,11 +1,13 @@
 use rustc_serialize;
 use std;
-use std::error::Error as ErrorTrait;
 use super::value::{self, XmlRpcValue};
+use super::error::{Error, ErrorKind};
 
 pub struct Encoder {
     data: Vec<(XmlRpcValue, usize)>,
 }
+
+// TODO: add error chaining for IO errors
 
 impl Encoder {
     pub fn new() -> Encoder {
@@ -58,215 +60,197 @@ impl Encoder {
     }
 }
 
+type EncoderResult = Result<(), Error>;
+
 impl rustc_serialize::Encoder for Encoder {
     type Error = Error;
 
-    fn emit_nil(&mut self) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_nil(&mut self) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("nil".into()))
     }
 
-    fn emit_usize(&mut self, _: usize) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_usize(&mut self, _: usize) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("usize".into()))
     }
 
-    fn emit_u64(&mut self, _: u64) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_u64(&mut self, _: u64) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("u64".into()))
     }
 
-    fn emit_u32(&mut self, _: u32) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_u32(&mut self, _: u32) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("u32".into()))
     }
 
-    fn emit_u16(&mut self, _: u16) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_u16(&mut self, _: u16) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("u16".into()))
     }
 
-    fn emit_u8(&mut self, _: u8) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_u8(&mut self, _: u8) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("u8".into()))
     }
 
-    fn emit_isize(&mut self, _: isize) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_isize(&mut self, _: isize) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("isize".into()))
     }
 
-    fn emit_i64(&mut self, _: i64) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_i64(&mut self, _: i64) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("i64".into()))
     }
 
-    fn emit_i32(&mut self, v: i32) -> Result<(), Self::Error> {
+    fn emit_i32(&mut self, v: i32) -> EncoderResult {
         Ok(self.data.push((XmlRpcValue::Int(v), 0)))
     }
 
-    fn emit_i16(&mut self, _: i16) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_i16(&mut self, _: i16) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("i16".into()))
     }
 
-    fn emit_i8(&mut self, _: i8) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_i8(&mut self, _: i8) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("i8".into()))
     }
 
-    fn emit_bool(&mut self, v: bool) -> Result<(), Self::Error> {
+    fn emit_bool(&mut self, v: bool) -> EncoderResult {
         Ok(self.data.push((XmlRpcValue::Bool(v), 0)))
     }
 
-    fn emit_f64(&mut self, v: f64) -> Result<(), Self::Error> {
+    fn emit_f64(&mut self, v: f64) -> EncoderResult {
         Ok(self.data.push((XmlRpcValue::Double(v), 0)))
     }
 
-    fn emit_f32(&mut self, _: f32) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_f32(&mut self, _: f32) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("f32".into()))
     }
 
-    fn emit_char(&mut self, _: char) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_char(&mut self, _: char) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("char".into()))
     }
 
-    fn emit_str(&mut self, v: &str) -> Result<(), Self::Error> {
+    fn emit_str(&mut self, v: &str) -> EncoderResult {
         Ok(self.data.push((XmlRpcValue::String(String::from(v)), 0)))
     }
 
-    fn emit_enum<F>(&mut self, _: &str, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_enum<F>(&mut self, _: &str, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("enum".into()))
     }
 
-    fn emit_enum_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_enum_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
     }
 
-    fn emit_enum_variant_arg<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_enum_variant_arg<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
     }
 
-    fn emit_enum_struct_variant<F>(&mut self,
-                                   _: &str,
-                                   _: usize,
-                                   _: usize,
-                                   _: F)
-                                   -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_enum_struct_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
     }
 
-    fn emit_enum_struct_variant_field<F>(&mut self,
-                                         _: &str,
-                                         _: usize,
-                                         _: F)
-                                         -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_enum_struct_variant_field<F>(&mut self, _: &str, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
     }
 
-    fn emit_struct<F>(&mut self, _: &str, l: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_struct<F>(&mut self, name: &str, l: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
+        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
-        f(self)
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("struct {}", name)))
     }
 
-    fn emit_struct_field<F>(&mut self, _: &str, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_struct_field<F>(&mut self, name: &str, _: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field {}", name)))
     }
 
-    fn emit_tuple<F>(&mut self, l: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple<F>(&mut self, l: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
+        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
-        f(self)
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType("tuple".into()))
     }
 
-    fn emit_tuple_arg<F>(&mut self, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_arg<F>(&mut self, n: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field number {}", n)))
     }
 
-    fn emit_tuple_struct<F>(&mut self, _: &str, l: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_struct<F>(&mut self, name: &str, l: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
+        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
-        f(self)
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("tuple struct {}", name)))
     }
 
-    fn emit_tuple_struct_arg<F>(&mut self, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_tuple_struct_arg<F>(&mut self, n: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field number {}", n)))
     }
 
-    fn emit_option<F>(&mut self, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_option<F>(&mut self, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("option".into()))
     }
 
-    fn emit_option_none(&mut self) -> Result<(), Self::Error> {
-        Err(Error {})
+    fn emit_option_none(&mut self) -> EncoderResult {
+        bail!(ErrorKind::UnsupportedDataType("none".into()))
     }
 
-    fn emit_option_some<F>(&mut self, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_option_some<F>(&mut self, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("some".into()))
     }
 
-    fn emit_seq<F>(&mut self, l: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_seq<F>(&mut self, l: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
+        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
-        f(self)
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType("array".into()))
     }
 
-    fn emit_seq_elt<F>(&mut self, _: usize, f: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_seq_elt<F>(&mut self, n: usize, f: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        f(self)
+        use super::error::ResultExt;
+        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("element number {}", n)))
     }
 
-    fn emit_map<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_map<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
-    fn emit_map_elt_key<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_map_elt_key<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
+        bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
-    fn emit_map_elt_val<F>(&mut self, _: usize, _: F) -> Result<(), Self::Error>
-        where F: FnOnce(&mut Self) -> Result<(), Self::Error>
+    fn emit_map_elt_val<F>(&mut self, _: usize, _: F) -> EncoderResult
+        where F: FnOnce(&mut Self) -> EncoderResult
     {
-        Err(Error {})
-    }
-}
-
-#[derive(Debug)]
-pub struct Error {}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.description())
-    }
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        "Decoder does not support all members of given data structure"
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        None
+        bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }
 }
 

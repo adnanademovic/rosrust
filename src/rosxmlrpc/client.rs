@@ -63,7 +63,7 @@ impl Request {
         }
     }
 
-    pub fn add<T: Encodable>(&mut self, parameter: &T) -> Result<(), serde::encoder::Error> {
+    pub fn add<T: Encodable>(&mut self, parameter: &T) -> Result<(), serde::Error> {
         parameter.encode(&mut self.encoder)
     }
 }

@@ -1,4 +1,8 @@
+#![recursion_limit = "1024"]
+
 extern crate byteorder;
+#[macro_use]
+extern crate error_chain;
 extern crate hyper;
 #[macro_use]
 extern crate lazy_static;

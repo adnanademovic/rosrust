@@ -1,7 +1,6 @@
 use regex::Regex;
 use rosxmlrpc;
 use rosxmlrpc::error::Error;
-use rosxmlrpc::serde::decoder::Error as DecoderError;
 use rustc_serialize::{Decodable, Decoder, Encodable};
 use std;
 use super::value::Topic;
@@ -11,9 +10,6 @@ pub struct Master {
     client_id: String,
     caller_api: String,
 }
-
-const MISMATCHED_FORMAT: MasterError =
-    MasterError::XmlRpc(Error::Deserialization(DecoderError::MismatchedDataFormat));
 
 macro_rules! request {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
@@ -51,30 +47,39 @@ impl Master {
                         -> MasterResult<rosxmlrpc::XmlRpcValue> {
         let values = match data? {
             rosxmlrpc::XmlRpcValue::Array(values) => values,
-            _ => return Err(MISMATCHED_FORMAT),
+            _ => return Err(MasterError::XmlRpc(Error::Serde(
+        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
+            "while handling request".into()).into()))),
         };
         if values.len() != 3 {
-            return Err(MISMATCHED_FORMAT);
+            return Err(MasterError::XmlRpc(Error::Serde(
+        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
+            "while handling request".into()).into())));
         }
         let mut values = values.into_iter();
         let code = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::Int(v)) => v,
-            _ => return Err(MISMATCHED_FORMAT),
+            _ => return Err(MasterError::XmlRpc(Error::Serde(
+        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
+            "while handling request".into()).into()))),
         };
         let message = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::String(v)) => v,
-            _ => return Err(MISMATCHED_FORMAT),
+            _ => return Err(MasterError::XmlRpc(Error::Serde(
+        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
+            "while handling request".into()).into()))),
         };
         let value = values.next()
-            .ok_or(rosxmlrpc::serde::decoder::Error::MismatchedDataFormat)?;
+            .ok_or(MasterError::XmlRpc(Error::Serde(
+        rosxmlrpc::serde::ErrorKind::MismatchedDataFormat(
+            "while handling request".into()).into())))?;
         match code {
-            0 | -1 => Err(rosxmlrpc::serde::decoder::Error::Other(message))?,
+            0 | -1 => Err(rosxmlrpc::serde::Error::from(message))?,
             1 => Ok(value),
             v => {
                 warn!("ROS Master returned '{}' response code (only -1, 0, 1 legal)",
                       v);
-                Err(rosxmlrpc::serde::decoder::Error::Other(String::from("Invalid response \
-                                                                          code returned by ROS")))?
+                Err(rosxmlrpc::serde::Error::from("Invalid response code returned by ROS"))?
             }
         }
     }
@@ -220,7 +225,8 @@ pub enum MasterError {
 
 impl From<Error> for MasterError {
     fn from(err: Error) -> MasterError {
-        if let Error::Deserialization(DecoderError::Other(ref v)) = err {
+        if let Error::Serde(rosxmlrpc::serde::Error(rosxmlrpc::serde::ErrorKind::Msg(ref v), _)) =
+            err {
             lazy_static!{
                 static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$").unwrap();
             }
@@ -238,15 +244,9 @@ impl From<Error> for MasterError {
     }
 }
 
-impl From<DecoderError> for MasterError {
-    fn from(err: DecoderError) -> MasterError {
-        MasterError::from(MasterError::XmlRpc(Error::Deserialization(err)))
-    }
-}
-
-impl From<rosxmlrpc::serde::encoder::Error> for MasterError {
-    fn from(err: rosxmlrpc::serde::encoder::Error) -> MasterError {
-        MasterError::from(MasterError::XmlRpc(Error::Serialization(err)))
+impl From<rosxmlrpc::serde::Error> for MasterError {
+    fn from(err: rosxmlrpc::serde::Error) -> MasterError {
+        MasterError::from(MasterError::XmlRpc(Error::Serde(err)))
     }
 }
 
