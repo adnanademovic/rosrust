@@ -16,9 +16,13 @@ error_chain! {
             description("Data field within header missing")
             display("Data field '{}' within header missing", field)
         }
-        Mismatch {
-            description("Mismatch within data")
-            display("Mismatch within data")
+        MessageTypeMismatch(expected: String, actual: String) {
+            description("Cannot publish with multiple message types")
+            display("Cannot publish '{}' data on '{}' publisher", actual, expected)
+        }
+        ServiceResponseInterruption {
+            description("Data stream interrupted while reading service response")
+            display("Data stream interrupted while reading service response")
         }
     }
 }

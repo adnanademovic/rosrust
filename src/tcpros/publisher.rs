@@ -108,15 +108,15 @@ pub struct PublisherStream<T: Message> {
 }
 
 impl<T: Message> PublisherStream<T> {
-    pub fn new(publisher: &Publisher) -> Result<PublisherStream<T>, Error> {
-        if publisher.msg_type == T::msg_type() {
-            Ok(PublisherStream {
-                stream: publisher.subscriptions.clone(),
-                datatype: std::marker::PhantomData,
-            })
-        } else {
-            Err(ErrorKind::Mismatch.into())
+    fn new(publisher: &Publisher) -> Result<PublisherStream<T>, Error> {
+        let msg_type = T::msg_type();
+        if publisher.msg_type != msg_type {
+            bail!(ErrorKind::MessageTypeMismatch(publisher.msg_type.clone(), msg_type));
         }
+        Ok(PublisherStream {
+            stream: publisher.subscriptions.clone(),
+            datatype: std::marker::PhantomData,
+        })
     }
 
     pub fn send(&mut self, message: T) {

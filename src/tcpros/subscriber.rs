@@ -3,7 +3,7 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::error::{Error, ErrorKind};
+use super::error::Error;
 use super::header::{encode, decode, match_field};
 use super::Message;
 use super::decoder::{Decoder, DecoderSource};

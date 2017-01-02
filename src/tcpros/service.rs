@@ -59,7 +59,7 @@ fn listen_for_clients<T, U, V, F>(service: String,
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send + 'static,
           V: Iterator<Item = U>,
-          F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+          F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
 {
     let handler = Arc::new(handler);
     for mut stream in listener {
@@ -79,7 +79,7 @@ fn listen_for_clients<T, U, V, F>(service: String,
 fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send,
-          F: Fn(T::Request) -> T::Response
+          F: Fn(T::Request) -> Result<T::Response, String>
 {
     loop {
         let mut encoder = Encoder::new();
@@ -91,9 +91,16 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
             Ok(req) => req,
             Err(_) => break,
         };
-        let res = handler(req);
-        true.encode(&mut encoder).unwrap();
-        res.encode(&mut encoder).unwrap();
+        match handler(req) {
+            Ok(res) => {
+                true.encode(&mut encoder).unwrap();
+                res.encode(&mut encoder).unwrap();
+            }
+            Err(message) => {
+                false.encode(&mut encoder).unwrap();
+                message.encode(&mut encoder).unwrap();
+            }
+        }
         encoder.write_to(&mut stream).unwrap();
     }
     let mut encoder = Encoder::new();
@@ -110,7 +117,7 @@ impl Service {
                      handler: F)
                      -> Result<Service, Error>
         where T: ServicePair,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
     {
         let listener = TcpListener::bind((hostname, port))?;
         let socket_address = listener.local_addr()?;
@@ -131,7 +138,7 @@ impl Service {
         where T: ServicePair,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
     {
         let service_name = String::from(service);
         let node_name = String::from(node_name);

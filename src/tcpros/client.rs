@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::error::{Error, ErrorKind};
+use super::error::{Error, ErrorKind, ResultExt};
 use super::header::{encode, decode};
 use super::ServicePair;
 use super::decoder::DecoderSource;
@@ -26,12 +26,12 @@ impl<T: ServicePair> Client<T> {
         }
     }
 
-    pub fn req(&self, args: &T::Request) -> Result<T::Response, Error> {
+    pub fn req(&self, args: &T::Request) -> Result<Result<T::Response, String>, Error> {
         Self::request_body(args, &self.uri, &self.caller_id, &self.service)
     }
 
     pub fn req_callback<F>(&self, args: T::Request, callback: F)
-        where F: Fn(Result<T::Response, Error>) -> () + Send + 'static
+        where F: Fn(Result<Result<T::Response, String>, Error>) -> () + Send + 'static
     {
         let uri = self.uri.clone();
         let caller_id = self.caller_id.clone();
@@ -43,7 +43,7 @@ impl<T: ServicePair> Client<T> {
                     uri: &str,
                     caller_id: &str,
                     service: &str)
-                    -> Result<T::Response, Error> {
+                    -> Result<Result<T::Response, String>, Error> {
         let mut stream = TcpStream::connect(uri)?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
@@ -52,16 +52,15 @@ impl<T: ServicePair> Client<T> {
         encoder.write_to(&mut stream)?;
 
         let mut decoder = DecoderSource::new(&mut stream);
-        let success = decoder.pop_verification_byte()?;
-        let mut decoder = match decoder.next() {
-            Some(v) => v,
-            None => bail!(ErrorKind::Mismatch),
-        };
-        if success {
-            T::Response::decode(&mut decoder).map_err(|err| err.into())
+        let success = decoder.pop_verification_byte()
+            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
+        let mut decoder = decoder.pop_decoder()
+            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
+        Ok(if success {
+            Ok(T::Response::decode(&mut decoder)?)
         } else {
-            String::decode(&mut decoder).map_err(|err| err.into()).and_then(|v| Err(v.into()))
-        }
+            Err(String::decode(&mut decoder)?)
+        })
     }
 }
 

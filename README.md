@@ -142,7 +142,7 @@ use std::{thread, time};
 fn main() {
     let mut ros = Ros::new("node_name").unwrap();
     ros.service::<AddTwoInts>("/add_two_ints",
-        |req| AddTwoIntsRes { sum: req.a + req.b } ).unwrap();
+        |req| Ok(AddTwoIntsRes { sum: req.a + req.b }) ).unwrap();
     loop {
         thread::sleep(time::Duration::from_secs(100);
     }
@@ -166,7 +166,7 @@ fn main() {
         println!("5 + 7 = {}", client.req(&AddTwoIntsReq { a: 5, b: 7 }).sum)
         // Async approach
         client.req_callback(AddTwoIntsReq { a: 5, b: 7 },
-            |result| println!("12 + 4 = {}", result.unwrap().sum));
+            |result| println!("12 + 4 = {}", result.unwrap().unwrap().sum));
         thread::sleep(time::Duration::from_secs(1);
     }
 }

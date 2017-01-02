@@ -66,7 +66,7 @@ impl Slave {
                              handler: F)
                              -> SerdeResult<String>
         where T: ServicePair,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
     {
         use std::collections::hash_map::Entry;
         match self.services.lock().unwrap().entry(String::from(service)) {
