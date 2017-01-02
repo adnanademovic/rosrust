@@ -7,6 +7,15 @@ error_chain! {
         Encoder(self::encoder::Error, self::encoder::ErrorKind);
     }
     errors {
+        HeaderMismatch(field: String, expected: String, actual: String) {
+            description("Data field within header mismatched")
+            display("Data field '{}' within header mismatched. Expected: '{}' Actual: '{}'",
+                    field, expected, actual)
+        }
+        HeaderMissingField(field: String) {
+            description("Data field within header missing")
+            display("Data field '{}' within header missing", field)
+        }
         Mismatch {
             description("Mismatch within data")
             display("Mismatch within data")

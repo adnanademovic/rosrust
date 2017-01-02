@@ -78,19 +78,15 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
     Ok(())
 }
 
-fn header_matches(fields: &HashMap<String, String>) -> bool {
-    fields.get("callerid") != None
-}
-
 fn read_response<T, U>(mut stream: &mut U) -> Result<(), Error>
     where T: ServicePair,
           U: std::io::Read
 {
-    if header_matches(&decode(&mut stream)?) {
-        Ok(())
-    } else {
-        Err(ErrorKind::Mismatch.into())
+    let fields = decode(&mut stream)?;
+    if fields.get("callerid").is_none() {
+        bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
+    Ok(())
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<(), Error>

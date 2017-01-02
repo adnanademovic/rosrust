@@ -7,7 +7,7 @@ use std;
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
 use super::error::{Error, ErrorKind};
-use super::header::{encode, decode};
+use super::header::{encode, decode, match_field};
 use super::ServicePair;
 
 pub struct Service {
@@ -16,14 +16,19 @@ pub struct Service {
     pub service: String,
 }
 
-fn header_matches<T: ServicePair>(fields: &HashMap<String, String>, service: &str) -> bool {
-    if fields.get("service") != Some(&String::from(service)) && fields.get("callerid") == None {
-        return false;
+fn read_request<T: ServicePair, U: std::io::Read>(mut stream: &mut U,
+                                                  service: &str)
+                                                  -> Result<(), Error> {
+
+    let fields = decode(stream)?;
+    match_field(&fields, "service", service)?;
+    if fields.get("callerid").is_none() {
+        bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
-    if fields.get("probe") == Some(&String::from("1")) {
-        return true;
+    if match_field(&fields, "probe", "1").is_ok() {
+        return Ok(());
     }
-    fields.get("md5sum") == Some(&T::md5sum())
+    match_field(&fields, "md5sum", &T::md5sum())
 }
 
 fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<(), Error>
@@ -42,11 +47,8 @@ fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) ->
     where T: ServicePair,
           U: std::io::Write + std::io::Read
 {
-    if header_matches::<T>(&decode(stream)?, service) {
-        write_response::<T, U>(stream, node_name)
-    } else {
-        Err(ErrorKind::Mismatch.into())
-    }
+    read_request::<T, U>(stream, service)?;
+    write_response::<T, U>(stream, node_name)
 }
 
 fn listen_for_clients<T, U, V, F>(service: String,

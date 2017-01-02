@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std;
 use super::encoder::Encoder;
 use super::error::{Error, ErrorKind};
-use super::header::{encode, decode};
+use super::header::{encode, decode, match_field};
 use super::Message;
 use super::streamfork::{fork, TargetList, DataStream};
 
@@ -15,20 +15,18 @@ pub struct Publisher {
     pub topic: String,
 }
 
-fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
-    fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
-    fields.get("message_definition") == Some(&T::msg_definition()) &&
-    fields.get("topic") == Some(&String::from(topic)) && fields.get("callerid") != None
-}
-
 fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U,
                                               topic: &str)
                                               -> Result<(), Error> {
-    if header_matches::<T>(&decode(&mut stream)?, topic) {
-        Ok(())
-    } else {
-        Err(ErrorKind::Mismatch.into())
+    let fields = decode(&mut stream)?;
+    match_field(&fields, "md5sum", &T::md5sum())?;
+    match_field(&fields, "type", &T::msg_type())?;
+    match_field(&fields, "message_definition", &T::msg_definition())?;
+    match_field(&fields, "topic", topic)?;
+    if fields.get("callerid").is_none() {
+        bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
+    Ok(())
 }
 
 fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(), Error> {

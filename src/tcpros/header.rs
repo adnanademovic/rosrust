@@ -52,6 +52,21 @@ pub fn encode(data: HashMap<String, String>) -> Result<Encoder, super::error::en
     Ok(encoder)
 }
 
+pub fn match_field(fields: &HashMap<String, String>,
+                   field: &str,
+                   expected: &str)
+                   -> Result<(), super::error::Error> {
+    use super::error::ErrorKind;
+    let actual = match fields.get(field) {
+        Some(actual) => actual,
+        None => bail!(ErrorKind::HeaderMissingField(field.into())),
+    };
+    if actual != &expected {
+        bail!(ErrorKind::HeaderMismatch(field.into(), expected.into(), actual.clone()));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

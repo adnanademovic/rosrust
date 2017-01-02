@@ -4,7 +4,7 @@ use std::thread;
 use std::collections::HashMap;
 use std;
 use super::error::{Error, ErrorKind};
-use super::header::{encode, decode};
+use super::header::{encode, decode, match_field};
 use super::Message;
 use super::decoder::{Decoder, DecoderSource};
 
@@ -100,16 +100,10 @@ fn write_request<T: Message, U: std::io::Write>(mut stream: &mut U,
     Ok(())
 }
 
-fn header_matches<T: Message>(fields: &HashMap<String, String>) -> bool {
-    fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type())
-}
-
 fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<(), Error> {
-    if header_matches::<T>(&decode(&mut stream)?) {
-        Ok(())
-    } else {
-        Err(ErrorKind::Mismatch.into())
-    }
+    let fields = decode(&mut stream)?;
+    match_field(&fields, "md5sum", &T::md5sum())?;
+    match_field(&fields, "type", &T::msg_type())
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, topic: &str) -> Result<(), Error>
