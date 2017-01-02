@@ -16,7 +16,6 @@ pub struct Publisher {
 }
 
 fn header_matches<T: Message>(fields: &HashMap<String, String>, topic: &str) -> bool {
-    println!("{:?}", fields);
     fields.get("md5sum") == Some(&T::md5sum()) && fields.get("type") == Some(&T::msg_type()) &&
     fields.get("message_definition") == Some(&T::msg_definition()) &&
     fields.get("topic") == Some(&String::from(topic)) && fields.get("callerid") != None

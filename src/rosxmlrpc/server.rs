@@ -56,7 +56,7 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
     fn handle(&self, req: Request, res: Response) {
         if let Err(err) = self.process(req, res) {
-            println!("Server handler error: {}", err);
+            error!("Server handler error: {}", err);
         }
     }
 }

@@ -77,10 +77,11 @@ fn join_connections<T>(data_stream: Sender<Decoder>,
         }
         let target = data_stream.clone();
         thread::spawn(move || {
-            DecoderSource::new(stream)
-                .map(|decoder| target.send(decoder))
-                .collect::<Result<Vec<()>, _>>()
-                .unwrap_err();
+            for decoder in DecoderSource::new(stream) {
+                if let Err(_) = target.send(decoder) {
+                    break;
+                }
+            }
         });
     }
 }
