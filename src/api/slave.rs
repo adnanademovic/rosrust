@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::thread;
-use super::error::ServerError as Error;
+use super::error::{Error, ErrorKind};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
 use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service, ServicePair};
 
@@ -72,7 +72,7 @@ impl Slave {
         match self.services.lock().unwrap().entry(String::from(service)) {
             Entry::Occupied(..) => {
                 error!("Duplicate initiation of service '{}' attempted", service);
-                Err(Error::Critical(String::from("Could not add duplicate service")))
+                Err(ErrorKind::Critical("Could not add duplicate service".into()).into())
             }
             Entry::Vacant(entry) => {
                 let service = Service::new::<T, _>(hostname, 0, service, &self.name, handler)?;
@@ -115,7 +115,8 @@ impl Slave {
         match self.subscriptions.lock().unwrap().entry(String::from(topic)) {
             Entry::Occupied(..) => {
                 error!("Duplicate subscription to topic '{}' attempted", topic);
-                Err(Error::Critical(String::from("Could not add duplicate subscription to topic")))
+                Err(ErrorKind::Critical("Could not add duplicate subscription to topic".into())
+                    .into())
             }
             Entry::Vacant(entry) => {
                 let subscriber = Subscriber::new::<T, F>(&self.name, topic, callback);

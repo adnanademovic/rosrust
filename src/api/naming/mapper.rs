@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use super::path::{Buffer, Slice, Path};
-use super::Error;
+use super::error::{Error, ErrorKind};
 
 pub struct Mapper {
     children: HashMap<String, Mapper>,
@@ -19,7 +19,7 @@ impl Mapper {
         match keys.split_first() {
             None => {
                 if self.value.is_some() {
-                    Err(Error::MappingSourceExists)
+                    Err(ErrorKind::MappingSourceExists.into())
                 } else {
                     self.value = Some(value);
                     Ok(())

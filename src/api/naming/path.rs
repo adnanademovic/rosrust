@@ -1,7 +1,7 @@
 use std;
 use std::ops::{Add, AddAssign};
 use std::fmt;
-use super::Error;
+use super::error::{Error, ErrorKind};
 
 pub trait Path {
     fn get(&self) -> &[String];
@@ -101,7 +101,7 @@ impl std::str::FromStr for Buffer {
                 }
             }
         }
-        Err(Error::MappingSourceExists)
+        bail!(ErrorKind::MappingSourceExists)
     }
 }
 

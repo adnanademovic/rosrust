@@ -1,9 +1,9 @@
 use regex::Regex;
 use rosxmlrpc;
 use rosxmlrpc::error::{Error as ReError, ErrorKind as ReErrorKind};
-use rosxmlrpc::serde::{Error as SeError, ErrorKind as SeErrorKind};
+use rosxmlrpc::serde::ErrorKind as SeErrorKind;
+use super::error::master::{Error, ErrorKind};
 use rustc_serialize::{Decodable, Decoder, Encodable};
-use std;
 use super::value::Topic;
 
 pub struct Master {
@@ -15,9 +15,9 @@ pub struct Master {
 macro_rules! request {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
         let mut request = rosxmlrpc::client::Request::new(stringify!($name));
-        request.add(&$s.client_id)?;
+        request.add(&$s.client_id).map_err(|v| Error::from(ReError::from(v)))?;
         $(
-            request.add(&$item)?;
+            request.add(&$item).map_err(|v| Error::from(ReError::from(v)))?;
         )*
         let data : ResponseData<_> = $s.client.request(request)?;
         Ok(data.0)
@@ -27,11 +27,13 @@ macro_rules! request {
 macro_rules! request_tree {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
         let mut request = rosxmlrpc::client::Request::new(stringify!($name));
-        request.add(&$s.client_id)?;
+        request.add(&$s.client_id).map_err(|v| Error::from(ReError::from(v)))?;
         $(
-            request.add(&$item)?;
+            request.add(&$item).map_err(|v| Error::from(ReError::from(v)))?;
         )*
-        Master::remove_tree_wrap($s.client.request_tree(request))
+        $s.client.request_tree(request)
+            .map_err(extract_error_code)
+            .and_then(Master::remove_tree_wrap)
     })
 }
 
@@ -44,45 +46,46 @@ impl Master {
         }
     }
 
-    fn remove_tree_wrap(data: Result<rosxmlrpc::XmlRpcValue, ReError>)
-                        -> MasterResult<rosxmlrpc::XmlRpcValue> {
-        let values = match data? {
+    fn remove_tree_wrap(data: rosxmlrpc::XmlRpcValue) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+        let values = match data {
             rosxmlrpc::XmlRpcValue::Array(values) => values,
-            _ => return Err(MasterError::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into())).into())),
+            _ => {
+                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into()))))
+            }
         };
         if values.len() != 3 {
-            return Err(MasterError::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into())).into()));
+            bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat("while \
+                                                                                          handling \
+                                                                                          request"
+                .into()))))
         }
         let mut values = values.into_iter();
         let code = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::Int(v)) => v,
-            _ => return Err(MasterError::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into())).into())),
+            _ => {
+                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into()))))
+            }
         };
         let message = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::String(v)) => v,
-            _ => return Err(MasterError::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into())).into())),
-        };
-        let value = values.next()
-            .ok_or(MasterError::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into())).into()))?;
-        match code {
-            0 | -1 => Err(SeError::from(message))?,
-            1 => Ok(value),
-            v => {
-                warn!("ROS Master returned '{}' response code (only -1, 0, 1 legal)",
-                      v);
-                Err(SeError::from("Invalid response code returned by ROS"))?
+            _ => {
+                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into()))))
             }
+        };
+        let value = match values.next() {
+            Some(v) => v,
+            _ => {
+                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while handling request".into()))))
+            }
+        };
+        if code != 1 {
+            bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::Msg(message))));
         }
+        Ok(value)
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
@@ -180,7 +183,28 @@ impl Master {
     }
 }
 
-pub type MasterResult<T> = Result<T, MasterError>;
+pub type MasterResult<T> = Result<T, Error>;
+
+
+fn extract_error_code(err: ReError) -> Error {
+    use super::error::api::ErrorKind as ApiErrorKind;
+    if let ReError(ReErrorKind::Serde(SeErrorKind::Msg(ref v)), _) = err {
+        lazy_static!{
+            static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$").unwrap();
+        }
+        if let Some(cap) = RE.captures(&v) {
+            let message = String::from(cap.at(2).unwrap_or(""));
+            return if cap.at(1) == Some("0") {
+                    ErrorKind::Api(ApiErrorKind::Fail(message))
+                } else {
+                    ErrorKind::Api(ApiErrorKind::Error(message))
+                }
+                .into();
+        }
+    }
+    ErrorKind::XmlRpc(err.into()).into()
+}
+
 
 #[derive(Debug)]
 struct ResponseData<T>(T);
@@ -210,79 +234,4 @@ pub struct SystemState {
     pub publishers: Vec<TopicData>,
     pub subscribers: Vec<TopicData>,
     pub services: Vec<TopicData>,
-}
-
-#[derive(Debug)]
-pub enum FailureType {
-    Failure,
-    Error,
-}
-
-#[derive(Debug)]
-pub enum MasterError {
-    XmlRpc(ReError),
-    ApiError(FailureType, String),
-}
-
-impl From<ReError> for MasterError {
-    fn from(err: ReError) -> MasterError {
-        if let ReError(ReErrorKind::Serde(SeErrorKind::Msg(ref v)), _) = err {
-            lazy_static!{
-                static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$").unwrap();
-            }
-            if let Some(cap) = RE.captures(&v) {
-                let failure_type = if cap.at(1) == Some("0") {
-                    FailureType::Failure
-                } else {
-                    FailureType::Error
-                };
-                let message = String::from(cap.at(2).unwrap_or(""));
-                return MasterError::ApiError(failure_type, message);
-            }
-        }
-        MasterError::XmlRpc(err)
-    }
-}
-
-impl From<SeError> for MasterError {
-    fn from(err: SeError) -> MasterError {
-        MasterError::XmlRpc(err.into())
-    }
-}
-
-impl std::fmt::Display for FailureType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f,
-               "{}",
-               match *self {
-                   FailureType::Error => "ERROR",
-                   FailureType::Failure => "FAILURE",
-               })
-    }
-}
-
-impl std::fmt::Display for MasterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use std::error::Error as ErrorTrait;
-        match *self {
-            MasterError::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
-            MasterError::ApiError(..) => write!(f, "Error with ROS API: {}", self.description()),
-        }
-    }
-}
-
-impl std::error::Error for MasterError {
-    fn description(&self) -> &str {
-        match *self {
-            MasterError::XmlRpc(ref err) => err.description(),
-            MasterError::ApiError(.., ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            MasterError::XmlRpc(ref err) => Some(err),
-            MasterError::ApiError(..) => None,
-        }
-    }
 }

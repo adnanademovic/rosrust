@@ -5,7 +5,7 @@ use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
-use super::error::ServerError as Error;
+use super::error::{Error, ErrorKind};
 use super::value::Topic;
 use tcpros::{Publisher, Subscriber, Service};
 
@@ -52,7 +52,10 @@ impl SlaveHandler {
         }
     }
 
-    fn handle_call(&self, method_name: &str, req: &mut ParameterIterator) -> SerdeResult<Answer> {
+    fn handle_call(&self,
+                   method_name: &str,
+                   req: &mut ParameterIterator)
+                   -> Result<Answer, rosxmlrpc::serde::Error> {
         match method_name {
             "getBusStats" => encode_response(self.get_bus_stats(req), "Bus stats"),
             "getBusInfo" => encode_response(self.get_bus_info(req), "Bus stats"),
@@ -69,8 +72,10 @@ impl SlaveHandler {
             "publisherUpdate" => encode_response(self.publisher_update(req), "Publishers updated"),
             "requestTopic" => encode_response(self.request_topic(req), "Chosen protocol"),
             name => {
-                encode_response::<i32>(Err(Error::Protocol(format!("Unimplemented method: {}",
-                                                                   name))),
+                encode_response::<i32>(Err(ErrorKind::Protocol(format!("Unimplemented method: \
+                                                                        {}",
+                                                                       name))
+                                           .into()),
                                        "")
             }
         }
@@ -79,7 +84,7 @@ impl SlaveHandler {
     fn get_bus_stats(&self, req: &mut ParameterIterator) -> SerdeResult<BusStats> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         // TODO: implement actual stats displaying
         Ok(BusStats {
@@ -96,7 +101,7 @@ impl SlaveHandler {
     fn get_bus_info(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<BusInfo>> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         // TODO: implement actual info displaying
         Ok(Vec::new())
@@ -108,10 +113,10 @@ impl SlaveHandler {
         // We don't do anything with parameter updates
         let value = req.next();
         if let None = value {
-            return Err(Error::Protocol(String::from("Missing parameter")));
+            bail!(ErrorKind::Protocol("Missing parameter".into()));
         }
         if caller_id == "" || key == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         Ok(0)
     }
@@ -119,7 +124,7 @@ impl SlaveHandler {
     fn get_pid(&self, req: &mut ParameterIterator) -> SerdeResult<i32> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         Ok(getpid())
     }
@@ -128,19 +133,19 @@ impl SlaveHandler {
         let caller_id = pop::<String>(req)?;
         let message = pop::<String>(req).unwrap_or(String::from(""));
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         info!("Server is shutting down because: {}", message);
-        match self.shutdown_signal.lock().unwrap().send(()) {
-            Ok(..) => Ok(0),
-            Err(..) => Err(Error::Critical(String::from("Slave API is down already"))),
+        if let Err(..) = self.shutdown_signal.lock().unwrap().send(()) {
+            bail!(ErrorKind::Critical("Slave API is down already".into()));
         }
+        Ok(0)
     }
 
     fn get_publications(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         Ok(self.publications
             .lock()
@@ -158,7 +163,7 @@ impl SlaveHandler {
     fn get_subscriptions(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         Ok(self.subscriptions
             .lock()
@@ -178,7 +183,7 @@ impl SlaveHandler {
         let topic = pop::<String>(req)?;
         let publishers = pop::<Vec<String>>(req)?;
         if caller_id == "" || topic == "" || publishers.iter().any(|ref x| x.as_str() == "") {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         add_publishers_to_subscription(&mut self.subscriptions.lock().unwrap(),
                                        &self.name,
@@ -190,7 +195,7 @@ impl SlaveHandler {
     fn get_master_uri(&self, req: &mut ParameterIterator) -> SerdeResult<&str> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         Ok(&self.master_uri)
     }
@@ -199,7 +204,7 @@ impl SlaveHandler {
         let caller_id = pop::<String>(req)?;
         let topic = pop::<String>(req)?;
         let protocols = req.next()
-            .ok_or(Error::Protocol(String::from("Missing parameter")))?
+            .ok_or(ErrorKind::Protocol("Missing parameter".into()))?
             .value();
         let (ip, port) = match self.publications
             .lock()
@@ -207,17 +212,18 @@ impl SlaveHandler {
             .get(&topic) {
             Some(publisher) => (self.hostname.clone(), publisher.port as i32),
             None => {
-                return Err(Error::Protocol(String::from("Requested topic not published by node")))
+                bail!(ErrorKind::Protocol("Requested topic not published by node".into()));
             }
         };
         if caller_id == "" || topic == "" {
-            return Err(Error::Protocol(String::from("Empty strings given")));
+            bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         let protocols = match protocols {
             XmlRpcValue::Array(protocols) => protocols,
             _ => {
-                return Err(Error::Protocol(String::from("Protocols need to be provided as [ \
-                                                         [String, XmlRpcLegalValue] ]")))
+                bail!(ErrorKind::Protocol("Protocols need to be provided as [ [String, \
+                                           XmlRpcLegalValue] ]"
+                    .into()));
             }
         };
         let mut has_tcpros = false;
@@ -231,7 +237,7 @@ impl SlaveHandler {
         if has_tcpros {
             Ok((String::from("TCPROS"), ip, port))
         } else {
-            Err(Error::Protocol(String::from("No matching protocols available")))
+            Err(ErrorKind::Protocol("No matching protocols available".into()).into())
         }
     }
 }
@@ -256,23 +262,24 @@ pub fn add_publishers_to_subscription<T>(subscriptions: &mut HashMap<String, Sub
     Ok(())
 }
 
-fn encode_response<T: Encodable>(response: SerdeResult<T>, message: &str) -> SerdeResult<Answer> {
+fn encode_response<T: Encodable>(response: SerdeResult<T>,
+                                 message: &str)
+                                 -> Result<Answer, rosxmlrpc::serde::Error> {
     use std::error::Error;
     let mut res = Answer::new();
     match response {
-        Ok(value) => res.add(&(1i32, message, value)),
-        Err(err) => res.add(&(-1i32, err.description(), 0)),
-    }?;
-
-    Ok(res)
+            Ok(value) => res.add(&(1i32, message, value)),
+            Err(err) => res.add(&(-1i32, err.description(), 0)),
+        }
+        .map(|_| res)
 }
 
 
 fn pop<T: Decodable>(req: &mut ParameterIterator) -> SerdeResult<T> {
     req.next()
-        .ok_or(Error::Protocol(String::from("Missing parameter")))?
+        .ok_or(ErrorKind::Protocol("Missing parameter".into()))?
         .read()
-        .map_err(|v| Error::XmlRpcSerde(v))
+        .map_err(|v| ErrorKind::XmlRpc(rosxmlrpc::error::ErrorKind::Serde(v.into())).into())
 }
 
 fn connect_to_publisher(subscriber: &mut Subscriber,
@@ -285,7 +292,7 @@ fn connect_to_publisher(subscriber: &mut Subscriber,
         // This should never happen, due to the nature of ROS
         panic!("Expected TCPROS protocol from ROS publisher");
     }
-    subscriber.connect_to((hostname.as_str(), port as u16)).map_err(|err| Error::Io(err))
+    subscriber.connect_to((hostname.as_str(), port as u16)).map_err(|err| ErrorKind::Io(err).into())
 }
 
 fn request_topic(publisher_uri: &str,

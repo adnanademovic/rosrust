@@ -1,10 +1,10 @@
 use self::path::Path;
 use self::mapper::Mapper;
-pub use self::error::Error;
+pub use self::error::{Error, ErrorKind};
 
 mod path;
 mod mapper;
-mod error;
+pub mod error;
 
 pub struct Resolver {
     path: path::Buffer,
@@ -15,7 +15,7 @@ pub struct Resolver {
 impl Resolver {
     pub fn new(name: &str) -> Result<Resolver, Error> {
         let path = name.parse::<path::Buffer>()?;
-        let namespace = path.parent().ok_or(Error::IllegalPath)?.take();
+        let namespace = path.parent().ok_or(ErrorKind::IllegalPath)?.take();
         Ok(Resolver {
             path: path,
             namespace: namespace,
@@ -30,7 +30,7 @@ impl Resolver {
     }
 
     fn resolve(&self, name: &str) -> Result<path::Buffer, Error> {
-        let first_char = *name.as_bytes().get(0).ok_or(Error::IllegalPath)?;
+        let first_char = *name.as_bytes().get(0).ok_or(ErrorKind::IllegalPath)?;
         if first_char == b'/' {
             return name.parse();
         }
