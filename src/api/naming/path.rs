@@ -12,8 +12,11 @@ pub trait Path {
         Slice { chain: self.get() }
     }
 
-    fn parent(&self) -> Option<Slice> {
-        self.get().split_last().map(|v| Slice { chain: v.1 })
+    fn parent(&self) -> Result<Slice, Error> {
+        match self.get().split_last() {
+            Some(v) => Ok(Slice { chain: v.1 }),
+            None => Err(ErrorKind::MissingParent.into()),
+        }
     }
 }
 
@@ -92,26 +95,30 @@ impl std::str::FromStr for Buffer {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim_right_matches('/');
         let mut word_iter = s.split('/');
-        if let Some("") = word_iter.next() {
-            let words = word_iter.map(|v| String::from(v)).collect::<Vec<String>>();
-            if words.len() > 0 {
-                if words.iter().all(is_legal_name) {
-                    return Ok(Buffer { chain: words });
-                }
-            }
+        match word_iter.next() {
+            Some("") => {}
+            Some(_) | None => bail!(ErrorKind::LeadingSlashMissing(s.into())),
         }
-        bail!(ErrorKind::MappingSourceExists)
+        let words = word_iter.map(process_name).collect::<Result<Vec<String>, Error>>()?;
+        Ok(Buffer { chain: words })
     }
 }
 
-fn is_legal_name(v: &String) -> bool {
-    let mut bytes = v.bytes();
+fn process_name(name: &str) -> Result<String, Error> {
+    let mut bytes = name.bytes();
     let first_char = match bytes.next() {
         Some(v) => v,
-        None => return false,
+        None => bail!(ErrorKind::EmptyName),
     };
-    is_legal_first_char(first_char) && bytes.all(is_legal_char)
+    if !is_legal_first_char(first_char) {
+        bail!(ErrorKind::IllegalFirstCharacter(name.into()));
+    }
+    if !bytes.all(is_legal_char) {
+        bail!(ErrorKind::IllegalCharacter(name.into()));
+    }
+    Ok(String::from(name))
 }
 
 fn is_legal_first_char(v: u8) -> bool {
@@ -131,7 +138,9 @@ mod tests {
         assert!("/foo".parse::<Buffer>().is_ok());
         assert!("/foo/bar".parse::<Buffer>().is_ok());
         assert!("/f1_aA/Ba02/Xx".parse::<Buffer>().is_ok());
-        assert!("".parse::<Buffer>().is_err());
+        assert!("/asdf/".parse::<Buffer>().is_ok());
+        assert!("/".parse::<Buffer>().is_ok());
+        assert!("".parse::<Buffer>().is_ok());
         assert!("a".parse::<Buffer>().is_err());
         assert!("/123/".parse::<Buffer>().is_err());
         assert!("/foo$".parse::<Buffer>().is_err());
@@ -168,7 +177,8 @@ mod tests {
         assert_eq!("/f1_aA/Ba02",
                    format!("{}",
                            "/f1_aA/Ba02/Xx".parse::<Buffer>().unwrap().parent().unwrap()));
-        assert!("/foo".parse::<Buffer>().unwrap().parent().unwrap().parent().is_none());
+        assert!("/".parse::<Buffer>().unwrap().parent().is_err());
+        assert!("/foo".parse::<Buffer>().unwrap().parent().unwrap().parent().is_err());
     }
 
     #[test]

@@ -15,7 +15,7 @@ pub struct Resolver {
 impl Resolver {
     pub fn new(name: &str) -> Result<Resolver, Error> {
         let path = name.parse::<path::Buffer>()?;
-        let namespace = path.parent().ok_or(ErrorKind::IllegalPath)?.take();
+        let namespace = path.parent()?.take();
         Ok(Resolver {
             path: path,
             namespace: namespace,
@@ -26,11 +26,12 @@ impl Resolver {
     pub fn map(&mut self, source: &str, destination: &str) -> Result<(), Error> {
         let source = self.resolve(source)?;
         let destination = self.resolve(destination)?;
-        self.mapper.add(source.get(), destination)
+        self.mapper.add(source.get(), destination);
+        Ok(())
     }
 
     fn resolve(&self, name: &str) -> Result<path::Buffer, Error> {
-        let first_char = *name.as_bytes().get(0).ok_or(ErrorKind::IllegalPath)?;
+        let first_char = *name.as_bytes().get(0).ok_or(ErrorKind::EmptyName)?;
         if first_char == b'/' {
             return name.parse();
         }

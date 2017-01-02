@@ -37,7 +37,7 @@ impl Ros {
         let namespace = namespace.trim_right_matches("/");
 
         if name.contains("/") {
-            bail!(ErrorKind::Naming(naming::error::ErrorKind::IllegalPath.into()));
+            bail!(ErrorKind::Naming(naming::error::ErrorKind::IllegalCharacter(name.into())));
         }
 
         let name = format!("{}/{}", namespace, name);

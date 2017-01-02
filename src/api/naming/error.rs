@@ -1,12 +1,24 @@
 error_chain! {
     errors {
-        IllegalPath {
-            description("Illegal ROS path specified")
-            display("Illegal ROS path specified")
+        IllegalCharacter(name: String) {
+            description("Illegal character")
+            display("Illegal character in '{}' - limited to letters, numbers and underscores", name)
         }
-        MappingSourceExists {
-            description("Path is already mapped to another path")
-            display("Path is already mapped to another path")
+        IllegalFirstCharacter(name: String) {
+            description("Illegal first character")
+            display("Illegal first character in '{}' - limited to letters", name)
+        }
+        EmptyName {
+            description("Name in path is empty")
+            display("Name in path is empty")
+        }
+        LeadingSlashMissing(path: String) {
+            description("Leading slash is missing")
+            display("Leading slash is missing in path {}", path)
+        }
+        MissingParent {
+            description("Path has no parent due to being root path")
+            display("Path has no parent due to being root path")
         }
     }
 }
