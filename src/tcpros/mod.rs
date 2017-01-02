@@ -15,6 +15,8 @@ mod streamfork;
 mod service;
 mod client;
 
+pub type ServiceResult<T> = Result<T, String>;
+
 pub trait Message: Decodable + Encodable + Send + 'static {
     fn msg_definition() -> String;
     fn md5sum() -> String;

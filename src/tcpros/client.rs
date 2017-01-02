@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std;
 use super::error::{Error, ErrorKind, ResultExt};
 use super::header::{encode, decode};
-use super::ServicePair;
+use super::{ServicePair, ServiceResult};
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
 
@@ -26,12 +26,12 @@ impl<T: ServicePair> Client<T> {
         }
     }
 
-    pub fn req(&self, args: &T::Request) -> Result<Result<T::Response, String>, Error> {
+    pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>, Error> {
         Self::request_body(args, &self.uri, &self.caller_id, &self.service)
     }
 
     pub fn req_callback<F>(&self, args: T::Request, callback: F)
-        where F: Fn(Result<Result<T::Response, String>, Error>) -> () + Send + 'static
+        where F: FnOnce(Result<ServiceResult<T::Response>, Error>) + Send + 'static
     {
         let uri = self.uri.clone();
         let caller_id = self.caller_id.clone();
@@ -43,7 +43,7 @@ impl<T: ServicePair> Client<T> {
                     uri: &str,
                     caller_id: &str,
                     service: &str)
-                    -> Result<Result<T::Response, String>, Error> {
+                    -> Result<ServiceResult<T::Response>, Error> {
         let mut stream = TcpStream::connect(uri)?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 

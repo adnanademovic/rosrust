@@ -8,7 +8,7 @@ use super::decoder::DecoderSource;
 use super::encoder::Encoder;
 use super::error::{Error, ErrorKind};
 use super::header::{encode, decode, match_field};
-use super::ServicePair;
+use super::{ServicePair, ServiceResult};
 
 pub struct Service {
     pub api: String,
@@ -59,7 +59,7 @@ fn listen_for_clients<T, U, V, F>(service: String,
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send + 'static,
           V: Iterator<Item = U>,
-          F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
+          F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
 {
     let handler = Arc::new(handler);
     for mut stream in listener {
@@ -79,7 +79,7 @@ fn listen_for_clients<T, U, V, F>(service: String,
 fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send,
-          F: Fn(T::Request) -> Result<T::Response, String>
+          F: Fn(T::Request) -> ServiceResult<T::Response>
 {
     loop {
         let mut encoder = Encoder::new();
@@ -117,7 +117,7 @@ impl Service {
                      handler: F)
                      -> Result<Service, Error>
         where T: ServicePair,
-              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let listener = TcpListener::bind((hostname, port))?;
         let socket_address = listener.local_addr()?;
@@ -138,7 +138,7 @@ impl Service {
         where T: ServicePair,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static,
-              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let service_name = String::from(service);
         let node_name = String::from(node_name);

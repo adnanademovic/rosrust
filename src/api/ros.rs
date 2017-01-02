@@ -5,7 +5,7 @@ use super::error::{Error, ErrorKind};
 use super::value::Topic;
 use super::naming::{self, Resolver};
 use super::resolve;
-use tcpros::{Client, Message, PublisherStream, ServicePair};
+use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
 use rosxmlrpc::serde::XmlRpcValue;
 
 pub struct Ros {
@@ -91,7 +91,7 @@ impl Ros {
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), Error>
         where T: ServicePair,
-              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let name = self.resolver.translate(service)?;
         let api = self.slave.add_service::<T, F>(&self.hostname, &name, handler)?;

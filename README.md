@@ -163,7 +163,8 @@ fn main() {
     let client = ros.client::<AddTwoInts>("/add_two_ints").unwrap();
     loop {
         // Sync approach
-        println!("5 + 7 = {}", client.req(&AddTwoIntsReq { a: 5, b: 7 }).sum)
+        println!("5 + 7 = {}",
+            client.req(&AddTwoIntsReq { a: 5, b: 7 }).unwrap().unwrap().sum);
         // Async approach
         client.req_callback(AddTwoIntsReq { a: 5, b: 7 },
             |result| println!("12 + 4 = {}", result.unwrap().unwrap().sum));

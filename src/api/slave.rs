@@ -5,7 +5,8 @@ use std::sync::mpsc::channel;
 use std::thread;
 use super::error::{Error, ErrorKind};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
-use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service, ServicePair};
+use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service, ServicePair,
+             ServiceResult};
 
 pub struct Slave {
     name: String,
@@ -66,7 +67,7 @@ impl Slave {
                              handler: F)
                              -> SerdeResult<String>
         where T: ServicePair,
-              F: Fn(T::Request) -> Result<T::Response, String> + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         use std::collections::hash_map::Entry;
         match self.services.lock().unwrap().entry(String::from(service)) {
