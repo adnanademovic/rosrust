@@ -32,7 +32,7 @@ pub type ParameterIterator = std::iter::Map<std::vec::IntoIter<serde::decoder::D
                                             fn(serde::decoder::Decoder) -> Parameter>;
 
 pub trait XmlRpcServer {
-    fn handle(&self, method_name: &str, params: ParameterIterator) -> Answer;
+    fn handle(&self, method_name: &str, params: ParameterIterator) -> error::serde::Result<Answer>;
 }
 
 struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
@@ -47,7 +47,7 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
     fn process(&self, req: Request, res: Response) -> Result<()> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
         res.send(&self.handler
-                .handle(&method_name, parameters.into_iter().map(Parameter::new))
+                .handle(&method_name, parameters.into_iter().map(Parameter::new))?
                 .write_response()?)?;
         Ok(())
     }
@@ -56,7 +56,9 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
     fn handle(&self, req: Request, res: Response) {
         if let Err(err) = self.process(req, res) {
-            error!("Server handler error: {}", err);
+            let info =
+                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            error!("Server handler error: {}", info);
         }
     }
 }

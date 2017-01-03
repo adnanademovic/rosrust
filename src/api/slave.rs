@@ -74,7 +74,7 @@ impl Slave {
         match self.services.lock().expect(FAILED_TO_LOCK).entry(String::from(service)) {
             Entry::Occupied(..) => {
                 error!("Duplicate initiation of service '{}' attempted", service);
-                Err(ErrorKind::Critical("Could not add duplicate service".into()).into())
+                Err(ErrorKind::Duplicate("service".into()).into())
             }
             Entry::Vacant(entry) => {
                 let service = Service::new::<T, _>(hostname, 0, service, &self.name, handler)?;
@@ -117,8 +117,7 @@ impl Slave {
         match self.subscriptions.lock().expect(FAILED_TO_LOCK).entry(String::from(topic)) {
             Entry::Occupied(..) => {
                 error!("Duplicate subscription to topic '{}' attempted", topic);
-                Err(ErrorKind::Critical("Could not add duplicate subscription to topic".into())
-                    .into())
+                Err(ErrorKind::Duplicate("subscription".into()).into())
             }
             Entry::Vacant(entry) => {
                 let subscriber = Subscriber::new::<T, F>(&self.name, topic, callback);

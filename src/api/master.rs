@@ -1,4 +1,3 @@
-use regex::Regex;
 use rosxmlrpc;
 use error::rosxmlrpc::{Error as ReError, ErrorKind as ReErrorKind};
 use error::rosxmlrpc::serde::ErrorKind as SeErrorKind;
@@ -20,7 +19,7 @@ macro_rules! request {
             request.add(&$item).map_err(|v| ReError::from(v))?;
         )*
         let data : ResponseData<_> = $s.client.request(request)?;
-        Ok(data.0)
+        data.0.map_err(to_api_error)
     })
 }
 
@@ -32,7 +31,7 @@ macro_rules! request_tree {
             request.add(&$item).map_err(|v| ReError::from(v))?;
         )*
         $s.client.request_tree(request)
-            .map_err(extract_error_code)
+            .map_err(|v|v.into())
             .and_then(Master::remove_tree_wrap)
     })
 }
@@ -183,30 +182,17 @@ impl Master {
     }
 }
 
-
-fn extract_error_code(err: ReError) -> Error {
+fn to_api_error(v: (bool, String)) -> Error {
     use super::error::api::ErrorKind as ApiErrorKind;
-    if let ReError(ReErrorKind::Serde(SeErrorKind::Msg(ref v)), _) = err {
-        lazy_static!{
-            static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$")
-                .expect("Failed to compile regex");
+    match v.0 {
+            false => ErrorKind::Api(ApiErrorKind::SystemFail(v.1)),
+            true => ErrorKind::Api(ApiErrorKind::BadData(v.1)),
         }
-        if let Some(cap) = RE.captures(&v) {
-            let message = String::from(cap.at(2).unwrap_or(""));
-            return if cap.at(1) == Some("0") {
-                    ErrorKind::Api(ApiErrorKind::Fail(message))
-                } else {
-                    ErrorKind::Api(ApiErrorKind::Error(message))
-                }
-                .into();
-        }
-    }
-    ErrorKind::XmlRpc(err.into()).into()
+        .into()
 }
 
-
 #[derive(Debug)]
-struct ResponseData<T>(T);
+struct ResponseData<T>(::std::result::Result<T, (bool, String)>);
 
 impl<T: Decodable> Decodable for ResponseData<T> {
     fn decode<D: Decoder>(d: &mut D) -> ::std::result::Result<ResponseData<T>, D::Error> {
@@ -214,8 +200,8 @@ impl<T: Decodable> Decodable for ResponseData<T> {
             let code = d.read_struct_field("status_code", 0, |d| d.read_i32())?;
             let message = d.read_struct_field("status_message", 1, |d| d.read_str())?;
             match code {
-                0 | -1 => Err(d.error(&format!("ROS MASTER ERROR CODE {}: {}", -code, message))),
-                1 => Ok(ResponseData(d.read_struct_field("data", 2, |d| T::decode(d))?)),
+                0 | -1 => Ok(ResponseData(Err((code != 0, message)))),
+                1 => Ok(ResponseData(Ok(d.read_struct_field("data", 2, |d| T::decode(d))?))),
                 _ => Err(d.error("Invalid response code returned by ROS")),
             }
         })

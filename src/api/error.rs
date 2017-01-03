@@ -15,13 +15,9 @@ error_chain! {
         Master(self::master::Error, self::master::ErrorKind);
     }
     errors {
-        Protocol(t: String) {
-            description("Error within ROS protocols")
-            display("Error within ROS protocols: {}", t)
-        }
-        Critical(t: String) {
-            description("Critical error")
-            display("Critical error: {}", t)
+        Duplicate(t: String) {
+            description("Could not add duplicate")
+            display("Could not add duplicate {}", t)
         }
     }
 }
@@ -29,13 +25,13 @@ error_chain! {
 pub mod api {
     error_chain! {
         errors {
-            Fail(message: String) {
+            SystemFail(message: String) {
                 description("Failure to handle API call")
                 display("Failure to handle API call: {}", message)
             }
-            Error(message: String) {
-                description("Error while handling API call")
-                display("Error while handling API call: {}", message)
+            BadData(message: String) {
+                description("Bad parameters provided in API call")
+                display("Bad parameters provided in API call: {}", message)
             }
         }
     }
