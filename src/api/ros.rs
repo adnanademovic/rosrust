@@ -1,11 +1,12 @@
 use rustc_serialize::{Encodable, Decodable};
-use super::master::{self, Master, MasterResult};
+use super::master::{self, Master};
 use super::slave::Slave;
-use super::error::ServerError;
+use super::error::{ErrorKind, Result};
+use super::error::master::Result as MasterResult;
 use super::value::Topic;
 use super::naming::{self, Resolver};
 use super::resolve;
-use tcpros::{Client, Message, PublisherStream, ServicePair};
+use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
 use rosxmlrpc::serde::XmlRpcValue;
 
 pub struct Ros {
@@ -17,7 +18,7 @@ pub struct Ros {
 }
 
 impl Ros {
-    pub fn new(name: &str) -> Result<Ros, ServerError> {
+    pub fn new(name: &str) -> Result<Ros> {
         let namespace = resolve::namespace();
         let master_uri = resolve::master();
         let hostname = resolve::hostname();
@@ -29,15 +30,11 @@ impl Ros {
         Ok(ros)
     }
 
-    fn new_raw(master_uri: &str,
-               hostname: &str,
-               namespace: &str,
-               name: &str)
-               -> Result<Ros, ServerError> {
+    fn new_raw(master_uri: &str, hostname: &str, namespace: &str, name: &str) -> Result<Ros> {
         let namespace = namespace.trim_right_matches("/");
 
         if name.contains("/") {
-            return Err(ServerError::Naming(naming::Error::IllegalPath));
+            bail!(ErrorKind::Naming(naming::error::ErrorKind::IllegalCharacter(name.into())));
         }
 
         let name = format!("{}/{}", namespace, name);
@@ -54,8 +51,8 @@ impl Ros {
         })
     }
 
-    fn map(&mut self, source: &str, destination: &str) -> Result<(), ServerError> {
-        self.resolver.map(source, destination).map_err(|v| ServerError::Naming(v))
+    fn map(&mut self, source: &str, destination: &str) -> Result<()> {
+        self.resolver.map(source, destination).map_err(|v| v.into())
     }
 
     pub fn uri(&self) -> &str {
@@ -83,15 +80,15 @@ impl Ros {
         self.master.get_topic_types()
     }
 
-    pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>, ServerError> {
+    pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>> {
         let name = self.resolver.translate(service)?;
         let uri = self.master.lookup_service(&name)?;
         Ok(Client::new(&self.name, &uri, &name))
     }
 
-    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), ServerError>
+    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>
         where T: ServicePair,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let name = self.resolver.translate(service)?;
         let api = self.slave.add_service::<T, F>(&self.hostname, &name, handler)?;
@@ -99,13 +96,14 @@ impl Ros {
         if let Err(err) = self.master.register_service(&name, &api) {
             self.slave.remove_service(&name);
             self.master.unregister_service(&name, &api)?;
-            Err(ServerError::from(err))
+            Err(err.into())
         } else {
             Ok(())
         }
+
     }
 
-    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), ServerError>
+    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<()>
         where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
@@ -125,12 +123,12 @@ impl Ros {
             Err(err) => {
                 self.slave.remove_subscription(&name);
                 self.master.unregister_subscriber(&name)?;
-                Err(ServerError::from(err))
+                Err(err.into())
             }
         }
     }
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>, ServerError>
+    pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>>
         where T: Message
     {
         let name = self.resolver.translate(topic)?;
@@ -143,7 +141,7 @@ impl Ros {
                        error);
                 self.slave.remove_publication(&name);
                 self.master.unregister_publisher(&name)?;
-                Err(ServerError::from(error))
+                Err(error.into())
             }
         }
     }

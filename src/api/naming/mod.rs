@@ -1,10 +1,10 @@
 use self::path::Path;
 use self::mapper::Mapper;
-pub use self::error::Error;
+pub use self::error::{Error, ErrorKind};
 
 mod path;
 mod mapper;
-mod error;
+pub mod error;
 
 pub struct Resolver {
     path: path::Buffer,
@@ -15,7 +15,7 @@ pub struct Resolver {
 impl Resolver {
     pub fn new(name: &str) -> Result<Resolver, Error> {
         let path = name.parse::<path::Buffer>()?;
-        let namespace = path.parent().ok_or(Error::IllegalPath)?.take();
+        let namespace = path.parent()?.take();
         Ok(Resolver {
             path: path,
             namespace: namespace,
@@ -26,11 +26,12 @@ impl Resolver {
     pub fn map(&mut self, source: &str, destination: &str) -> Result<(), Error> {
         let source = self.resolve(source)?;
         let destination = self.resolve(destination)?;
-        self.mapper.add(source.get(), destination)
+        self.mapper.add(source.get(), destination);
+        Ok(())
     }
 
     fn resolve(&self, name: &str) -> Result<path::Buffer, Error> {
-        let first_char = *name.as_bytes().get(0).ok_or(Error::IllegalPath)?;
+        let first_char = *name.as_bytes().get(0).ok_or(ErrorKind::EmptyName)?;
         if first_char == b'/' {
             return name.parse();
         }
@@ -55,6 +56,8 @@ mod tests {
     use super::*;
     use super::path::Path;
 
+    static FAILED_TO_RESOLVE: &'static str = "Failed to resolve";
+
     #[test]
     fn constructs_from_legal_path() {
         assert!(Resolver::new("/foo").is_ok());
@@ -71,7 +74,7 @@ mod tests {
 
     #[test]
     fn rejects_illegal_names() {
-        let r = Resolver::new("/some/long/path").unwrap();
+        let r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);
         assert!(r.resolve("/fo$o").is_err());
         assert!(r.resolve("1foo/bar").is_err());
         assert!(r.resolve("#f1_aA/Ba02/Xx").is_err());
@@ -79,81 +82,86 @@ mod tests {
 
     #[test]
     fn resolves_absolute_names() {
-        let r = Resolver::new("/some/long/path").unwrap();
-        assert_eq!(vec![String::from("foo")], r.resolve("/foo").unwrap().get());
+        let r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);
+        assert_eq!(vec![String::from("foo")],
+                   r.resolve("/foo").expect(FAILED_TO_RESOLVE).get());
         assert_eq!(vec![String::from("foo"), String::from("bar")],
-                   r.resolve("/foo/bar").unwrap().get());
+                   r.resolve("/foo/bar").expect(FAILED_TO_RESOLVE).get());
         assert_eq!(vec![String::from("f1_aA"), String::from("Ba02"), String::from("Xx")],
-                   r.resolve("/f1_aA/Ba02/Xx").unwrap().get());
+                   r.resolve("/f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE).get());
     }
 
     #[test]
     fn resolves_relative_names() {
-        let r = Resolver::new("/some/long/path").unwrap();
+        let r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);
         assert_eq!(vec![String::from("some"), String::from("long"), String::from("foo")],
-                   r.resolve("foo").unwrap().get());
+                   r.resolve("foo").expect(FAILED_TO_RESOLVE).get());
         assert_eq!(vec![String::from("some"),
                         String::from("long"),
                         String::from("foo"),
                         String::from("bar")],
-                   r.resolve("foo/bar").unwrap().get());
+                   r.resolve("foo/bar").expect(FAILED_TO_RESOLVE).get());
         assert_eq!(vec![String::from("some"),
                         String::from("long"),
                         String::from("f1_aA"),
                         String::from("Ba02"),
                         String::from("Xx")],
-                   r.resolve("f1_aA/Ba02/Xx").unwrap().get());
+                   r.resolve("f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE).get());
     }
 
     #[test]
     fn resolves_private_names() {
-        let r = Resolver::new("/some/long/path").unwrap();
+        let r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);
         assert_eq!(vec![String::from("some"),
                         String::from("long"),
                         String::from("path"),
                         String::from("foo")],
-                   r.resolve("~foo").unwrap().get());
+                   r.resolve("~foo").expect(FAILED_TO_RESOLVE).get());
         assert_eq!(vec![String::from("some"),
                         String::from("long"),
                         String::from("path"),
                         String::from("foo"),
                         String::from("bar")],
-                   r.resolve("~foo/bar").unwrap().get());
+                   r.resolve("~foo/bar").expect(FAILED_TO_RESOLVE).get());
         assert_eq!(vec![String::from("some"),
                         String::from("long"),
                         String::from("path"),
                         String::from("f1_aA"),
                         String::from("Ba02"),
                         String::from("Xx")],
-                   r.resolve("~f1_aA/Ba02/Xx").unwrap().get());
+                   r.resolve("~f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE).get());
     }
 
     #[test]
     fn translates_strings() {
-        let r = Resolver::new("/some/long/path").unwrap();
+        let r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);
         assert_eq!(String::from("/f1_aA/Ba02/Xx"),
-                   r.translate("/f1_aA/Ba02/Xx").unwrap());
+                   r.translate("/f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE));
         assert_eq!(String::from("/some/long/f1_aA/Ba02/Xx"),
-                   r.translate("f1_aA/Ba02/Xx").unwrap());
+                   r.translate("f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE));
         assert_eq!(String::from("/some/long/path/f1_aA/Ba02/Xx"),
-                   r.translate("~f1_aA/Ba02/Xx").unwrap());
+                   r.translate("~f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE));
     }
 
     #[test]
     fn supports_remapping() {
-        let mut r = Resolver::new("/some/long/path").unwrap();
-        r.map("a", "/d").unwrap();
-        r.map("~x", "/e").unwrap();
-        r.map("/z", "/f").unwrap();
-        r.map("/a1", "g").unwrap();
-        r.map("a2", "~g").unwrap();
-        assert_eq!(String::from("/d"), r.translate("/some/long/a").unwrap());
-        assert_eq!(String::from("/e"), r.translate("path/x").unwrap());
-        assert_eq!(String::from("/f"), r.translate("/z").unwrap());
-        assert_eq!(String::from("/some/long/g"), r.translate("/a1").unwrap());
+        let mut r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);
+        r.map("a", "/d").expect(FAILED_TO_RESOLVE);
+        r.map("~x", "/e").expect(FAILED_TO_RESOLVE);
+        r.map("/z", "/f").expect(FAILED_TO_RESOLVE);
+        r.map("/a1", "g").expect(FAILED_TO_RESOLVE);
+        r.map("a2", "~g").expect(FAILED_TO_RESOLVE);
+        assert_eq!(String::from("/d"),
+                   r.translate("/some/long/a").expect(FAILED_TO_RESOLVE));
+        assert_eq!(String::from("/e"),
+                   r.translate("path/x").expect(FAILED_TO_RESOLVE));
+        assert_eq!(String::from("/f"),
+                   r.translate("/z").expect(FAILED_TO_RESOLVE));
+        assert_eq!(String::from("/some/long/g"),
+                   r.translate("/a1").expect(FAILED_TO_RESOLVE));
         assert_eq!(String::from("/some/long/path/g"),
-                   r.translate("/some/long/a2").unwrap());
+                   r.translate("/some/long/a2").expect(FAILED_TO_RESOLVE));
         assert_eq!(String::from("/some/long/other"),
-                   r.translate("other").unwrap());
+                   r.translate("other").expect(FAILED_TO_RESOLVE));
     }
 }

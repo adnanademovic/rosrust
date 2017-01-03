@@ -1,6 +1,6 @@
 use hyper;
 use rustc_serialize::{Encodable, Decodable};
-use super::error::Error;
+use super::error::{self, ErrorKind, Result};
 use super::serde;
 
 pub struct Client {
@@ -16,7 +16,7 @@ impl Client {
         }
     }
 
-    pub fn request_tree(&self, request: Request) -> ClientResult<serde::XmlRpcValue> {
+    pub fn request_tree(&self, request: Request) -> Result<serde::XmlRpcValue> {
         let mut body = Vec::<u8>::new();
         request.encoder.write_request(&request.name, &mut body)?;
 
@@ -27,13 +27,15 @@ impl Client {
             .send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
-
-        Ok(res.pop()
-            .ok_or(Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?
-            .value())
+        match res.pop() {
+            Some(v) => Ok(v.value()),
+            None => {
+                bail!(ErrorKind::Serde(error::serde::ErrorKind::Decoding("request tree".into())))
+            }
+        }
     }
 
-    pub fn request<T: Decodable>(&self, request: Request) -> ClientResult<T> {
+    pub fn request<T: Decodable>(&self, request: Request) -> Result<T> {
         let mut body = Vec::<u8>::new();
         request.encoder.write_request(&request.name, &mut body)?;
 
@@ -44,9 +46,11 @@ impl Client {
             .send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
-
-        Ok(T::decode(&mut res.pop()
-            .ok_or(Error::Decoding(serde::value::DecodeError::UnsupportedDataFormat))?)?)
+        let mut value = match res.pop() {
+            Some(v) => v,
+            None => bail!(ErrorKind::Serde(error::serde::ErrorKind::Decoding("request".into()))),
+        };
+        T::decode(&mut value).map_err(|v| v.into())
     }
 }
 
@@ -63,9 +67,7 @@ impl Request {
         }
     }
 
-    pub fn add<T: Encodable>(&mut self, parameter: &T) -> Result<(), serde::encoder::Error> {
+    pub fn add<T: Encodable>(&mut self, parameter: &T) -> error::serde::Result<()> {
         parameter.encode(&mut self.encoder)
     }
 }
-
-pub type ClientResult<T> = Result<T, Error>;

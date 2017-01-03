@@ -8,12 +8,14 @@ pub use self::error::Error;
 mod decoder;
 mod encoder;
 mod header;
-mod error;
+pub mod error;
 mod publisher;
 mod subscriber;
 mod streamfork;
 mod service;
 mod client;
+
+pub type ServiceResult<T> = Result<T, String>;
 
 pub trait Message: Decodable + Encodable + Send + 'static {
     fn msg_definition() -> String;

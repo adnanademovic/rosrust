@@ -3,11 +3,29 @@ use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::error::Error;
+use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode};
-use super::ServicePair;
+use super::{ServicePair, ServiceResult};
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
+
+pub struct ClientResponse<T> {
+    handle: thread::JoinHandle<Result<ServiceResult<T>>>,
+}
+
+impl<T> ClientResponse<T> {
+    pub fn read(self) -> Result<ServiceResult<T>> {
+        self.handle.join().unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
+    }
+}
+
+impl<T: Send + 'static> ClientResponse<T> {
+    pub fn callback<F>(self, callback: F)
+        where F: FnOnce(Result<ServiceResult<T>>) + Send + 'static
+    {
+        thread::spawn(move || callback(self.read()));
+    }
+}
 
 pub struct Client<T: ServicePair> {
     caller_id: String,
@@ -20,31 +38,33 @@ impl<T: ServicePair> Client<T> {
     pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
         Client {
             caller_id: String::from(caller_id),
-            uri: String::from(uri.trim_left_matches("rosrpc://")),
+            uri: String::from(uri),
             service: String::from(service),
             phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn req(&self, args: &T::Request) -> Result<T::Response, Error> {
+    pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
         Self::request_body(args, &self.uri, &self.caller_id, &self.service)
     }
 
-    pub fn req_callback<F>(&self, args: T::Request, callback: F)
-        where F: Fn(Result<T::Response, Error>) -> () + Send + 'static
-    {
+    pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
         let uri = self.uri.clone();
         let caller_id = self.caller_id.clone();
         let service = self.service.clone();
-        thread::spawn(move || callback(Self::request_body(&args, &uri, &caller_id, &service)));
+        ClientResponse {
+            handle: thread::spawn(move || Self::request_body(&args, &uri, &caller_id, &service)),
+        }
     }
 
     fn request_body(args: &T::Request,
                     uri: &str,
                     caller_id: &str,
                     service: &str)
-                    -> Result<T::Response, Error> {
-        let mut stream = TcpStream::connect(uri)?;
+                    -> Result<ServiceResult<T::Response>> {
+        let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
+        let mut stream =
+            connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
         let mut encoder = Encoder::new();
@@ -52,17 +72,19 @@ impl<T: ServicePair> Client<T> {
         encoder.write_to(&mut stream)?;
 
         let mut decoder = DecoderSource::new(&mut stream);
-        let success = decoder.pop_verification_byte()?;
-        let mut decoder = decoder.next().ok_or(Error::Mismatch)?;
-        if success {
-            T::Response::decode(&mut decoder)
+        let success = decoder.pop_verification_byte()
+            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
+        let mut decoder = decoder.pop_decoder()
+            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
+        Ok(if success {
+            Ok(T::Response::decode(&mut decoder)?)
         } else {
-            String::decode(&mut decoder).and_then(|v| Err(Error::Other(v)))
-        }
+            Err(String::decode(&mut decoder)?)
+        })
     }
 }
 
-fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<(), Error>
+fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
     where T: ServicePair,
           U: std::io::Write
 {
@@ -71,25 +93,22 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
     fields.insert(String::from("service"), String::from(service));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields, &mut stream)
+    encode(fields)?.write_to(&mut stream)?;
+    Ok(())
 }
 
-fn header_matches(fields: &HashMap<String, String>) -> bool {
-    fields.get("callerid") != None
-}
-
-fn read_response<T, U>(mut stream: &mut U) -> Result<(), Error>
+fn read_response<T, U>(mut stream: &mut U) -> Result<()>
     where T: ServicePair,
           U: std::io::Read
 {
-    if header_matches(&decode(&mut stream)?) {
-        Ok(())
-    } else {
-        Err(Error::Mismatch)
+    let fields = decode(&mut stream)?;
+    if fields.get("callerid").is_none() {
+        bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
+    Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<(), Error>
+fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
     where T: ServicePair,
           U: std::io::Write + std::io::Read
 {

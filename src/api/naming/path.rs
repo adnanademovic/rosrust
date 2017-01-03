@@ -1,7 +1,7 @@
 use std;
 use std::ops::{Add, AddAssign};
 use std::fmt;
-use super::Error;
+use super::error::{Error, ErrorKind};
 
 pub trait Path {
     fn get(&self) -> &[String];
@@ -12,8 +12,11 @@ pub trait Path {
         Slice { chain: self.get() }
     }
 
-    fn parent(&self) -> Option<Slice> {
-        self.get().split_last().map(|v| Slice { chain: v.1 })
+    fn parent(&self) -> Result<Slice, Error> {
+        match self.get().split_last() {
+            Some(v) => Ok(Slice { chain: v.1 }),
+            None => Err(ErrorKind::MissingParent.into()),
+        }
     }
 }
 
@@ -92,26 +95,30 @@ impl std::str::FromStr for Buffer {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim_right_matches('/');
         let mut word_iter = s.split('/');
-        if let Some("") = word_iter.next() {
-            let words = word_iter.map(|v| String::from(v)).collect::<Vec<String>>();
-            if words.len() > 0 {
-                if words.iter().all(is_legal_name) {
-                    return Ok(Buffer { chain: words });
-                }
-            }
+        match word_iter.next() {
+            Some("") => {}
+            Some(_) | None => bail!(ErrorKind::LeadingSlashMissing(s.into())),
         }
-        Err(Error::MappingSourceExists)
+        let words = word_iter.map(process_name).collect::<Result<Vec<String>, Error>>()?;
+        Ok(Buffer { chain: words })
     }
 }
 
-fn is_legal_name(v: &String) -> bool {
-    let mut bytes = v.bytes();
+fn process_name(name: &str) -> Result<String, Error> {
+    let mut bytes = name.bytes();
     let first_char = match bytes.next() {
         Some(v) => v,
-        None => return false,
+        None => bail!(ErrorKind::EmptyName),
     };
-    is_legal_first_char(first_char) && bytes.all(is_legal_char)
+    if !is_legal_first_char(first_char) {
+        bail!(ErrorKind::IllegalFirstCharacter(name.into()));
+    }
+    if !bytes.all(is_legal_char) {
+        bail!(ErrorKind::IllegalCharacter(name.into()));
+    }
+    Ok(String::from(name))
 }
 
 fn is_legal_first_char(v: u8) -> bool {
@@ -126,12 +133,16 @@ fn is_legal_char(v: u8) -> bool {
 mod tests {
     use super::*;
 
+    static FAILED_TO_HANDLE: &'static str = "Failed to handle";
+
     #[test]
     fn names_are_legal() {
         assert!("/foo".parse::<Buffer>().is_ok());
         assert!("/foo/bar".parse::<Buffer>().is_ok());
         assert!("/f1_aA/Ba02/Xx".parse::<Buffer>().is_ok());
-        assert!("".parse::<Buffer>().is_err());
+        assert!("/asdf/".parse::<Buffer>().is_ok());
+        assert!("/".parse::<Buffer>().is_ok());
+        assert!("".parse::<Buffer>().is_ok());
         assert!("a".parse::<Buffer>().is_err());
         assert!("/123/".parse::<Buffer>().is_err());
         assert!("/foo$".parse::<Buffer>().is_err());
@@ -142,40 +153,62 @@ mod tests {
     #[test]
     fn names_are_parsed() {
         assert_eq!(vec![String::from("foo")],
-                   "/foo".parse::<Buffer>().unwrap().get());
+                   "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
         assert_eq!(vec![String::from("foo"), String::from("bar")],
-                   "/foo/bar".parse::<Buffer>().unwrap().get());
+                   "/foo/bar".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
         assert_eq!(vec![String::from("f1_aA"), String::from("Ba02"), String::from("Xx")],
-                   "/f1_aA/Ba02/Xx".parse::<Buffer>().unwrap().get());
+                   "/f1_aA/Ba02/Xx".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
     }
 
     #[test]
     fn is_formatted() {
-        assert_eq!("/foo", format!("{}", "/foo".parse::<Buffer>().unwrap()));
+        assert_eq!("/foo",
+                   format!("{}", "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
         assert_eq!("/foo/bar",
-                   format!("{}", "/foo/bar".parse::<Buffer>().unwrap()));
+                   format!("{}", "/foo/bar".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
         assert_eq!("/f1_aA/Ba02/Xx",
-                   format!("{}", "/f1_aA/Ba02/Xx".parse::<Buffer>().unwrap()));
+                   format!("{}",
+                           "/f1_aA/Ba02/Xx".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
     }
 
     #[test]
     fn parents_are_handled() {
         assert_eq!("",
-                   format!("{}", "/foo".parse::<Buffer>().unwrap().parent().unwrap()));
+                   format!("{}",
+                           "/foo"
+                               .parse::<Buffer>()
+                               .expect(FAILED_TO_HANDLE)
+                               .parent()
+                               .expect(FAILED_TO_HANDLE)));
         assert_eq!("/foo",
                    format!("{}",
-                           "/foo/bar".parse::<Buffer>().unwrap().parent().unwrap()));
+                           "/foo/bar"
+                               .parse::<Buffer>()
+                               .expect(FAILED_TO_HANDLE)
+                               .parent()
+                               .expect(FAILED_TO_HANDLE)));
         assert_eq!("/f1_aA/Ba02",
                    format!("{}",
-                           "/f1_aA/Ba02/Xx".parse::<Buffer>().unwrap().parent().unwrap()));
-        assert!("/foo".parse::<Buffer>().unwrap().parent().unwrap().parent().is_none());
+                           "/f1_aA/Ba02/Xx"
+                               .parse::<Buffer>()
+                               .expect(FAILED_TO_HANDLE)
+                               .parent()
+                               .expect(FAILED_TO_HANDLE)));
+        assert!("/".parse::<Buffer>().expect(FAILED_TO_HANDLE).parent().is_err());
+        assert!("/foo"
+            .parse::<Buffer>()
+            .expect(FAILED_TO_HANDLE)
+            .parent()
+            .expect(FAILED_TO_HANDLE)
+            .parent()
+            .is_err());
     }
 
     #[test]
     fn addition_works() {
-        let foo = "/foo".parse::<Buffer>().unwrap();
-        let bar = "/B4r/x".parse::<Buffer>().unwrap();
-        let baz = "/bA_z".parse::<Buffer>().unwrap();
+        let foo = "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE);
+        let bar = "/B4r/x".parse::<Buffer>().expect(FAILED_TO_HANDLE);
+        let baz = "/bA_z".parse::<Buffer>().expect(FAILED_TO_HANDLE);
         assert_eq!("/foo/B4r/x", format!("{}", foo.slice() + bar.slice()));
         assert_eq!("/B4r/x/foo/foo",
                    format!("{}", bar.slice() + foo.slice() + foo.slice()));

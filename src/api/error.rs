@@ -1,140 +1,47 @@
-use nix;
-use std;
-use rosxmlrpc;
-use tcpros;
-use super::naming::Error as NamingError;
-use super::master::{MasterError, FailureType};
+pub use ::api::naming::error as naming;
+pub use ::rosxmlrpc::error as rosxmlrpc;
+pub use ::tcpros::error as tcpros;
 
-#[derive(Debug)]
-pub enum ServerError {
-    Deserialization(rosxmlrpc::serde::value::DecodeError),
-    Decoding(rosxmlrpc::serde::decoder::Error),
-    Protocol(String),
-    Critical(String),
-    Serialization(rosxmlrpc::serde::encoder::Error),
-    XmlRpc(rosxmlrpc::error::Error),
-    Tcpros(tcpros::Error),
-    Io(std::io::Error),
-    Nix(nix::Error),
-    FromUTF8(std::string::FromUtf8Error),
-    ApiFail(FailureType, String),
-    Naming(NamingError),
-}
-
-impl From<rosxmlrpc::serde::value::DecodeError> for ServerError {
-    fn from(err: rosxmlrpc::serde::value::DecodeError) -> ServerError {
-        ServerError::Deserialization(err)
+error_chain! {
+    foreign_links {
+        Io(::std::io::Error);
+        Nix(::nix::Error);
+        FromUTF8(::std::string::FromUtf8Error);
     }
-}
-
-impl From<rosxmlrpc::serde::decoder::Error> for ServerError {
-    fn from(err: rosxmlrpc::serde::decoder::Error) -> ServerError {
-        ServerError::Decoding(err)
+    links {
+        XmlRpc(rosxmlrpc::Error, rosxmlrpc::ErrorKind);
+        Tcpros(tcpros::Error, tcpros::ErrorKind);
+        Naming(naming::Error, naming::ErrorKind);
+        Master(self::master::Error, self::master::ErrorKind);
     }
-}
-
-impl From<rosxmlrpc::serde::encoder::Error> for ServerError {
-    fn from(err: rosxmlrpc::serde::encoder::Error) -> ServerError {
-        ServerError::Serialization(err)
-    }
-}
-
-impl From<rosxmlrpc::error::Error> for ServerError {
-    fn from(err: rosxmlrpc::error::Error) -> ServerError {
-        ServerError::XmlRpc(err)
-    }
-}
-
-impl From<tcpros::Error> for ServerError {
-    fn from(err: tcpros::Error) -> ServerError {
-        ServerError::Tcpros(err)
-    }
-}
-
-impl From<std::io::Error> for ServerError {
-    fn from(err: std::io::Error) -> ServerError {
-        ServerError::Io(err)
-    }
-}
-
-impl From<nix::Error> for ServerError {
-    fn from(err: nix::Error) -> ServerError {
-        ServerError::Nix(err)
-    }
-}
-
-impl From<std::string::FromUtf8Error> for ServerError {
-    fn from(err: std::string::FromUtf8Error) -> ServerError {
-        ServerError::FromUTF8(err)
-    }
-}
-
-impl From<MasterError> for ServerError {
-    fn from(err: MasterError) -> ServerError {
-        match err {
-            MasterError::XmlRpc(v) => ServerError::from(v),
-            MasterError::ApiError(t, m) => ServerError::ApiFail(t, m),
+    errors {
+        Duplicate(t: String) {
+            description("Could not add duplicate")
+            display("Could not add duplicate {}", t)
         }
     }
 }
 
-impl From<NamingError> for ServerError {
-    fn from(err: NamingError) -> ServerError {
-        ServerError::Naming(err)
-    }
-}
-
-impl std::fmt::Display for ServerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ServerError::Deserialization(ref err) => write!(f, "Deserialization error: {}", err),
-            ServerError::Decoding(ref err) => write!(f, "Decoding error: {}", err),
-            ServerError::Protocol(ref err) => write!(f, "Protocol error: {}", err),
-            ServerError::Critical(ref err) => write!(f, "Critical error: {}", err),
-            ServerError::Serialization(ref err) => write!(f, "Serialization error: {}", err),
-            ServerError::XmlRpc(ref err) => write!(f, "XML RPC error: {}", err),
-            ServerError::Tcpros(ref err) => write!(f, "TCPROS error: {}", err),
-            ServerError::Io(ref err) => write!(f, "IO error: {}", err),
-            ServerError::Nix(ref err) => write!(f, "NIX error: {}", err),
-            ServerError::FromUTF8(ref err) => write!(f, "From UTF-8 error: {}", err),
-            ServerError::ApiFail(ref t, ref m) => write!(f, "{} in Master API: {}", t, m),
-            ServerError::Naming(ref err) => write!(f, "Naming error: {}", err),
+pub mod api {
+    error_chain! {
+        errors {
+            SystemFail(message: String) {
+                description("Failure to handle API call")
+                display("Failure to handle API call: {}", message)
+            }
+            BadData(message: String) {
+                description("Bad parameters provided in API call")
+                display("Bad parameters provided in API call: {}", message)
+            }
         }
     }
 }
 
-impl std::error::Error for ServerError {
-    fn description(&self) -> &str {
-        match *self {
-            ServerError::Deserialization(ref err) => err.description(),
-            ServerError::Decoding(ref err) => err.description(),
-            ServerError::Protocol(ref err) => &err,
-            ServerError::Critical(ref err) => &err,
-            ServerError::Serialization(ref err) => err.description(),
-            ServerError::XmlRpc(ref err) => err.description(),
-            ServerError::Tcpros(ref err) => err.description(),
-            ServerError::Io(ref err) => err.description(),
-            ServerError::Nix(ref err) => err.description(),
-            ServerError::FromUTF8(ref err) => err.description(),
-            ServerError::ApiFail(.., ref m) => m,
-            ServerError::Naming(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            ServerError::Deserialization(ref err) => Some(err),
-            ServerError::Decoding(ref err) => Some(err),
-            ServerError::Protocol(..) => None,
-            ServerError::Critical(..) => None,
-            ServerError::Serialization(ref err) => Some(err),
-            ServerError::XmlRpc(ref err) => Some(err),
-            ServerError::Tcpros(ref err) => Some(err),
-            ServerError::Io(ref err) => Some(err),
-            ServerError::Nix(ref err) => Some(err),
-            ServerError::FromUTF8(ref err) => Some(err),
-            ServerError::ApiFail(..) => None,
-            ServerError::Naming(ref err) => Some(err),
+pub mod master {
+    error_chain! {
+        links {
+            XmlRpc(super::rosxmlrpc::Error, super::rosxmlrpc::ErrorKind);
+            Api(::error::api::Error, ::error::api::ErrorKind);
         }
     }
 }

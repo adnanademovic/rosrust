@@ -2,31 +2,35 @@ use rustc_serialize::{Encodable, Decodable};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::sync::Arc;
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::collections::HashMap;
 use std;
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
-use super::error::Error;
-use super::header::{encode, decode};
-use super::ServicePair;
+use super::error::{ErrorKind, Result};
+use super::header::{encode, decode, match_field};
+use super::{ServicePair, ServiceResult};
 
 pub struct Service {
     pub api: String,
     pub msg_type: String,
     pub service: String,
+    _raii: TcpRaii,
 }
 
-fn header_matches<T: ServicePair>(fields: &HashMap<String, String>, service: &str) -> bool {
-    if fields.get("service") != Some(&String::from(service)) && fields.get("callerid") == None {
-        return false;
+fn read_request<T: ServicePair, U: std::io::Read>(mut stream: &mut U, service: &str) -> Result<()> {
+    let fields = decode(stream)?;
+    match_field(&fields, "service", service)?;
+    if fields.get("callerid").is_none() {
+        bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
-    if fields.get("probe") == Some(&String::from("1")) {
-        return true;
+    if match_field(&fields, "probe", "1").is_ok() {
+        return Ok(());
     }
-    fields.get("md5sum") == Some(&T::md5sum())
+    match_field(&fields, "md5sum", &T::md5sum())
 }
 
-fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<(), Error>
+fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<()>
     where T: ServicePair,
           U: std::io::Write
 {
@@ -34,29 +38,23 @@ fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<(), Error
     fields.insert(String::from("callerid"), String::from(node_name));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields, &mut stream)
+    encode(fields)?.write_to(&mut stream)?;
+    Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) -> Result<(), Error>
+fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) -> Result<()>
     where T: ServicePair,
           U: std::io::Write + std::io::Read
 {
-    if header_matches::<T>(&decode(stream)?, service) {
-        write_response::<T, U>(stream, node_name)
-    } else {
-        Err(Error::Mismatch)
-    }
+    read_request::<T, U>(stream, service)?;
+    write_response::<T, U>(stream, node_name)
 }
 
-fn listen_for_clients<T, U, V, F>(service: String,
-                                  node_name: String,
-                                  handler: F,
-                                  listener: V)
-                                  -> Result<(), Error>
+fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F, listener: V)
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send + 'static,
           V: Iterator<Item = U>,
-          F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+          F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
 {
     let handler = Arc::new(handler);
     for mut stream in listener {
@@ -67,16 +65,20 @@ fn listen_for_clients<T, U, V, F>(service: String,
             continue;
         }
         let h = handler.clone();
-        thread::spawn(move || respond_to::<T, U, F>(stream, h));
+        thread::spawn(move || {
+            if let Err(err) = respond_to::<T, U, F>(stream, h) {
+                let info =
+                    err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+                error!("{}", info);
+            }
+        });
     }
-
-    Ok(())
 }
 
-fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
+fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send,
-          F: Fn(T::Request) -> T::Response
+          F: Fn(T::Request) -> ServiceResult<T::Response>
 {
     loop {
         let mut encoder = Encoder::new();
@@ -88,15 +90,23 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>)
             Ok(req) => req,
             Err(_) => break,
         };
-        let res = handler(req);
-        true.encode(&mut encoder).unwrap();
-        res.encode(&mut encoder).unwrap();
-        encoder.write_to(&mut stream).unwrap();
+        match handler(req) {
+            Ok(res) => {
+                true.encode(&mut encoder)?;
+                res.encode(&mut encoder)?;
+            }
+            Err(message) => {
+                false.encode(&mut encoder)?;
+                message.encode(&mut encoder)?;
+            }
+        }
+        encoder.write_to(&mut stream)?;
     }
     let mut encoder = Encoder::new();
-    false.encode(&mut encoder).unwrap();
-    "Failed to parse passed arguments".encode(&mut encoder).unwrap();
-    encoder.write_to(&mut stream).unwrap();
+    false.encode(&mut encoder)?;
+    "Failed to parse passed arguments".encode(&mut encoder)?;
+    encoder.write_to(&mut stream)?;
+    Ok(())
 }
 
 impl Service {
@@ -105,30 +115,28 @@ impl Service {
                      service: &str,
                      node_name: &str,
                      handler: F)
-                     -> Result<Service, Error>
+                     -> Result<Service>
         where T: ServicePair,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let listener = TcpListener::bind((hostname, port))?;
         let socket_address = listener.local_addr()?;
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
-        Ok(Service::wrap_stream::<T, _, _, _>(service,
-                                              node_name,
-                                              handler,
-                                              TcpIterator::new(listener, service),
-                                              &api))
+        let (raii, listener) = TcpIterator::new(listener, service);
+        Ok(Service::wrap_stream::<T, _, _, _>(service, node_name, handler, raii, listener, &api))
     }
 
     fn wrap_stream<T, U, V, F>(service: &str,
                                node_name: &str,
                                handler: F,
+                               raii: TcpRaii,
                                listener: V,
                                api: &str)
                                -> Service
         where T: ServicePair,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let service_name = String::from(service);
         let node_name = String::from(node_name);
@@ -139,21 +147,49 @@ impl Service {
             api: String::from(api),
             msg_type: T::msg_type(),
             service: String::from(service),
+            _raii: raii,
+        }
+    }
+}
+
+struct TcpRaii {
+    killer: Sender<Option<TcpStream>>,
+}
+
+impl Drop for TcpRaii {
+    fn drop(&mut self) {
+        if self.killer.send(None).is_err() {
+            error!("TCP connection listener has already been killed");
         }
     }
 }
 
 struct TcpIterator {
-    listener: TcpListener,
-    service: String,
+    listener: Receiver<Option<TcpStream>>,
 }
 
 impl TcpIterator {
-    pub fn new(listener: TcpListener, service: &str) -> TcpIterator {
-        TcpIterator {
-            listener: listener,
-            service: String::from(service),
-        }
+    pub fn new(listener: TcpListener, service: &str) -> (TcpRaii, TcpIterator) {
+        let (tx, rx) = channel();
+        let killer = TcpRaii { killer: tx.clone() };
+        let service = String::from(service);
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        if tx.send(Some(stream)).is_err() {
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        error!("TCP connection to subscriber failed on service '{}': {}",
+                               service,
+                               err);
+                    }
+                }
+            }
+        });
+        (killer, TcpIterator { listener: rx })
     }
 }
 
@@ -161,14 +197,6 @@ impl Iterator for TcpIterator {
     type Item = TcpStream;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.listener.accept() {
-            Ok((stream, _)) => Some(stream),
-            Err(err) => {
-                error!("TCP connection to subscriber failed on service '{}': {}",
-                       self.service,
-                       err);
-                self.next()
-            }
-        }
+        self.listener.recv().unwrap_or(None)
     }
 }

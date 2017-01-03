@@ -1,40 +1,70 @@
-use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std;
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
-use super::error::Error;
 
-pub fn decode<T: std::io::Read>(data: &mut T) -> Result<HashMap<String, String>, Error> {
+pub fn decode<T: std::io::Read>
+    (data: &mut T)
+     -> Result<HashMap<String, String>, super::error::decoder::Error> {
+    use super::error::decoder::{ErrorKind, ResultExt};
     let mut decoder = DecoderSource::new(data);
-    let length = decoder.pop_length()? as usize;
+    let length = decoder.pop_length().chain_err(|| ErrorKind::EndOfBuffer)? as usize;
     let mut result = HashMap::<String, String>::new();
     let mut size_count = 0;
     while length > size_count {
-        let mut decoder = match decoder.next() {
-            Some(decoder) => decoder,
-            None => return Err(Error::Mismatch),
+        let mut decoder = match decoder.pop_decoder() {
+            Ok(decoder) => decoder,
+            Err(err) => return Err(err).chain_err(|| ErrorKind::EndOfBuffer),
         };
         let point = String::decode(&mut decoder)?;
         size_count += point.len() + 4;
         let mut point = point.splitn(2, '=');
-        let key = point.next().ok_or(Error::UnsupportedData)?;
-        let value = point.next().ok_or(Error::UnsupportedData)?;
+        let key = match point.next() {
+            Some(v) => v,
+            None => bail!(ErrorKind::FailedToDecode("map key, because it was empty".into())),
+        };
+        let value = match point.next() {
+            Some(v) => v,
+            None => {
+                bail!(ErrorKind::FailedToDecode("map element, because equal sign was missing"
+                    .into()))
+            }
+        };
         result.insert(String::from(key), String::from(value));
     }
     Ok(result)
 }
 
-pub fn encode<T: std::io::Write>(data: HashMap<String, String>,
-                                 buffer: &mut T)
-                                 -> Result<(), Error> {
+pub fn encode(data: HashMap<String, String>) -> Result<Encoder, super::error::encoder::Error> {
+    use rustc_serialize::Encoder as EncoderTrait;
+    use super::error::encoder::{ErrorKind, ResultExt};
     let mut encoder = Encoder::new();
-    for (key, value) in data {
-        [key, value].join("=").encode(&mut encoder)?;
+    encoder.emit_tuple(data.len(), |e| {
+            for (key, value) in data {
+                [key, value].join("=")
+                .encode(e)
+                .chain_err(|| ErrorKind::UnsupportedDataType("non-UTF-8 map key/value".into()))?;
+            }
+            Ok(())
+        })
+        .chain_err(|| ErrorKind::UnsupportedDataType("map".into()))?;
+    Ok(encoder)
+}
+
+pub fn match_field(fields: &HashMap<String, String>,
+                   field: &str,
+                   expected: &str)
+                   -> Result<(), super::error::Error> {
+    use super::error::ErrorKind;
+    let actual = match fields.get(field) {
+        Some(actual) => actual,
+        None => bail!(ErrorKind::HeaderMissingField(field.into())),
+    };
+    if actual != &expected {
+        bail!(ErrorKind::HeaderMismatch(field.into(), expected.into(), actual.clone()));
     }
-    buffer.write_u32::<LittleEndian>(encoder.len() as u32)?;
-    encoder.write_to(buffer).map_err(|v| Error::Io(v))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -43,11 +73,16 @@ mod tests {
     use std;
     use std::collections::HashMap;
 
+    static WRITE_TO_VECTOR: &'static str = "Writing to vector shouldn't fail";
+    static FAILED_TO_ENCODE: &'static str = "Failed to encode";
+    static FAILED_TO_DECODE: &'static str = "Failed to decode";
+
     #[test]
     fn writes_empty_map() {
         let mut cursor = std::io::Cursor::new(Vec::new());
         let data = HashMap::<String, String>::new();
-        encode(data, &mut cursor).unwrap();
+        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
+
         assert_eq!(vec![0, 0, 0, 0], cursor.into_inner());
     }
 
@@ -56,22 +91,37 @@ mod tests {
         let mut cursor = std::io::Cursor::new(Vec::new());
         let mut data = HashMap::<String, String>::new();
         data.insert(String::from("abc"), String::from("123"));
-        encode(data, &mut cursor).unwrap();
+        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
         assert_eq!(vec![11, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51],
                    cursor.into_inner());
+    }
+
+
+    #[test]
+    fn writes_multiple_items() {
+        let mut cursor = std::io::Cursor::new(Vec::new());
+        let mut data = HashMap::<String, String>::new();
+        data.insert(String::from("abc"), String::from("123"));
+        data.insert(String::from("AAA"), String::from("B0"));
+        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
+        let data = cursor.into_inner();
+        assert!(vec![21, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51, 6, 0, 0, 0, 65, 65,
+                     65, 61, 66, 48] == data ||
+                vec![21, 0, 0, 0, 6, 0, 0, 0, 65, 65, 65, 61, 66, 48, 7, 0, 0, 0, 97, 98, 99,
+                     61, 49, 50, 51] == data);
     }
 
     #[test]
     fn reads_empty_map() {
         let input = vec![0, 0, 0, 0];
-        let data = decode(&mut std::io::Cursor::new(input)).unwrap();
+        let data = decode(&mut std::io::Cursor::new(input)).expect(FAILED_TO_DECODE);
         assert_eq!(0, data.len());
     }
 
     #[test]
     fn reads_single_element() {
         let input = vec![11, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51];
-        let data = decode(&mut std::io::Cursor::new(input)).unwrap();
+        let data = decode(&mut std::io::Cursor::new(input)).expect(FAILED_TO_DECODE);
         assert_eq!(1, data.len());
         assert_eq!(Some(&String::from("123")), data.get("abc"));
     }
@@ -93,7 +143,7 @@ mod tests {
                          0x70, 0x69, 0x63, 0x3d, 0x2f, 0x63, 0x68, 0x61, 0x74, 0x74, 0x65, 0x72,
                          0x14, 0x00, 0x00, 0x00, 0x74, 0x79, 0x70, 0x65, 0x3d, 0x73, 0x74, 0x64,
                          0x5f, 0x6d, 0x73, 0x67, 0x73, 0x2f, 0x53, 0x74, 0x72, 0x69, 0x6e, 0x67];
-        let data = decode(&mut std::io::Cursor::new(input)).unwrap();
+        let data = decode(&mut std::io::Cursor::new(input)).expect(FAILED_TO_DECODE);
         assert_eq!(6, data.len());
         assert_eq!(Some(&String::from("string data\n\n")),
                    data.get("message_definition"));

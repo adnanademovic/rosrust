@@ -3,7 +3,7 @@ use hyper::server::{Request, Response, Handler};
 use rustc_serialize::{Decodable, Encodable};
 use std;
 use super::serde;
-use super::error::Error;
+use super::error::{self, Result};
 
 pub struct Server {
     listener: hyper::server::Listening,
@@ -11,7 +11,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new<T>(hostname: &str, port: u16, responder: T) -> Result<Server, Error>
+    pub fn new<T>(hostname: &str, port: u16, responder: T) -> Result<Server>
         where T: 'static + XmlRpcServer + Send + Sync
     {
         let listener = hyper::Server::http((hostname, port))?
@@ -23,7 +23,7 @@ impl Server {
         })
     }
 
-    pub fn shutdown(&mut self) -> Result<(), hyper::Error> {
+    pub fn shutdown(&mut self) -> hyper::Result<()> {
         self.listener.close()
     }
 }
@@ -32,7 +32,7 @@ pub type ParameterIterator = std::iter::Map<std::vec::IntoIter<serde::decoder::D
                                             fn(serde::decoder::Decoder) -> Parameter>;
 
 pub trait XmlRpcServer {
-    fn handle(&self, method_name: &str, params: ParameterIterator) -> Answer;
+    fn handle(&self, method_name: &str, params: ParameterIterator) -> error::serde::Result<Answer>;
 }
 
 struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
@@ -44,10 +44,10 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
         XmlRpcHandler { handler: handler }
     }
 
-    fn process(&self, req: Request, res: Response) -> Result<(), Error> {
+    fn process(&self, req: Request, res: Response) -> Result<()> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
         res.send(&self.handler
-                .handle(&method_name, parameters.into_iter().map(Parameter::new))
+                .handle(&method_name, parameters.into_iter().map(Parameter::new))?
                 .write_response()?)?;
         Ok(())
     }
@@ -56,7 +56,9 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
     fn handle(&self, req: Request, res: Response) {
         if let Err(err) = self.process(req, res) {
-            println!("Server handler error: {}", err);
+            let info =
+                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            error!("Server handler error: {}", info);
         }
     }
 }
@@ -70,11 +72,11 @@ impl Answer {
         Answer { encoder: serde::Encoder::new() }
     }
 
-    pub fn add<T: Encodable>(&mut self, data: &T) -> Result<(), serde::encoder::Error> {
+    pub fn add<T: Encodable>(&mut self, data: &T) -> error::serde::Result<()> {
         data.encode(&mut self.encoder)
     }
 
-    fn write_response(self) -> Result<Vec<u8>, std::io::Error> {
+    fn write_response(self) -> std::io::Result<Vec<u8>> {
         let mut data = vec![];
         self.encoder.write_response(&mut data).and(Ok(data))
     }
@@ -89,7 +91,7 @@ impl Parameter {
         Parameter { decoder: decoder }
     }
 
-    pub fn read<T: Decodable>(mut self) -> Result<T, serde::decoder::Error> {
+    pub fn read<T: Decodable>(mut self) -> error::serde::Result<T> {
         T::decode(&mut self.decoder)
     }
 

@@ -1,6 +1,6 @@
 use std;
-use std::error::Error;
 use xml;
+use self::error::{ErrorKind, Result, ResultExt};
 
 #[derive(Clone,Debug,PartialEq)]
 pub enum XmlRpcValue {
@@ -77,104 +77,143 @@ impl std::fmt::Display for XmlRpcResponse {
 }
 
 impl XmlRpcRequest {
-    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcRequest, DecodeError> {
-        if let Tree::Node(key, mut children) = Tree::new(body)? {
-            if key != "methodCall" || children.len() != 2 {
-                return Err(DecodeError::BadXmlStructure);
+    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcRequest> {
+        let tree = Tree::new(body).chain_err(|| "Failed to transform XML data into tree")?;
+        let (key, mut children) = match tree {
+            Tree::Node(key, children) => (key, children),
+            Tree::Leaf(_) => {
+                bail!("XML-RPC request should contain a node called 'methodCall' with two children")
             }
-            let parameters_tree = children.pop().ok_or(DecodeError::BadXmlStructure)?;
-            let method = children.pop().ok_or(DecodeError::BadXmlStructure)?;
-            match method.peel_layer("methodName") {
-                Ok(Tree::Leaf(method_name)) => {
-                    Ok(XmlRpcRequest {
-                        method: method_name,
-                        parameters: extract_parameters(parameters_tree)?,
-                    })
-                }
-                Ok(_) => Err(DecodeError::BadXmlStructure),
-                Err(err) => Err(err),
+        };
+        if key != "methodCall" || children.len() != 2 {
+            bail!("XML-RPC request should contain a node called 'methodCall' with two children")
+        }
+        // We checked the array length, so it's safe to pop
+        let parameters_tree = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
+        let method = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
+        match method.peel_layer("methodName")
+            .chain_err(|| "Bad XML-RPC Request method name value")? {
+            Tree::Leaf(method_name) => {
+                Ok(XmlRpcRequest {
+                    method: method_name,
+                    parameters: extract_parameters(parameters_tree)?,
+                })
             }
-        } else {
-            Err(DecodeError::BadXmlStructure)
+            Tree::Node(_, _) => {
+                bail!("Node 'methodName' should just contain a string representing the method name")
+            }
         }
     }
 }
 
 impl XmlRpcResponse {
-    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcResponse, DecodeError> {
-        extract_parameters(Tree::new(body)?.peel_layer("methodResponse")?)
+    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcResponse> {
+        extract_parameters(Tree::new(body).chain_err(|| "Failed to transform XML data into tree")?
+                .peel_layer("methodResponse")?)
             .map(|parameters| XmlRpcResponse { parameters: parameters })
     }
 }
 
-fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>, DecodeError> {
+fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>> {
     if let Tree::Node(key, parameters) = parameters {
         if key == "params" {
-            return parameters.into_iter().map(XmlRpcValue::from_parameter).collect();
+            return parameters.into_iter()
+                .map(XmlRpcValue::from_parameter)
+                .collect::<Result<_>>()
+                .chain_err(|| "Failed to parse parameters");
         }
     }
-    Err(DecodeError::BadXmlStructure)
+    bail!("Parameters need to be contained within a node called params")
 }
 
 impl XmlRpcValue {
-    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcValue, DecodeError> {
-        XmlRpcValue::from_tree(Tree::new(body)?)
+    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcValue> {
+        XmlRpcValue::from_tree(Tree::new(body)
+                               .chain_err(|| "Couldn't generate XML tree to form value")?)
     }
 
-    fn read_member(tree: Tree) -> Result<(String, XmlRpcValue), DecodeError> {
-        if let Tree::Node(key, mut children) = tree {
-            if key != "member" || children.len() != 2 {
-                return Err(DecodeError::BadXmlStructure);
+    fn read_member(tree: Tree) -> Result<(String, XmlRpcValue)> {
+        let (key, mut children) = match tree {
+            Tree::Node(key, children) => (key, children),
+            Tree::Leaf(_) => {
+                bail!("Structure member node should contain a node called 'member' with two \
+                       children")
             }
-            if let Some(value) = children.pop() {
-                if let Some(name_node) = children.pop() {
-                    if let Tree::Leaf(name) = name_node.peel_layer("name")? {
-                        return XmlRpcValue::from_tree(value).and_then(|v| Ok((name, v)));
-                    }
+        };
+        if key != "member" || children.len() != 2 {
+            bail!("Structure member node should contain a node called 'member' with two children")
+        }
+        // We tested the vector length already, so it's safe to pop
+        let value = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
+        let name_node = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
+        let name = match name_node.peel_layer("name")
+            .chain_err(|| "First struct member field should be a node called 'name'")? {
+            Tree::Leaf(name) => name,
+            Tree::Node(_, _) => {
+                bail!("Struct member's name node should just contain the member's name")
+            }
+        };
+
+        XmlRpcValue::from_tree(value)
+            .chain_err(|| format!("Failed to parse subtree of struct field {}", name))
+            .map(|v| (name, v))
+    }
+
+    fn from_parameter(tree: Tree) -> Result<XmlRpcValue> {
+        XmlRpcValue::from_tree(tree.peel_layer("param")
+                .chain_err(|| "Parameters should be contained within node 'param'")?)
+            .chain_err(|| "Failed to parse XML RPC parameter")
+    }
+
+    fn from_tree(tree: Tree) -> Result<XmlRpcValue> {
+        let (key, mut values) = match tree.peel_layer("value")? {
+            Tree::Node(key, values) => (key, values),
+            Tree::Leaf(_) => bail!("Value node should contain one node representing its data type"),
+        };
+        if key == "struct" {
+            return Ok(XmlRpcValue::Struct(values.into_iter()
+                .map(XmlRpcValue::read_member)
+                .collect::<Result<Vec<(String, XmlRpcValue)>>>()
+                .chain_err(|| "Couldn't parse struct")?));
+        }
+        if values.len() > 1 {
+            bail!("Node '{}' can't have more than one child", key);
+        }
+        if key == "array" {
+            return if let Some(Tree::Node(key, children)) = values.pop() {
+                if key != "data" {
+                    bail!("Node 'array' must contain 'data' node, but '{}' detected",
+                          key);
                 }
-            }
+                Ok(XmlRpcValue::Array(children.into_iter()
+                    .map(XmlRpcValue::from_tree)
+                    .collect::<Result<_>>()
+                    .chain_err(|| "Failed to parse array's children")?))
+            } else {
+                bail!("Node 'array' must contain 'data' node with child values");
+            };
         }
-        Err(DecodeError::BadXmlStructure)
-    }
-
-    fn from_parameter(tree: Tree) -> Result<XmlRpcValue, DecodeError> {
-        XmlRpcValue::from_tree(tree.peel_layer("param")?)
-    }
-
-    fn from_tree(tree: Tree) -> Result<XmlRpcValue, DecodeError> {
-        if let Ok(Tree::Node(key, mut values)) = tree.peel_layer("value") {
-            if key == "struct" {
-                return Ok(XmlRpcValue::Struct(values.into_iter()
-                    .map(XmlRpcValue::read_member)
-                    .collect::<Result<Vec<(String, XmlRpcValue)>, DecodeError>>()?));
+        let value = match values.pop().unwrap_or(Tree::Leaf(String::from(""))) {
+            Tree::Leaf(value) => value,
+            Tree::Node(_, _) => bail!("Value field for type '{}' must contain just the value", key),
+        };
+        match key.as_str() {
+            "i4" | "int" => {
+                Ok(XmlRpcValue::Int(value.parse()
+                    .chain_err(|| format!("Failed to parse integer (i32) {}", value))?))
             }
-            if values.len() > 1 {
-                return Err(DecodeError::BadXmlStructure);
+            "boolean" => {
+                Ok(XmlRpcValue::Bool(value.parse::<i32>()
+                    .chain_err(|| format!("Expected 0 or 1 for boolean, got {}", value))? !=
+                                     0))
             }
-            if key == "array" {
-                return if let Some(Tree::Node(key, children)) = values.pop() {
-                    if key != "data" {
-                        return Err(DecodeError::BadXmlStructure);
-                    }
-                    Ok(XmlRpcValue::Array(children.into_iter()
-                        .map(XmlRpcValue::from_tree)
-                        .collect::<Result<_, _>>()?))
-                } else {
-                    Err(DecodeError::BadXmlStructure)
-                };
+            "string" => Ok(XmlRpcValue::String(value)),
+            "double" => {
+                Ok(XmlRpcValue::Double(value.parse()
+                    .chain_err(|| format!("Failed to parse double (f64) {}", value))?))
             }
-            let value = values.pop().unwrap_or(Tree::Leaf(String::from("")));
-            if let Tree::Leaf(value) = value {
-                return match key.as_str() {
-                    "i4" | "int" => Ok(XmlRpcValue::Int(value.parse()?)),
-                    "boolean" => Ok(XmlRpcValue::Bool(value.parse::<i32>()? != 0)),
-                    "string" => Ok(XmlRpcValue::String(value)),
-                    "double" => Ok(XmlRpcValue::Double(value.parse()?)),
-                    _ => Err(DecodeError::UnsupportedDataFormat),
-                };
-            }
+            _ => bail!("Unsupported data type '{}'", key),
         }
-        return Err(DecodeError::BadXmlStructure);
     }
 }
 
@@ -184,17 +223,19 @@ enum Tree {
 }
 
 impl Tree {
-    fn new<T: std::io::Read>(body: T) -> Result<Tree, DecodeError> {
-        parse_tree(&mut xml::EventReader::new(body))?.ok_or(DecodeError::BadXmlStructure)
+    fn new<T: std::io::Read>(body: T) -> Result<Tree> {
+        parse_tree(&mut xml::EventReader::new(body))
+            ?
+            .ok_or("XML data started with a closing tag".into())
     }
 
-    fn peel_layer(self, name: &str) -> Result<Tree, DecodeError> {
+    fn peel_layer(self, name: &str) -> Result<Tree> {
         if let Tree::Node(key, mut children) = self {
             if key == name && children.len() == 1 {
-                return children.pop().ok_or(DecodeError::BadXmlStructure);
+                return Ok(children.pop().expect(UNEXPECTED_EMPTY_ARRAY));
             }
         }
-        Err(DecodeError::BadXmlStructure)
+        bail!("Expected a node named '{}' with 1 child", name)
     }
 }
 
@@ -204,25 +245,23 @@ enum Node {
     Close(String),
 }
 
-fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>)
-                                -> Result<Option<Tree>, DecodeError> {
-    match next_node(reader)? {
+fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Option<Tree>> {
+    match next_node(reader).chain_err(|| "Unexpected end of XML data")? {
         Node::Close(..) => Ok(None),
         Node::Data(value) => Ok(Some(Tree::Leaf(value))),
         Node::Open(name) => {
-            Ok(Some(Tree::Node(name, {
-                let mut children = Vec::<Tree>::new();
-                while let Some(node) = parse_tree(reader)? {
-                    children.push(node);
-                }
-                children
-            })))
+            let mut children = Vec::<Tree>::new();
+            while let Some(node) =
+                parse_tree(reader).chain_err(|| ErrorKind::TreeParsing(name.clone()))? {
+                children.push(node);
+            }
+            Ok(Some(Tree::Node(name, children)))
         }
     }
 }
 
-fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Node, DecodeError> {
-    match reader.next()? {
+fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Node> {
+    match reader.next().chain_err(|| "Couldn't obtain XML token")? {
         xml::reader::XmlEvent::StartElement { name, .. } => Ok(Node::Open(name.local_name)),
         xml::reader::XmlEvent::Characters(value) => Ok(Node::Data(value)),
         xml::reader::XmlEvent::EndElement { name } => Ok(Node::Close(name.local_name)),
@@ -230,79 +269,39 @@ fn next_node<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Node,
     }
 }
 
-#[derive(Debug)]
-pub enum DecodeError {
-    BadXmlStructure,
-    XmlRead(xml::reader::Error),
-    UnsupportedDataFormat,
-}
-
-impl From<xml::reader::Error> for DecodeError {
-    fn from(err: xml::reader::Error) -> DecodeError {
-        DecodeError::XmlRead(err)
-    }
-}
-
-impl From<std::num::ParseIntError> for DecodeError {
-    fn from(_: std::num::ParseIntError) -> DecodeError {
-        DecodeError::BadXmlStructure
-    }
-}
-
-impl From<std::num::ParseFloatError> for DecodeError {
-    fn from(_: std::num::ParseFloatError) -> DecodeError {
-        DecodeError::BadXmlStructure
-    }
-}
-
-impl std::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DecodeError::XmlRead(ref err) => write!(f, "XML reading error: {}", err),
-            DecodeError::BadXmlStructure |
-            DecodeError::UnsupportedDataFormat => write!(f, "{}", self.description()),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {
-    fn description(&self) -> &str {
-        match *self {
-            DecodeError::BadXmlStructure => "XML data provided didn't have XML-RPC format",
-            DecodeError::XmlRead(ref err) => err.description(),
-            DecodeError::UnsupportedDataFormat => {
-                "Data provided within XML-RPC call is not supported"
+mod error {
+    error_chain!{
+        errors {
+            TreeParsing(node_name: String) {
+                description("Error while building tree out of XML data")
+                display("XML tree building error within node {}", node_name)
             }
         }
     }
-
-    fn cause(&self) -> Option<&std::error::Error> {
-        match *self {
-            DecodeError::XmlRead(ref err) => Some(err),
-            DecodeError::BadXmlStructure |
-            DecodeError::UnsupportedDataFormat => None,
-        }
-    }
 }
+
+static UNEXPECTED_EMPTY_ARRAY: &'static str = "Popping failure from this array is impossible";
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std;
 
+    static BAD_DATA: &'static str = "Bad data provided";
+
     #[test]
     fn reads_string() {
         let data = r#"<?xml version="1.0"?><value><string>First test</string></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::String(String::from("First test")), value);
         let data = r#"<?xml version="1.0"?><value><string /></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::String(String::from("")), value);
         let data = r#"<?xml version="1.0"?><value><string></string></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::String(String::from("")), value);
     }
 
@@ -310,11 +309,11 @@ mod tests {
     fn reads_int() {
         let data = r#"<?xml version="1.0"?><value><i4>41</i4></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Int(41), value);
         let data = r#"<?xml version="1.0"?><value><int>14</int></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Int(14), value);
     }
 
@@ -322,7 +321,7 @@ mod tests {
     fn reads_float() {
         let data = r#"<?xml version="1.0"?><value><double>33.25</double></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Double(33.25), value);
     }
 
@@ -330,11 +329,11 @@ mod tests {
     fn reads_bool() {
         let data = r#"<?xml version="1.0"?><value><boolean>1</boolean></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Bool(true), value);
         let data = r#"<?xml version="1.0"?><value><boolean>0</boolean></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Bool(false), value);
     }
 
@@ -350,15 +349,13 @@ mod tests {
   </data></array></value>
 </data></array></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
-        assert_eq!(XmlRpcValue::Array(vec![
-            XmlRpcValue::Int(41),
-            XmlRpcValue::Bool(true),
-            XmlRpcValue::Array(vec![
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
+        assert_eq!(XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                           XmlRpcValue::Bool(true),
+                                           XmlRpcValue::Array(vec![
                 XmlRpcValue::String(String::from("Hello")),
                 XmlRpcValue::Double(0.5),
-            ]),
-        ]),
+            ])]),
                    value);
     }
 
@@ -389,15 +386,14 @@ mod tests {
   </member>
 </struct></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
-        assert_eq!(XmlRpcValue::Struct(vec![
-            (String::from("a"), XmlRpcValue::Int(41)),
-            (String::from("b"), XmlRpcValue::Bool(true)),
-            (String::from("c"), XmlRpcValue::Struct(vec![
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
+        assert_eq!(XmlRpcValue::Struct(vec![(String::from("a"), XmlRpcValue::Int(41)),
+                                            (String::from("b"), XmlRpcValue::Bool(true)),
+                                            (String::from("c"),
+                                             XmlRpcValue::Struct(vec![
                 (String::from("xxx"), XmlRpcValue::String(String::from("Hello"))),
                 (String::from("yyy"), XmlRpcValue::Double(0.5)),
-            ])),
-        ]),
+            ]))]),
                    value);
     }
 
@@ -423,19 +419,15 @@ mod tests {
   </params>
 </methodCall>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcRequest::new(&mut cursor).unwrap();
+        let value = XmlRpcRequest::new(&mut cursor).expect(BAD_DATA);
         assert_eq!("mytype.mymethod", value.method);
-        assert_eq!(vec![
-            XmlRpcValue::Int(33),
-            XmlRpcValue::Array(vec![
-                XmlRpcValue::Int(41),
-                XmlRpcValue::Bool(true),
-                XmlRpcValue::Array(vec![
+        assert_eq!(vec![XmlRpcValue::Int(33),
+                        XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                                XmlRpcValue::Bool(true),
+                                                XmlRpcValue::Array(vec![
                     XmlRpcValue::String(String::from("Hello")),
                     XmlRpcValue::Double(0.5),
-                ]),
-            ]),
-        ],
+                ])])],
                    value.parameters);
     }
 
@@ -460,18 +452,14 @@ mod tests {
   </params>
 </methodResponse>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcResponse::new(&mut cursor).unwrap();
-        assert_eq!(vec![
-            XmlRpcValue::Int(33),
-            XmlRpcValue::Array(vec![
-                XmlRpcValue::Int(41),
-                XmlRpcValue::Bool(true),
-                XmlRpcValue::Array(vec![
+        let value = XmlRpcResponse::new(&mut cursor).expect(BAD_DATA);
+        assert_eq!(vec![XmlRpcValue::Int(33),
+                        XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                                XmlRpcValue::Bool(true),
+                                                XmlRpcValue::Array(vec![
                     XmlRpcValue::String(String::from("Hello")),
                     XmlRpcValue::Double(0.5),
-                ]),
-            ]),
-        ],
+                ])])],
                    value.parameters);
     }
 
@@ -514,14 +502,12 @@ mod tests {
                            r#"</data></array></value>"#,
                            r#"</data></array></value>"#),
                    format!("{}",
-                           XmlRpcValue::Array(vec![
-                               XmlRpcValue::Int(41),
-                               XmlRpcValue::Bool(true),
-                               XmlRpcValue::Array(vec![
+                           XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                                   XmlRpcValue::Bool(true),
+                                                   XmlRpcValue::Array(vec![
                                    XmlRpcValue::String(String::from("Hello")),
                                    XmlRpcValue::Double(0.5),
-                               ]),
-                           ])));
+                               ])])));
     }
 
     #[test]
@@ -550,14 +536,14 @@ mod tests {
                            r#"</member>"#,
                            r#"</struct></value>"#),
                    format!("{}",
-                           XmlRpcValue::Struct(vec![
-                       (String::from("a"), XmlRpcValue::Int(41)),
-                       (String::from("b"), XmlRpcValue::Bool(true)),
-                       (String::from("c"), XmlRpcValue::Struct(vec![
+                           XmlRpcValue::Struct(vec![(String::from("a"), XmlRpcValue::Int(41)),
+                                                    (String::from("b"),
+                                                     XmlRpcValue::Bool(true)),
+                                                    (String::from("c"),
+                                                     XmlRpcValue::Struct(vec![
                            (String::from("xxx"), XmlRpcValue::String(String::from("Hello"))),
                            (String::from("yyy"), XmlRpcValue::Double(0.5)),
-                       ])),
-                   ])));
+                       ]))])));
     }
 
     #[test]
@@ -584,18 +570,14 @@ mod tests {
                    format!("{}",
                            XmlRpcRequest {
                                method: String::from("mytype.mymethod"),
-                               parameters: vec![
-                                   XmlRpcValue::Int(33),
-                                   XmlRpcValue::Array(vec![
-                                       XmlRpcValue::Int(41),
-                                       XmlRpcValue::Bool(true),
-                                       XmlRpcValue::Array(vec![
+                               parameters: vec![XmlRpcValue::Int(33),
+                                                XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                                                        XmlRpcValue::Bool(true),
+                                                                        XmlRpcValue::Array(vec![
                                            XmlRpcValue::String(
                                                String::from("Hello")),
                                            XmlRpcValue::Double(0.5),
-                                       ]),
-                                   ]),
-                               ],
+                                       ])])],
                            }));
     }
 
@@ -621,18 +603,14 @@ mod tests {
                            r#"</methodResponse>"#),
                    format!("{}",
                            XmlRpcResponse {
-                               parameters: vec![
-                                   XmlRpcValue::Int(33),
-                                   XmlRpcValue::Array(vec![
-                                       XmlRpcValue::Int(41),
-                                       XmlRpcValue::Bool(true),
-                                       XmlRpcValue::Array(vec![
+                               parameters: vec![XmlRpcValue::Int(33),
+                                                XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
+                                                                        XmlRpcValue::Bool(true),
+                                                                        XmlRpcValue::Array(vec![
                                            XmlRpcValue::String(
                                                String::from("Hello")),
                                            XmlRpcValue::Double(0.5),
-                                       ]),
-                                   ]),
-                               ],
+                                       ])])],
                            }));
     }
 }

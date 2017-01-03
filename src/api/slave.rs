@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::thread;
-use super::error::ServerError as Error;
+use super::error::{self, ErrorKind, Result};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
-use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service, ServicePair};
+use tcpros::{Message, Publisher, PublisherStream, Subscriber, Service, ServicePair, ServiceResult};
 
 pub struct Slave {
     name: String,
@@ -15,10 +15,10 @@ pub struct Slave {
     services: Arc<Mutex<HashMap<String, Service>>>,
 }
 
-type SerdeResult<T> = Result<T, Error>;
+type SerdeResult<T> = Result<T>;
 
 impl Slave {
-    pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave, Error> {
+    pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave> {
         let (shutdown_tx, shutdown_rx) = channel();
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
         let pubs = handler.publications.clone();
@@ -54,7 +54,9 @@ impl Slave {
                                              -> SerdeResult<()>
         where T: Iterator<Item = String>
     {
-        add_publishers_to_subscription(&mut self.subscriptions.lock().unwrap(),
+        add_publishers_to_subscription(&mut self.subscriptions
+                                           .lock()
+                                           .expect(FAILED_TO_LOCK),
                                        &self.name,
                                        topic,
                                        publishers)
@@ -66,13 +68,13 @@ impl Slave {
                              handler: F)
                              -> SerdeResult<String>
         where T: ServicePair,
-              F: Fn(T::Request) -> T::Response + Send + Sync + 'static
+              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         use std::collections::hash_map::Entry;
-        match self.services.lock().unwrap().entry(String::from(service)) {
+        match self.services.lock().expect(FAILED_TO_LOCK).entry(String::from(service)) {
             Entry::Occupied(..) => {
                 error!("Duplicate initiation of service '{}' attempted", service);
-                Err(Error::Critical(String::from("Could not add duplicate service")))
+                Err(ErrorKind::Duplicate("service".into()).into())
             }
             Entry::Vacant(entry) => {
                 let service = Service::new::<T, _>(hostname, 0, service, &self.name, handler)?;
@@ -84,17 +86,17 @@ impl Slave {
     }
 
     pub fn remove_service(&mut self, service: &str) {
-        self.services.lock().unwrap().remove(service);
+        self.services.lock().expect(FAILED_TO_LOCK).remove(service);
     }
 
     pub fn add_publication<T>(&mut self,
                               hostname: &str,
                               topic: &str)
-                              -> Result<PublisherStream<T>, tcpros::Error>
+                              -> error::tcpros::Result<PublisherStream<T>>
         where T: Message
     {
         use std::collections::hash_map::Entry;
-        match self.publications.lock().unwrap().entry(String::from(topic)) {
+        match self.publications.lock().expect(FAILED_TO_LOCK).entry(String::from(topic)) {
             Entry::Occupied(publisher_entry) => publisher_entry.get().stream(),
             Entry::Vacant(entry) => {
                 let publisher = Publisher::new::<T, _>(format!("{}:0", hostname).as_str(), topic)?;
@@ -104,18 +106,18 @@ impl Slave {
     }
 
     pub fn remove_publication(&mut self, topic: &str) {
-        self.publications.lock().unwrap().remove(topic);
+        self.publications.lock().expect(FAILED_TO_LOCK).remove(topic);
     }
 
-    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<(), Error>
+    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<()>
         where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
         use std::collections::hash_map::Entry;
-        match self.subscriptions.lock().unwrap().entry(String::from(topic)) {
+        match self.subscriptions.lock().expect(FAILED_TO_LOCK).entry(String::from(topic)) {
             Entry::Occupied(..) => {
                 error!("Duplicate subscription to topic '{}' attempted", topic);
-                Err(Error::Critical(String::from("Could not add duplicate subscription to topic")))
+                Err(ErrorKind::Duplicate("subscription".into()).into())
             }
             Entry::Vacant(entry) => {
                 let subscriber = Subscriber::new::<T, F>(&self.name, topic, callback);
@@ -126,6 +128,8 @@ impl Slave {
     }
 
     pub fn remove_subscription(&mut self, topic: &str) {
-        self.subscriptions.lock().unwrap().remove(topic);
+        self.subscriptions.lock().expect(FAILED_TO_LOCK).remove(topic);
     }
 }
+
+static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";

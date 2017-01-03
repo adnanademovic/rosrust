@@ -107,7 +107,7 @@ fn main() {
     let mut publisher = ros.publish::<Uint64>("some_topic").unwrap();
     loop {
         thread::sleep(time::Duration::from_secs(1);
-        publisher.send(UInt64 { data: 42 })
+        publisher.send(UInt64 { data: 42 }).unwrap();
     }
 }
 ```
@@ -142,7 +142,7 @@ use std::{thread, time};
 fn main() {
     let mut ros = Ros::new("node_name").unwrap();
     ros.service::<AddTwoInts>("/add_two_ints",
-        |req| AddTwoIntsRes { sum: req.a + req.b } ).unwrap();
+        |req| Ok(AddTwoIntsRes { sum: req.a + req.b }) ).unwrap();
     loop {
         thread::sleep(time::Duration::from_secs(100);
     }
@@ -151,7 +151,7 @@ fn main() {
 
 ### Creating a client
 
-Clients can handle requests synchronously and asynchronously. The sync method behaves like a function, while the async approach is via a callback. The async consumes the passed parameter, since we're passing the parameter between threads, and it's more common for users to pass and drop a parameter, so this being the default prevents needless cloning. Let's call requests from the `AddTwoInts` service on the topic `/add_two_ints`.
+Clients can handle requests synchronously and asynchronously. The sync method behaves like a function, while the async approach is via reading data afterwards. The async consumes the passed parameter, since we're passing the parameter between threads, and it's more common for users to pass and drop a parameter, so this being the default prevents needless cloning. Let's call requests from the `AddTwoInts` service on the topic `/add_two_ints`.
 
 ```rust
 extern crate rosrust;
@@ -163,10 +163,11 @@ fn main() {
     let client = ros.client::<AddTwoInts>("/add_two_ints").unwrap();
     loop {
         // Sync approach
-        println!("5 + 7 = {}", client.req(&AddTwoIntsReq { a: 5, b: 7 }).sum)
+        println!("5 + 7 = {}",
+            client.req(&AddTwoIntsReq { a: 5, b: 7 }).unwrap().unwrap().sum);
         // Async approach
-        client.req_callback(AddTwoIntsReq { a: 5, b: 7 },
-            |result| println!("12 + 4 = {}", result.unwrap().sum));
+        let retval = client.req_async(AddTwoIntsReq { a: 5, b: 7 }),
+        println!("12 + 4 = {}", retval.read().unwrap().unwrap().sum));
         thread::sleep(time::Duration::from_secs(1);
     }
 }
