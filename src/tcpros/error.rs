@@ -7,6 +7,10 @@ error_chain! {
         Encoder(self::encoder::Error, self::encoder::ErrorKind);
     }
     errors {
+        TopicConnectionFail(topic:String) {
+            description("Failed to connect to topic")
+            display("Failed to connect to topic '{}'", topic)
+        }
         HeaderMismatch(field: String, expected: String, actual: String) {
             description("Data field within header mismatched")
             display("Data field '{}' within header mismatched. Expected: '{}' Actual: '{}'",

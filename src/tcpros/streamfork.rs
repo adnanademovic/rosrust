@@ -12,7 +12,7 @@ pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
 
 fn fork_thread<T: Write + Send + 'static>(streams: Receiver<T>, data: Receiver<Encoder>) {
     let mut targets = Vec::new();
-    while let Ok(encoder) = data.recv() {
+    for encoder in data {
         while let Ok(target) = streams.try_recv() {
             targets.push(target);
         }

@@ -107,7 +107,7 @@ fn main() {
     let mut publisher = ros.publish::<Uint64>("some_topic").unwrap();
     loop {
         thread::sleep(time::Duration::from_secs(1);
-        publisher.send(UInt64 { data: 42 })
+        publisher.send(UInt64 { data: 42 }).unwrap();
     }
 }
 ```
