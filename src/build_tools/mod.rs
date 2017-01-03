@@ -49,10 +49,10 @@ pub fn depend_on_messages(messages: &[&str]) {
     let dest_path = Path::new(&out_dir).join("msg.rs");
     let mut f = File::create(&dest_path).unwrap();
     f.write(b"mod msg {\n").unwrap();
-    f.write(b"use ::std;\n").unwrap();
-    f.write(b"use ::rosrust;\n").unwrap();
     for (package, names) in messages {
         f.write_fmt(format_args!("pub mod {} {{\n", package)).unwrap();
+        f.write(b"use ::std;\n").unwrap();
+        f.write(b"use ::rosrust;\n").unwrap();
         for name in names {
             f.write_fmt(format_args!("// Content for message: {}/{}\n", package, name)).unwrap();
             f.write_all(&append_message(&paths, &package, &name)).unwrap();
