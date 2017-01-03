@@ -1,8 +1,8 @@
 use regex::Regex;
 use rosxmlrpc;
-use rosxmlrpc::error::{Error as ReError, ErrorKind as ReErrorKind};
-use rosxmlrpc::serde::ErrorKind as SeErrorKind;
-use super::error::master::{Error, ErrorKind};
+use error::rosxmlrpc::{Error as ReError, ErrorKind as ReErrorKind};
+use error::rosxmlrpc::serde::ErrorKind as SeErrorKind;
+use super::error::master::{Result, Error, ErrorKind};
 use rustc_serialize::{Decodable, Decoder, Encodable};
 use super::value::Topic;
 
@@ -15,9 +15,9 @@ pub struct Master {
 macro_rules! request {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
         let mut request = rosxmlrpc::client::Request::new(stringify!($name));
-        request.add(&$s.client_id).map_err(|v| Error::from(ReError::from(v)))?;
+        request.add(&$s.client_id).map_err(|v| ReError::from(v))?;
         $(
-            request.add(&$item).map_err(|v| Error::from(ReError::from(v)))?;
+            request.add(&$item).map_err(|v| ReError::from(v))?;
         )*
         let data : ResponseData<_> = $s.client.request(request)?;
         Ok(data.0)
@@ -27,9 +27,9 @@ macro_rules! request {
 macro_rules! request_tree {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
         let mut request = rosxmlrpc::client::Request::new(stringify!($name));
-        request.add(&$s.client_id).map_err(|v| Error::from(ReError::from(v)))?;
+        request.add(&$s.client_id).map_err(|v| ReError::from(v))?;
         $(
-            request.add(&$item).map_err(|v| Error::from(ReError::from(v)))?;
+            request.add(&$item).map_err(|v| ReError::from(v))?;
         )*
         $s.client.request_tree(request)
             .map_err(extract_error_code)
@@ -46,7 +46,7 @@ impl Master {
         }
     }
 
-    fn remove_tree_wrap(data: rosxmlrpc::XmlRpcValue) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+    fn remove_tree_wrap(data: rosxmlrpc::XmlRpcValue) -> Result<rosxmlrpc::XmlRpcValue> {
         let values = match data {
             rosxmlrpc::XmlRpcValue::Array(values) => values,
             _ => {
@@ -88,102 +88,100 @@ impl Master {
         Ok(value)
     }
 
-    pub fn register_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
+    pub fn register_service(&self, service: &str, service_api: &str) -> Result<i32> {
         request!(self; registerService; service, service_api, self.caller_api)
     }
 
-    pub fn unregister_service(&self, service: &str, service_api: &str) -> MasterResult<i32> {
+    pub fn unregister_service(&self, service: &str, service_api: &str) -> Result<i32> {
         request!(self; unregisterService; service, service_api)
     }
 
-    pub fn register_subscriber(&self, topic: &str, topic_type: &str) -> MasterResult<Vec<String>> {
+    pub fn register_subscriber(&self, topic: &str, topic_type: &str) -> Result<Vec<String>> {
         request!(self; registerSubscriber; topic, topic_type, self.caller_api)
     }
 
-    pub fn unregister_subscriber(&self, topic: &str) -> MasterResult<i32> {
+    pub fn unregister_subscriber(&self, topic: &str) -> Result<i32> {
         request!(self; registerSubscriber; topic, self.caller_api)
     }
 
-    pub fn register_publisher(&self, topic: &str, topic_type: &str) -> MasterResult<Vec<String>> {
+    pub fn register_publisher(&self, topic: &str, topic_type: &str) -> Result<Vec<String>> {
         request!(self; registerPublisher; topic, topic_type, self.caller_api)
     }
 
-    pub fn unregister_publisher(&self, topic: &str) -> MasterResult<i32> {
+    pub fn unregister_publisher(&self, topic: &str) -> Result<i32> {
         request!(self; unregisterPublisher; topic, self.caller_api)
     }
 
     #[allow(dead_code)]
-    pub fn lookup_node(&self, node_name: &str) -> MasterResult<String> {
+    pub fn lookup_node(&self, node_name: &str) -> Result<String> {
         request!(self; lookupNode; node_name)
     }
 
     #[allow(dead_code)]
-    pub fn get_published_topics(&self, subgraph: &str) -> MasterResult<Vec<(String, String)>> {
+    pub fn get_published_topics(&self, subgraph: &str) -> Result<Vec<(String, String)>> {
         request!(self; getPublishedTopics; subgraph)
     }
 
-    pub fn get_topic_types(&self) -> MasterResult<Vec<Topic>> {
+    pub fn get_topic_types(&self) -> Result<Vec<Topic>> {
         request!(self; getTopicTypes;)
     }
 
-    pub fn get_system_state(&self) -> MasterResult<SystemState> {
+    pub fn get_system_state(&self) -> Result<SystemState> {
         request!(self; getSystemState;)
     }
 
     #[allow(dead_code)]
-    pub fn get_uri(&self) -> MasterResult<String> {
+    pub fn get_uri(&self) -> Result<String> {
         request!(self; getUri;)
     }
 
-    pub fn lookup_service(&self, service: &str) -> MasterResult<String> {
+    pub fn lookup_service(&self, service: &str) -> Result<String> {
         request!(self; lookupService; service)
     }
 
-    pub fn delete_param(&self, key: &str) -> MasterResult<i32> {
+    pub fn delete_param(&self, key: &str) -> Result<i32> {
         request!(self; deleteParam; key)
     }
 
-    pub fn set_param<T: Encodable>(&self, key: &str, value: &T) -> MasterResult<i32> {
+    pub fn set_param<T: Encodable>(&self, key: &str, value: &T) -> Result<i32> {
         request!(self; setParam; key, value)
     }
 
-    pub fn get_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
+    pub fn get_param<T: Decodable>(&self, key: &str) -> Result<T> {
         request!(self; getParam; key)
     }
 
-    pub fn get_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+    pub fn get_param_any(&self, key: &str) -> Result<rosxmlrpc::XmlRpcValue> {
         request_tree!(self; getParam; key)
     }
 
-    pub fn search_param(&self, key: &str) -> MasterResult<String> {
+    pub fn search_param(&self, key: &str) -> Result<String> {
         request!(self; searchParam; key)
     }
 
     #[allow(dead_code)]
-    pub fn subscribe_param<T: Decodable>(&self, key: &str) -> MasterResult<T> {
+    pub fn subscribe_param<T: Decodable>(&self, key: &str) -> Result<T> {
         request!(self; subscribeParam; self.caller_api, key)
     }
 
     #[allow(dead_code)]
-    pub fn subscribe_param_any(&self, key: &str) -> MasterResult<rosxmlrpc::XmlRpcValue> {
+    pub fn subscribe_param_any(&self, key: &str) -> Result<rosxmlrpc::XmlRpcValue> {
         request_tree!(self; subscribeParam; self.caller_api, key)
     }
 
     #[allow(dead_code)]
-    pub fn unsubscribe_param(&self, key: &str) -> MasterResult<i32> {
+    pub fn unsubscribe_param(&self, key: &str) -> Result<i32> {
         request!(self; unsubscribeParam; self.caller_api, key)
     }
 
-    pub fn has_param(&self, key: &str) -> MasterResult<bool> {
+    pub fn has_param(&self, key: &str) -> Result<bool> {
         request!(self; hasParam; key)
     }
 
-    pub fn get_param_names(&self) -> MasterResult<Vec<String>> {
+    pub fn get_param_names(&self) -> Result<Vec<String>> {
         request!(self; getParamNames;)
     }
 }
-
-pub type MasterResult<T> = Result<T, Error>;
 
 
 fn extract_error_code(err: ReError) -> Error {
@@ -210,7 +208,7 @@ fn extract_error_code(err: ReError) -> Error {
 struct ResponseData<T>(T);
 
 impl<T: Decodable> Decodable for ResponseData<T> {
-    fn decode<D: Decoder>(d: &mut D) -> Result<ResponseData<T>, D::Error> {
+    fn decode<D: Decoder>(d: &mut D) -> ::std::result::Result<ResponseData<T>, D::Error> {
         d.read_struct("ResponseData", 3, |d| {
             let code = d.read_struct_field("status_code", 0, |d| d.read_i32())?;
             let message = d.read_struct_field("status_message", 1, |d| d.read_str())?;

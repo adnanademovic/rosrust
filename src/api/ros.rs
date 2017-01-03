@@ -1,7 +1,8 @@
 use rustc_serialize::{Encodable, Decodable};
-use super::master::{self, Master, MasterResult};
+use super::master::{self, Master};
 use super::slave::Slave;
-use super::error::{Error, ErrorKind};
+use super::error::{ErrorKind, Result};
+use super::error::master::Result as MasterResult;
 use super::value::Topic;
 use super::naming::{self, Resolver};
 use super::resolve;
@@ -17,7 +18,7 @@ pub struct Ros {
 }
 
 impl Ros {
-    pub fn new(name: &str) -> Result<Ros, Error> {
+    pub fn new(name: &str) -> Result<Ros> {
         let namespace = resolve::namespace();
         let master_uri = resolve::master();
         let hostname = resolve::hostname();
@@ -29,11 +30,7 @@ impl Ros {
         Ok(ros)
     }
 
-    fn new_raw(master_uri: &str,
-               hostname: &str,
-               namespace: &str,
-               name: &str)
-               -> Result<Ros, Error> {
+    fn new_raw(master_uri: &str, hostname: &str, namespace: &str, name: &str) -> Result<Ros> {
         let namespace = namespace.trim_right_matches("/");
 
         if name.contains("/") {
@@ -54,7 +51,7 @@ impl Ros {
         })
     }
 
-    fn map(&mut self, source: &str, destination: &str) -> Result<(), Error> {
+    fn map(&mut self, source: &str, destination: &str) -> Result<()> {
         self.resolver.map(source, destination).map_err(|v| v.into())
     }
 
@@ -83,13 +80,13 @@ impl Ros {
         self.master.get_topic_types()
     }
 
-    pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>, Error> {
+    pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>> {
         let name = self.resolver.translate(service)?;
         let uri = self.master.lookup_service(&name)?;
         Ok(Client::new(&self.name, &uri, &name))
     }
 
-    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<(), Error>
+    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>
         where T: ServicePair,
               F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
@@ -99,13 +96,14 @@ impl Ros {
         if let Err(err) = self.master.register_service(&name, &api) {
             self.slave.remove_service(&name);
             self.master.unregister_service(&name, &api)?;
-            Err(Error::from(err))
+            Err(err.into())
         } else {
             Ok(())
         }
+
     }
 
-    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<(), Error>
+    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<()>
         where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
@@ -125,12 +123,12 @@ impl Ros {
             Err(err) => {
                 self.slave.remove_subscription(&name);
                 self.master.unregister_subscriber(&name)?;
-                Err(Error::from(err))
+                Err(err.into())
             }
         }
     }
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>, Error>
+    pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>>
         where T: Message
     {
         let name = self.resolver.translate(topic)?;
@@ -143,7 +141,7 @@ impl Ros {
                        error);
                 self.slave.remove_publication(&name);
                 self.master.unregister_publisher(&name)?;
-                Err(Error::from(error))
+                Err(error.into())
             }
         }
     }

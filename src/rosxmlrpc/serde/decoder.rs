@@ -1,6 +1,6 @@
 use rustc_serialize;
 use std;
-use super::error::{Error, ErrorKind, ResultExt};
+use super::error::{ErrorKind, ResultExt, Result};
 use super::value;
 
 pub struct Decoder {
@@ -18,13 +18,13 @@ impl Decoder {
         }
     }
 
-    pub fn new_request<T: std::io::Read>(body: T) -> Result<(String, Vec<Decoder>), Error> {
+    pub fn new_request<T: std::io::Read>(body: T) -> Result<(String, Vec<Decoder>)> {
         value::XmlRpcRequest::new(body)
             .chain_err(|| ErrorKind::XmlRpcReading("request".into()))
             .map(|value| (value.method, value.parameters.into_iter().map(Decoder::new).collect()))
     }
 
-    pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>, Error> {
+    pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>> {
         value::XmlRpcResponse::new(body)
             .chain_err(|| ErrorKind::XmlRpcReading("response".into()))
             .map(|value| value.parameters.into_iter().map(Decoder::new).collect())
@@ -34,8 +34,8 @@ impl Decoder {
         self.value
     }
 
-    fn read_tuple_helper<T, F>(&mut self, l: usize, f: F) -> Result<T, Error>
-        where F: FnOnce(&mut Self) -> Result<T, Error>
+    fn read_tuple_helper<T, F>(&mut self, l: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
             if l == len {
@@ -61,41 +61,41 @@ fn append_elements(array: &mut Vec<(value::XmlRpcValue, usize)>, v: &value::XmlR
 }
 
 impl rustc_serialize::Decoder for Decoder {
-    type Error = Error;
+    type Error = super::error::Error;
 
-    fn read_nil(&mut self) -> Result<(), Self::Error> {
+    fn read_nil(&mut self) -> Result<()> {
         bail!(ErrorKind::UnsupportedDataType("nil".into()))
     }
 
-    fn read_usize(&mut self) -> Result<usize, Self::Error> {
+    fn read_usize(&mut self) -> Result<usize> {
         bail!(ErrorKind::UnsupportedDataType("usize".into()))
     }
 
-    fn read_u64(&mut self) -> Result<u64, Self::Error> {
+    fn read_u64(&mut self) -> Result<u64> {
         bail!(ErrorKind::UnsupportedDataType("u64".into()))
     }
 
-    fn read_u32(&mut self) -> Result<u32, Self::Error> {
+    fn read_u32(&mut self) -> Result<u32> {
         bail!(ErrorKind::UnsupportedDataType("u32".into()))
     }
 
-    fn read_u16(&mut self) -> Result<u16, Self::Error> {
+    fn read_u16(&mut self) -> Result<u16> {
         bail!(ErrorKind::UnsupportedDataType("u16".into()))
     }
 
-    fn read_u8(&mut self) -> Result<u8, Self::Error> {
+    fn read_u8(&mut self) -> Result<u8> {
         bail!(ErrorKind::UnsupportedDataType("u8".into()))
     }
 
-    fn read_isize(&mut self) -> Result<isize, Self::Error> {
+    fn read_isize(&mut self) -> Result<isize> {
         bail!(ErrorKind::UnsupportedDataType("isize".into()))
     }
 
-    fn read_i64(&mut self) -> Result<i64, Self::Error> {
+    fn read_i64(&mut self) -> Result<i64> {
         bail!(ErrorKind::UnsupportedDataType("i64".into()))
     }
 
-    fn read_i32(&mut self) -> Result<i32, Self::Error> {
+    fn read_i32(&mut self) -> Result<i32> {
         if let Some((value::XmlRpcValue::Int(v), _)) = self.chain.next() {
             Ok(v)
         } else {
@@ -103,15 +103,15 @@ impl rustc_serialize::Decoder for Decoder {
         }
     }
 
-    fn read_i16(&mut self) -> Result<i16, Self::Error> {
+    fn read_i16(&mut self) -> Result<i16> {
         bail!(ErrorKind::UnsupportedDataType("i16".into()))
     }
 
-    fn read_i8(&mut self) -> Result<i8, Self::Error> {
+    fn read_i8(&mut self) -> Result<i8> {
         bail!(ErrorKind::UnsupportedDataType("i8".into()))
     }
 
-    fn read_bool(&mut self) -> Result<bool, Self::Error> {
+    fn read_bool(&mut self) -> Result<bool> {
         if let Some((value::XmlRpcValue::Bool(v), _)) = self.chain.next() {
             Ok(v)
         } else {
@@ -119,7 +119,7 @@ impl rustc_serialize::Decoder for Decoder {
         }
     }
 
-    fn read_f64(&mut self) -> Result<f64, Self::Error> {
+    fn read_f64(&mut self) -> Result<f64> {
         if let Some((value::XmlRpcValue::Double(v), _)) = self.chain.next() {
             Ok(v)
         } else {
@@ -127,15 +127,15 @@ impl rustc_serialize::Decoder for Decoder {
         }
     }
 
-    fn read_f32(&mut self) -> Result<f32, Self::Error> {
+    fn read_f32(&mut self) -> Result<f32> {
         bail!(ErrorKind::UnsupportedDataType("f32".into()))
     }
 
-    fn read_char(&mut self) -> Result<char, Self::Error> {
+    fn read_char(&mut self) -> Result<char> {
         bail!(ErrorKind::UnsupportedDataType("char".into()))
     }
 
-    fn read_str(&mut self) -> Result<String, Self::Error> {
+    fn read_str(&mut self) -> Result<String> {
         if let Some((value::XmlRpcValue::String(v), _)) = self.chain.next() {
             Ok(v)
         } else {
@@ -143,95 +143,84 @@ impl rustc_serialize::Decoder for Decoder {
         }
     }
 
-    fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum".into()))
     }
 
-    fn read_enum_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T, Self::Error>
-        where F: FnMut(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_enum_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T>
+        where F: FnMut(&mut Self, usize) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
     }
 
-    fn read_enum_variant_arg<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_enum_variant_arg<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
     }
 
-    fn read_enum_struct_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T, Self::Error>
-        where F: FnMut(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_enum_struct_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T>
+        where F: FnMut(&mut Self, usize) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
     }
 
-    fn read_enum_struct_variant_field<T, F>(&mut self,
-                                            _: &str,
-                                            _: usize,
-                                            _: F)
-                                            -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_enum_struct_variant_field<T, F>(&mut self, _: &str, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
     }
 
-    fn read_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         self.read_tuple_helper(size, f)
             .chain_err(|| ErrorKind::Decoding(format!("struct {}", name)))
     }
 
-    fn read_struct_field<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_struct_field<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::Decoding(format!("field {}", name)))
     }
 
-    fn read_tuple<T, F>(&mut self, size: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple<T, F>(&mut self, size: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         self.read_tuple_helper(size, f)
             .chain_err(|| ErrorKind::Decoding("tuple".into()))
     }
 
-    fn read_tuple_arg<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple_arg<T, F>(&mut self, n: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::Decoding(format!("field number {}", n)))
     }
 
-    fn read_tuple_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         self.read_tuple_helper(size, f)
             .chain_err(|| ErrorKind::Decoding(format!("tuple struct {}", name)))
     }
 
-    fn read_tuple_struct_arg<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple_struct_arg<T, F>(&mut self, n: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::Decoding(format!("field number {}", n)))
     }
 
-    fn read_option<T, F>(&mut self, _: F) -> Result<T, Self::Error>
-        where F: FnMut(&mut Self, bool) -> Result<T, Self::Error>
+    fn read_option<T, F>(&mut self, _: F) -> Result<T>
+        where F: FnMut(&mut Self, bool) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("option".into()))
     }
 
-    fn read_seq<T, F>(&mut self, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_seq<T, F>(&mut self, f: F) -> Result<T>
+        where F: FnOnce(&mut Self, usize) -> Result<T>
     {
-        use super::error::ResultExt;
         if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
             f(self, len).chain_err(|| ErrorKind::Decoding("array".into()))
         } else {
@@ -239,27 +228,26 @@ impl rustc_serialize::Decoder for Decoder {
         }
     }
 
-    fn read_seq_elt<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_seq_elt<T, F>(&mut self, n: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::Decoding(format!("element number {}", n)))
     }
 
-    fn read_map<T, F>(&mut self, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_map<T, F>(&mut self, _: F) -> Result<T>
+        where F: FnOnce(&mut Self, usize) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
-    fn read_map_elt_key<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_map_elt_key<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
-    fn read_map_elt_val<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_map_elt_val<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }

@@ -1,4 +1,6 @@
-use super::naming;
+pub use ::api::naming::error as naming;
+pub use ::rosxmlrpc::error as rosxmlrpc;
+pub use ::tcpros::error as tcpros;
 
 error_chain! {
     foreign_links {
@@ -7,9 +9,9 @@ error_chain! {
         FromUTF8(::std::string::FromUtf8Error);
     }
     links {
-        XmlRpc(::rosxmlrpc::error::Error, ::rosxmlrpc::error::ErrorKind);
-        Tcpros(::tcpros::error::Error, ::tcpros::error::ErrorKind);
-        Naming(naming::error::Error, naming::error::ErrorKind);
+        XmlRpc(rosxmlrpc::Error, rosxmlrpc::ErrorKind);
+        Tcpros(tcpros::Error, tcpros::ErrorKind);
+        Naming(naming::Error, naming::ErrorKind);
         Master(self::master::Error, self::master::ErrorKind);
     }
     errors {
@@ -42,8 +44,8 @@ pub mod api {
 pub mod master {
     error_chain! {
         links {
-            XmlRpc(::rosxmlrpc::error::Error, ::rosxmlrpc::error::ErrorKind);
-            Api(super::api::Error, super::api::ErrorKind);
+            XmlRpc(super::rosxmlrpc::Error, super::rosxmlrpc::ErrorKind);
+            Api(::error::api::Error, ::error::api::ErrorKind);
         }
     }
 }

@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use rustc_serialize;
 use std;
-use super::error::encoder::{Error, ErrorKind, ResultExt};
+use super::error::encoder::{ErrorKind, Result, ResultExt};
 
 #[derive(Debug)]
 pub struct Encoder {
@@ -13,7 +13,7 @@ impl Encoder {
         Encoder { output: Vec::<Vec<u8>>::new() }
     }
 
-    pub fn write_to<T: std::io::Write>(&self, output: &mut T) -> Result<(), std::io::Error> {
+    pub fn write_to<T: std::io::Write>(&self, output: &mut T) -> std::io::Result<()> {
         for ref v in &self.output {
             output.write_all(&v)?;
         }
@@ -52,10 +52,10 @@ impl Encoder {
     }
 }
 
-type EncoderResult = Result<(), Error>;
+type EncoderResult = Result<()>;
 
 impl rustc_serialize::Encoder for Encoder {
-    type Error = Error;
+    type Error = super::error::encoder::Error;
 
     fn emit_nil(&mut self) -> EncoderResult {
         bail!(ErrorKind::UnsupportedDataType("nil".into()))

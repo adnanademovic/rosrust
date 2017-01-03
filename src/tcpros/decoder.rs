@@ -2,7 +2,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use rustc_serialize;
 use std;
 use std::io::Read;
-use super::error::decoder::{Error, ErrorKind, ResultExt};
+use super::error::decoder::{ErrorKind, Result, ResultExt};
 
 pub struct DecoderSource<T>
     where T: std::io::Read
@@ -17,15 +17,15 @@ impl<T> DecoderSource<T>
         DecoderSource { input: data }
     }
 
-    pub fn pop_verification_byte(&mut self) -> Result<bool, std::io::Error> {
+    pub fn pop_verification_byte(&mut self) -> std::io::Result<bool> {
         self.input.read_u8().map(|v| v != 0)
     }
 
-    pub fn pop_length(&mut self) -> Result<u32, std::io::Error> {
+    pub fn pop_length(&mut self) -> std::io::Result<u32> {
         self.input.read_u32::<LittleEndian>()
     }
 
-    pub fn pop_decoder(&mut self) -> Result<Decoder, std::io::Error> {
+    pub fn pop_decoder(&mut self) -> std::io::Result<Decoder> {
         self.pop_length()
             .and_then(|length| {
                 let mut data = vec![0u8; length as usize];
@@ -54,7 +54,7 @@ pub struct Decoder {
 }
 
 impl Decoder {
-    pub fn pop_length(&mut self) -> Result<u32, std::io::Error> {
+    pub fn pop_length(&mut self) -> std::io::Result<u32> {
         match self.extra {
             Some(l) => {
                 self.extra = None;
@@ -66,69 +66,69 @@ impl Decoder {
 }
 
 impl rustc_serialize::Decoder for Decoder {
-    type Error = Error;
+    type Error = super::error::decoder::Error;
 
-    fn read_nil(&mut self) -> Result<(), Self::Error> {
+    fn read_nil(&mut self) -> Result<()> {
         bail!(ErrorKind::UnsupportedDataType("nil".into()))
     }
 
-    fn read_usize(&mut self) -> Result<usize, Self::Error> {
+    fn read_usize(&mut self) -> Result<usize> {
         bail!(ErrorKind::UnsupportedDataType("usize".into()))
     }
 
-    fn read_u64(&mut self) -> Result<u64, Self::Error> {
+    fn read_u64(&mut self) -> Result<u64> {
         self.input.read_u64::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_u32(&mut self) -> Result<u32, Self::Error> {
+    fn read_u32(&mut self) -> Result<u32> {
         self.input.read_u32::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_u16(&mut self) -> Result<u16, Self::Error> {
+    fn read_u16(&mut self) -> Result<u16> {
         self.input.read_u16::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_u8(&mut self) -> Result<u8, Self::Error> {
+    fn read_u8(&mut self) -> Result<u8> {
         self.input.read_u8().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_isize(&mut self) -> Result<isize, Self::Error> {
+    fn read_isize(&mut self) -> Result<isize> {
         bail!(ErrorKind::UnsupportedDataType("isize".into()))
     }
 
-    fn read_i64(&mut self) -> Result<i64, Self::Error> {
+    fn read_i64(&mut self) -> Result<i64> {
         self.input.read_i64::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_i32(&mut self) -> Result<i32, Self::Error> {
+    fn read_i32(&mut self) -> Result<i32> {
         self.input.read_i32::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_i16(&mut self) -> Result<i16, Self::Error> {
+    fn read_i16(&mut self) -> Result<i16> {
         self.input.read_i16::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_i8(&mut self) -> Result<i8, Self::Error> {
+    fn read_i8(&mut self) -> Result<i8> {
         self.input.read_i8().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_bool(&mut self) -> Result<bool, Self::Error> {
+    fn read_bool(&mut self) -> Result<bool> {
         self.input.read_u8().chain_err(|| ErrorKind::EndOfBuffer).map(|v| v != 0)
     }
 
-    fn read_f64(&mut self) -> Result<f64, Self::Error> {
+    fn read_f64(&mut self) -> Result<f64> {
         self.input.read_f64::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_f32(&mut self) -> Result<f32, Self::Error> {
+    fn read_f32(&mut self) -> Result<f32> {
         self.input.read_f32::<LittleEndian>().chain_err(|| ErrorKind::EndOfBuffer)
     }
 
-    fn read_char(&mut self) -> Result<char, Self::Error> {
+    fn read_char(&mut self) -> Result<char> {
         bail!(ErrorKind::UnsupportedDataType("char".into()))
     }
 
-    fn read_str(&mut self) -> Result<String, Self::Error> {
+    fn read_str(&mut self) -> Result<String> {
         let length = self.pop_length().chain_err(|| ErrorKind::EndOfBuffer)?;
         let mut buffer = vec![0; length as usize];
         self.input.read_exact(&mut buffer).chain_err(|| ErrorKind::EndOfBuffer)?;
@@ -136,112 +136,108 @@ impl rustc_serialize::Decoder for Decoder {
             .chain_err(|| ErrorKind::UnsupportedDataType("non-UTF-8 string".into()))
     }
 
-    fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum".into()))
     }
 
-    fn read_enum_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T, Self::Error>
-        where F: FnMut(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_enum_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T>
+        where F: FnMut(&mut Self, usize) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
     }
 
-    fn read_enum_variant_arg<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_enum_variant_arg<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
     }
 
-    fn read_enum_struct_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T, Self::Error>
-        where F: FnMut(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_enum_struct_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T>
+        where F: FnMut(&mut Self, usize) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
     }
 
-    fn read_enum_struct_variant_field<T, F>(&mut self,
-                                            _: &str,
-                                            _: usize,
-                                            _: F)
-                                            -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_enum_struct_variant_field<T, F>(&mut self, _: &str, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
     }
 
-    fn read_struct<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_struct<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         self.pop_length().chain_err(|| ErrorKind::EndOfBuffer)?;
         f(self).chain_err(|| ErrorKind::FailedToDecode(format!("struct {}", name)))
     }
 
-    fn read_struct_field<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_struct_field<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         f(self).chain_err(|| ErrorKind::FailedToDecode(format!("field {}", name)))
     }
 
-    fn read_tuple<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple<T, F>(&mut self, _: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         self.pop_length().chain_err(|| ErrorKind::EndOfBuffer)?;
         f(self).chain_err(|| ErrorKind::FailedToDecode("tuple".into()))
     }
 
-    fn read_tuple_arg<T, F>(&mut self, n: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple_arg<T, F>(&mut self, n: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         f(self).chain_err(|| ErrorKind::FailedToDecode(format!("field number {}", n)))
     }
 
-    fn read_tuple_struct<T, F>(&mut self, _: &str, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple_struct<T, F>(&mut self, _: &str, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("tuple struct".into()))
     }
 
-    fn read_tuple_struct_arg<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_tuple_struct_arg<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("tuple struct argument".into()))
     }
 
-    fn read_option<T, F>(&mut self, _: F) -> Result<T, Self::Error>
-        where F: FnMut(&mut Self, bool) -> Result<T, Self::Error>
+    fn read_option<T, F>(&mut self, _: F) -> Result<T>
+        where F: FnMut(&mut Self, bool) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("option".into()))
     }
 
-    fn read_seq<T, F>(&mut self, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_seq<T, F>(&mut self, f: F) -> Result<T>
+        where F: FnOnce(&mut Self, usize) -> Result<T>
     {
         self.pop_length().chain_err(|| ErrorKind::EndOfBuffer)?;
         let count = self.pop_length().chain_err(|| ErrorKind::EndOfBuffer)? as usize;
         f(self, count).chain_err(|| ErrorKind::FailedToDecode("array".into()))
     }
 
-    fn read_seq_elt<T, F>(&mut self, _: usize, f: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_seq_elt<T, F>(&mut self, _: usize, f: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         f(self).chain_err(|| ErrorKind::FailedToDecode("array element".into()))
     }
 
-    fn read_map<T, F>(&mut self, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self, usize) -> Result<T, Self::Error>
+    fn read_map<T, F>(&mut self, _: F) -> Result<T>
+        where F: FnOnce(&mut Self, usize) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
-    fn read_map_elt_key<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_map_elt_key<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
-    fn read_map_elt_val<T, F>(&mut self, _: usize, _: F) -> Result<T, Self::Error>
-        where F: FnOnce(&mut Self) -> Result<T, Self::Error>
+    fn read_map_elt_val<T, F>(&mut self, _: usize, _: F) -> Result<T>
+        where F: FnOnce(&mut Self) -> Result<T>
     {
         bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }

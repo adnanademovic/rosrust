@@ -1,7 +1,7 @@
 use rustc_serialize;
 use std;
 use super::value::{self, XmlRpcValue};
-use super::error::{Error, ErrorKind};
+use super::error::{ErrorKind, Result, ResultExt};
 
 pub struct Encoder {
     data: Vec<(XmlRpcValue, usize)>,
@@ -42,7 +42,7 @@ impl Encoder {
     pub fn write_request<T: std::io::Write>(self,
                                             method: &str,
                                             mut body: &mut T)
-                                            -> Result<(), std::io::Error> {
+                                            -> std::io::Result<()> {
         write!(&mut body,
                "{}",
                value::XmlRpcRequest {
@@ -51,17 +51,17 @@ impl Encoder {
                })
     }
 
-    pub fn write_response<T: std::io::Write>(self, mut body: &mut T) -> Result<(), std::io::Error> {
+    pub fn write_response<T: std::io::Write>(self, mut body: &mut T) -> std::io::Result<()> {
         write!(&mut body,
                "{}",
                value::XmlRpcResponse { parameters: self.form_tree() })
     }
 }
 
-type EncoderResult = Result<(), Error>;
+type EncoderResult = Result<()>;
 
 impl rustc_serialize::Encoder for Encoder {
-    type Error = Error;
+    type Error = super::error::Error;
 
     fn emit_nil(&mut self) -> EncoderResult {
         bail!(ErrorKind::UnsupportedDataType("nil".into()))
@@ -160,7 +160,6 @@ impl rustc_serialize::Encoder for Encoder {
     fn emit_struct<F>(&mut self, name: &str, l: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("struct {}", name)))
     }
@@ -168,14 +167,12 @@ impl rustc_serialize::Encoder for Encoder {
     fn emit_struct_field<F>(&mut self, name: &str, _: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field {}", name)))
     }
 
     fn emit_tuple<F>(&mut self, l: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
         f(self).chain_err(|| ErrorKind::UnsupportedDataType("tuple".into()))
     }
@@ -183,14 +180,12 @@ impl rustc_serialize::Encoder for Encoder {
     fn emit_tuple_arg<F>(&mut self, n: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field number {}", n)))
     }
 
     fn emit_tuple_struct<F>(&mut self, name: &str, l: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("tuple struct {}", name)))
     }
@@ -198,7 +193,6 @@ impl rustc_serialize::Encoder for Encoder {
     fn emit_tuple_struct_arg<F>(&mut self, n: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field number {}", n)))
     }
 
@@ -221,7 +215,6 @@ impl rustc_serialize::Encoder for Encoder {
     fn emit_seq<F>(&mut self, l: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         self.data.push((XmlRpcValue::Array(vec![]), l));
         f(self).chain_err(|| ErrorKind::UnsupportedDataType("array".into()))
     }
@@ -229,7 +222,6 @@ impl rustc_serialize::Encoder for Encoder {
     fn emit_seq_elt<F>(&mut self, n: usize, f: F) -> EncoderResult
         where F: FnOnce(&mut Self) -> EncoderResult
     {
-        use super::error::ResultExt;
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("element number {}", n)))
     }
 

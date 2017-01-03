@@ -5,11 +5,9 @@ use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
-use super::error::{Error, ErrorKind};
+use super::error::{self, ErrorKind, Result};
 use super::value::Topic;
 use tcpros::{Publisher, Subscriber, Service};
-
-type SerdeResult<T> = Result<T, Error>;
 
 pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
@@ -55,7 +53,7 @@ impl SlaveHandler {
     fn handle_call(&self,
                    method_name: &str,
                    req: &mut ParameterIterator)
-                   -> Result<Answer, rosxmlrpc::serde::Error> {
+                   -> error::rosxmlrpc::serde::Result<Answer> {
         match method_name {
             "getBusStats" => encode_response(self.get_bus_stats(req), "Bus stats"),
             "getBusInfo" => encode_response(self.get_bus_info(req), "Bus stats"),
@@ -81,7 +79,7 @@ impl SlaveHandler {
         }
     }
 
-    fn get_bus_stats(&self, req: &mut ParameterIterator) -> SerdeResult<BusStats> {
+    fn get_bus_stats(&self, req: &mut ParameterIterator) -> Result<BusStats> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
@@ -98,7 +96,7 @@ impl SlaveHandler {
         })
     }
 
-    fn get_bus_info(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<BusInfo>> {
+    fn get_bus_info(&self, req: &mut ParameterIterator) -> Result<Vec<BusInfo>> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
@@ -107,7 +105,7 @@ impl SlaveHandler {
         Ok(Vec::new())
     }
 
-    fn param_update(&self, req: &mut ParameterIterator) -> SerdeResult<i32> {
+    fn param_update(&self, req: &mut ParameterIterator) -> Result<i32> {
         let caller_id = pop::<String>(req)?;
         let key = pop::<String>(req)?;
         // We don't do anything with parameter updates
@@ -121,7 +119,7 @@ impl SlaveHandler {
         Ok(0)
     }
 
-    fn get_pid(&self, req: &mut ParameterIterator) -> SerdeResult<i32> {
+    fn get_pid(&self, req: &mut ParameterIterator) -> Result<i32> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
@@ -129,7 +127,7 @@ impl SlaveHandler {
         Ok(getpid())
     }
 
-    fn shutdown(&self, req: &mut ParameterIterator) -> SerdeResult<i32> {
+    fn shutdown(&self, req: &mut ParameterIterator) -> Result<i32> {
         let caller_id = pop::<String>(req)?;
         let message = pop::<String>(req).unwrap_or(String::from(""));
         if caller_id == "" {
@@ -142,7 +140,7 @@ impl SlaveHandler {
         Ok(0)
     }
 
-    fn get_publications(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<Topic>> {
+    fn get_publications(&self, req: &mut ParameterIterator) -> Result<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
@@ -160,7 +158,7 @@ impl SlaveHandler {
             .collect())
     }
 
-    fn get_subscriptions(&self, req: &mut ParameterIterator) -> SerdeResult<Vec<Topic>> {
+    fn get_subscriptions(&self, req: &mut ParameterIterator) -> Result<Vec<Topic>> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
@@ -178,7 +176,7 @@ impl SlaveHandler {
             .collect())
     }
 
-    fn publisher_update(&self, req: &mut ParameterIterator) -> SerdeResult<i32> {
+    fn publisher_update(&self, req: &mut ParameterIterator) -> Result<i32> {
         let caller_id = pop::<String>(req)?;
         let topic = pop::<String>(req)?;
         let publishers = pop::<Vec<String>>(req)?;
@@ -192,7 +190,7 @@ impl SlaveHandler {
             .and(Ok(0))
     }
 
-    fn get_master_uri(&self, req: &mut ParameterIterator) -> SerdeResult<&str> {
+    fn get_master_uri(&self, req: &mut ParameterIterator) -> Result<&str> {
         let caller_id = pop::<String>(req)?;
         if caller_id == "" {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
@@ -200,7 +198,7 @@ impl SlaveHandler {
         Ok(&self.master_uri)
     }
 
-    fn request_topic(&self, req: &mut ParameterIterator) -> SerdeResult<(String, String, i32)> {
+    fn request_topic(&self, req: &mut ParameterIterator) -> Result<(String, String, i32)> {
         let caller_id = pop::<String>(req)?;
         let topic = pop::<String>(req)?;
         let protocols = req.next()
@@ -246,7 +244,7 @@ pub fn add_publishers_to_subscription<T>(subscriptions: &mut HashMap<String, Sub
                                          name: &str,
                                          topic: &str,
                                          publishers: T)
-                                         -> SerdeResult<()>
+                                         -> Result<()>
     where T: Iterator<Item = String>
 {
     if let Some(mut subscription) = subscriptions.get_mut(topic) {
@@ -262,9 +260,9 @@ pub fn add_publishers_to_subscription<T>(subscriptions: &mut HashMap<String, Sub
     Ok(())
 }
 
-fn encode_response<T: Encodable>(response: SerdeResult<T>,
+fn encode_response<T: Encodable>(response: Result<T>,
                                  message: &str)
-                                 -> Result<Answer, rosxmlrpc::serde::Error> {
+                                 -> error::rosxmlrpc::serde::Result<Answer> {
     use std::error::Error;
     let mut res = Answer::new();
     match response {
@@ -275,18 +273,18 @@ fn encode_response<T: Encodable>(response: SerdeResult<T>,
 }
 
 
-fn pop<T: Decodable>(req: &mut ParameterIterator) -> SerdeResult<T> {
+fn pop<T: Decodable>(req: &mut ParameterIterator) -> Result<T> {
     req.next()
         .ok_or(ErrorKind::Protocol("Missing parameter".into()))?
         .read()
-        .map_err(|v| ErrorKind::XmlRpc(rosxmlrpc::error::ErrorKind::Serde(v.into())).into())
+        .map_err(|v| ErrorKind::XmlRpc(error::rosxmlrpc::ErrorKind::Serde(v.into())).into())
 }
 
 fn connect_to_publisher(subscriber: &mut Subscriber,
                         caller_id: &str,
                         publisher: &str,
                         topic: &str)
-                        -> Result<(), Error> {
+                        -> Result<()> {
     let (protocol, hostname, port) = request_topic(publisher, caller_id, topic)?;
     if protocol != "TCPROS" {
         // This should never happen, due to the nature of ROS
@@ -298,7 +296,7 @@ fn connect_to_publisher(subscriber: &mut Subscriber,
 fn request_topic(publisher_uri: &str,
                  caller_id: &str,
                  topic: &str)
-                 -> Result<(String, String, i32), rosxmlrpc::error::Error> {
+                 -> error::rosxmlrpc::Result<(String, String, i32)> {
     let mut request = rosxmlrpc::client::Request::new("requestTopic");
     request.add(&caller_id)?;
     request.add(&topic)?;

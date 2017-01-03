@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::thread;
-use super::error::{Error, ErrorKind};
+use super::error::{self, ErrorKind, Result};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
-use tcpros::{self, Message, Publisher, PublisherStream, Subscriber, Service, ServicePair,
-             ServiceResult};
+use tcpros::{Message, Publisher, PublisherStream, Subscriber, Service, ServicePair, ServiceResult};
 
 pub struct Slave {
     name: String,
@@ -16,10 +15,10 @@ pub struct Slave {
     services: Arc<Mutex<HashMap<String, Service>>>,
 }
 
-type SerdeResult<T> = Result<T, Error>;
+type SerdeResult<T> = Result<T>;
 
 impl Slave {
-    pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave, Error> {
+    pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave> {
         let (shutdown_tx, shutdown_rx) = channel();
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
         let pubs = handler.publications.clone();
@@ -91,7 +90,7 @@ impl Slave {
     pub fn add_publication<T>(&mut self,
                               hostname: &str,
                               topic: &str)
-                              -> Result<PublisherStream<T>, tcpros::Error>
+                              -> error::tcpros::Result<PublisherStream<T>>
         where T: Message
     {
         use std::collections::hash_map::Entry;
@@ -108,7 +107,7 @@ impl Slave {
         self.publications.lock().unwrap().remove(topic);
     }
 
-    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<(), Error>
+    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<()>
         where T: Message,
               F: Fn(T) -> () + Send + 'static
     {
