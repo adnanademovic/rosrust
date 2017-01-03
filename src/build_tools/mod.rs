@@ -8,7 +8,6 @@ use std::path::Path;
 #[export_macro]
 macro_rules! rosmsg_main {
     ($($msg:expr),*)=> {
-        extern crate rosrust;
         fn main() {
             ::rosrust::build_tools::depend_on_messages(&[
             $(

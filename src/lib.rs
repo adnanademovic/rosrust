@@ -19,6 +19,7 @@ pub use api::error;
 pub use rosxmlrpc::XmlRpcValue;
 
 mod api;
+#[macro_use]
 pub mod build_tools;
 mod rosxmlrpc;
 mod tcpros;
