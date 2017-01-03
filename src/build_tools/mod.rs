@@ -5,6 +5,25 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 
+#[export_macro]
+macro_rules! rosmsg_main {
+    ($($msg:expr),*)=> {
+        extern crate rosrust;
+        fn main() {
+            ::rosrust::build_tools::depend_on_messages(&[
+            $(
+                $msg,
+            )*
+            ]);
+        }
+    }
+}
+
+#[export_macro]
+macro_rules! rosmsg_include {
+    () => (include!(concat!(env!("OUT_DIR"), "/msg.rs")))
+}
+
 pub fn depend_on_messages(messages: &[&str]) {
     let messages = messages.into_iter()
         .map(|v| {
@@ -34,8 +53,6 @@ pub fn depend_on_messages(messages: &[&str]) {
     f.write(b"mod msg {\n").unwrap();
     for (package, names) in messages {
         f.write_fmt(format_args!("pub mod {} {{\n", package)).unwrap();
-        f.write(b"extern crate rosrust;\n").unwrap();
-        f.write(b"use std;\n\n").unwrap();
         for name in names {
             f.write_fmt(format_args!("// Content for message: {}/{}\n", package, name)).unwrap();
             f.write_all(&append_message(&paths, &package, &name)).unwrap();
