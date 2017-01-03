@@ -253,6 +253,8 @@ mod tests {
     use std;
     use rustc_serialize::Decodable;
 
+    static FAILED_TO_DECODE: &'static str = "Failed to decode";
+
     fn push_data(data: Vec<u8>) -> DecoderSource<std::io::Cursor<Vec<u8>>> {
         DecoderSource::new(std::io::Cursor::new(data))
     }
@@ -260,27 +262,32 @@ mod tests {
     #[test]
     fn pops_length_right() {
         let mut decoder = push_data(vec![4, 0, 0, 0, 2, 33, 17, 0]);
-        assert_eq!(4, decoder.pop_length().unwrap());
-        assert_eq!(1122562, decoder.pop_length().unwrap());
+        assert_eq!(4, decoder.pop_length().expect(FAILED_TO_DECODE));
+        assert_eq!(1122562, decoder.pop_length().expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_u8() {
         let mut decoder = push_data(vec![1, 0, 0, 0, 150]);
-        assert_eq!(150, u8::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(150,
+                   u8::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_u16() {
         let mut decoder = push_data(vec![2, 0, 0, 0, 0x34, 0xA2]);
-        assert_eq!(0xA234, u16::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(0xA234,
+                   u16::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_u32() {
         let mut decoder = push_data(vec![4, 0, 0, 0, 0x45, 0x23, 1, 0xCD]);
         assert_eq!(0xCD012345,
-                   u32::decode(&mut decoder.next().unwrap()).unwrap());
+                   u32::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
@@ -288,26 +295,32 @@ mod tests {
         let mut decoder = push_data(vec![8, 0, 0, 0, 0xBB, 0xAA, 0x10, 0x32, 0x54, 0x76, 0x98,
                                          0xAB]);
         assert_eq!(0xAB9876543210AABB,
-                   u64::decode(&mut decoder.next().unwrap()).unwrap());
+                   u64::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_i8() {
         let mut decoder = push_data(vec![1, 0, 0, 0, 156]);
-        assert_eq!(-100, i8::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(-100,
+                   i8::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_i16() {
         let mut decoder = push_data(vec![2, 0, 0, 0, 0xD0, 0x8A]);
-        assert_eq!(-30000, i16::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(-30000,
+                   i16::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_i32() {
         let mut decoder = push_data(vec![4, 0, 0, 0, 0x00, 0x6C, 0xCA, 0x88]);
         assert_eq!(-2000000000,
-                   i32::decode(&mut decoder.next().unwrap()).unwrap());
+                   i32::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
@@ -315,45 +328,58 @@ mod tests {
         let mut decoder = push_data(vec![8, 0, 0, 0, 0x00, 0x00, 0x7c, 0x1d, 0xaf, 0x93, 0x19,
                                          0x83]);
         assert_eq!(-9000000000000000000,
-                   i64::decode(&mut decoder.next().unwrap()).unwrap());
+                   i64::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_f32() {
         let mut decoder = push_data(vec![4, 0, 0, 0, 0x00, 0x70, 0x7b, 0x44]);
-        assert_eq!(1005.75, f32::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(1005.75,
+                   f32::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_f64() {
         let mut decoder = push_data(vec![8, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x8f,
                                          0x40]);
-        assert_eq!(1005.75, f64::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(1005.75,
+                   f64::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_bool() {
         let mut decoder = push_data(vec![1, 0, 0, 0, 1]);
-        assert_eq!(true, bool::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(true,
+                   bool::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
         let mut decoder = push_data(vec![1, 0, 0, 0, 0]);
-        assert_eq!(false, bool::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!(false,
+                   bool::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_string() {
         let mut decoder = push_data(vec![0, 0, 0, 0]);
-        assert_eq!("", String::decode(&mut decoder.next().unwrap()).unwrap());
+        assert_eq!("",
+                   String::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
         let mut decoder = push_data(vec![13, 0, 0, 0, 72, 101, 108, 108, 111, 44, 32, 87, 111,
                                          114, 108, 100, 33]);
         assert_eq!("Hello, World!",
-                   String::decode(&mut decoder.next().unwrap()).unwrap());
+                   String::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_array() {
         let mut decoder = push_data(vec![12, 0, 0, 0, 4, 0, 0, 0, 7, 0, 1, 4, 33, 0, 57, 0]);
         assert_eq!(vec![7, 1025, 33, 57],
-                   Vec::<i16>::decode(&mut decoder.next().unwrap()).unwrap());
+                   Vec::<i16>::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,RustcDecodable,PartialEq)]
@@ -377,7 +403,8 @@ mod tests {
         let mut decoder = push_data(vec![26, 0, 0, 0, 2, 8, 1, 7, 6, 0, 0, 0, 65, 66, 67, 48, 49,
                                          50, 8, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 1]);
         assert_eq!(v,
-                   TestStructOne::decode(&mut decoder.next().unwrap()).unwrap());
+                   TestStructOne::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,RustcDecodable,PartialEq)]
@@ -416,6 +443,7 @@ mod tests {
                                          33, 33, 33, 1, 9, 0, 0, 0, 4, 0, 0, 0, 50, 51, 52, 98,
                                          0, 3, 0, 0, 0, 69, 69, 101]);
         assert_eq!(v,
-                   TestStructBig::decode(&mut decoder.next().unwrap()).unwrap());
+                   TestStructBig::decode(&mut decoder.next().expect(FAILED_TO_DECODE))
+                       .expect(FAILED_TO_DECODE));
     }
 }

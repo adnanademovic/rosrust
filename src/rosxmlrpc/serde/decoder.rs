@@ -264,30 +264,36 @@ mod tests {
     use rustc_serialize::Decodable;
     use std;
 
+    static FAILED_TO_DECODE: &'static str = "Failed to decode";
+
     #[test]
     fn reads_string() {
         assert_eq!("First test", String::decode(
-            &mut Decoder::new(XmlRpcValue::String(String::from("First test")))).unwrap());
+            &mut Decoder::new(XmlRpcValue::String(String::from("First test"))))
+                   .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_int() {
         assert_eq!(41,
-                   i32::decode(&mut Decoder::new(XmlRpcValue::Int(41))).unwrap());
+                   i32::decode(&mut Decoder::new(XmlRpcValue::Int(41))).expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_float() {
         assert_eq!(32.5,
-                   f64::decode(&mut Decoder::new(XmlRpcValue::Double(32.5))).unwrap());
+                   f64::decode(&mut Decoder::new(XmlRpcValue::Double(32.5)))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
     fn reads_bool() {
         assert_eq!(true,
-                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(true))).unwrap());
+                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(true)))
+                       .expect(FAILED_TO_DECODE));
         assert_eq!(false,
-                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(false))).unwrap());
+                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(false)))
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[test]
@@ -300,7 +306,7 @@ mod tests {
                        XmlRpcValue::Int(4),
                        XmlRpcValue::Int(5),
                    ])))
-                       .unwrap());
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,PartialEq,RustcDecodable)]
@@ -315,7 +321,7 @@ mod tests {
                        XmlRpcValue::String(String::from("abc")),
                        XmlRpcValue::Bool(false),
                    ])))
-                       .unwrap());
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,PartialEq,RustcDecodable)]
@@ -339,7 +345,7 @@ mod tests {
                            XmlRpcValue::Bool(false),
                        ]),
                    ])))
-                       .unwrap());
+                       .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,PartialEq,RustcDecodable)]
@@ -377,10 +383,10 @@ mod tests {
   </params>
 </methodCall>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let (method, mut parameters) = Decoder::new_request(&mut cursor).unwrap();
+        let (method, mut parameters) = Decoder::new_request(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!("mytype.mymethod", method);
         assert_eq!(2, parameters.len());
-        assert_eq!(33, i32::decode(&mut parameters[0]).unwrap());
+        assert_eq!(33, i32::decode(&mut parameters[0]).expect(FAILED_TO_DECODE));
         assert_eq!(ExampleRequestStruct {
                        a: 41,
                        b: true,
@@ -389,7 +395,7 @@ mod tests {
                            b: 0.5,
                        },
                    },
-                   ExampleRequestStruct::decode(&mut parameters[1]).unwrap());
+                   ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE));
     }
 
     #[test]
@@ -413,9 +419,9 @@ mod tests {
   </params>
 </methodResponse>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let mut parameters = Decoder::new_response(&mut cursor).unwrap();
+        let mut parameters = Decoder::new_response(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!(2, parameters.len());
-        assert_eq!(33, i32::decode(&mut parameters[0]).unwrap());
+        assert_eq!(33, i32::decode(&mut parameters[0]).expect(FAILED_TO_DECODE));
         assert_eq!(ExampleRequestStruct {
                        a: 41,
                        b: true,
@@ -424,7 +430,7 @@ mod tests {
                            b: 0.5,
                        },
                    },
-                   ExampleRequestStruct::decode(&mut parameters[1]).unwrap());
+                   ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE));
     }
 
     #[test]
@@ -449,7 +455,7 @@ mod tests {
   </params>
 </methodCall>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let (method, mut parameters) = Decoder::new_request(&mut cursor).unwrap();
+        let (method, mut parameters) = Decoder::new_request(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!("mytype.mymethod", method);
         assert_eq!(2, parameters.len());
         assert_eq!(XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
@@ -458,7 +464,8 @@ mod tests {
                 XmlRpcValue::String(String::from("Hello")),
                 XmlRpcValue::Double(0.5),
             ])]),
-                   parameters.pop().unwrap().value());
-        assert_eq!(XmlRpcValue::Int(33), parameters.pop().unwrap().value());
+                   parameters.pop().expect(FAILED_TO_DECODE).value());
+        assert_eq!(XmlRpcValue::Int(33),
+                   parameters.pop().expect(FAILED_TO_DECODE).value());
     }
 }

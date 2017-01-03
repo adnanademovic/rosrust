@@ -89,8 +89,8 @@ impl XmlRpcRequest {
             bail!("XML-RPC request should contain a node called 'methodCall' with two children")
         }
         // We checked the array length, so it's safe to pop
-        let parameters_tree = children.pop().unwrap();
-        let method = children.pop().unwrap();
+        let parameters_tree = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
+        let method = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
         match method.peel_layer("methodName")
             .chain_err(|| "Bad XML-RPC Request method name value")? {
             Tree::Leaf(method_name) => {
@@ -144,8 +144,8 @@ impl XmlRpcValue {
             bail!("Structure member node should contain a node called 'member' with two children")
         }
         // We tested the vector length already, so it's safe to pop
-        let value = children.pop().unwrap();
-        let name_node = children.pop().unwrap();
+        let value = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
+        let name_node = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
         let name = match name_node.peel_layer("name")
             .chain_err(|| "First struct member field should be a node called 'name'")? {
             Tree::Leaf(name) => name,
@@ -232,8 +232,7 @@ impl Tree {
     fn peel_layer(self, name: &str) -> Result<Tree> {
         if let Tree::Node(key, mut children) = self {
             if key == name && children.len() == 1 {
-                // Popping element from a vector of length 1 cannot fail
-                return Ok(children.pop().unwrap());
+                return Ok(children.pop().expect(UNEXPECTED_EMPTY_ARRAY));
             }
         }
         bail!("Expected a node named '{}' with 1 child", name)
@@ -281,24 +280,28 @@ mod error {
     }
 }
 
+static UNEXPECTED_EMPTY_ARRAY: &'static str = "Popping failure from this array is impossible";
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std;
 
+    static BAD_DATA: &'static str = "Bad data provided";
+
     #[test]
     fn reads_string() {
         let data = r#"<?xml version="1.0"?><value><string>First test</string></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::String(String::from("First test")), value);
         let data = r#"<?xml version="1.0"?><value><string /></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::String(String::from("")), value);
         let data = r#"<?xml version="1.0"?><value><string></string></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::String(String::from("")), value);
     }
 
@@ -306,11 +309,11 @@ mod tests {
     fn reads_int() {
         let data = r#"<?xml version="1.0"?><value><i4>41</i4></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Int(41), value);
         let data = r#"<?xml version="1.0"?><value><int>14</int></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Int(14), value);
     }
 
@@ -318,7 +321,7 @@ mod tests {
     fn reads_float() {
         let data = r#"<?xml version="1.0"?><value><double>33.25</double></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Double(33.25), value);
     }
 
@@ -326,11 +329,11 @@ mod tests {
     fn reads_bool() {
         let data = r#"<?xml version="1.0"?><value><boolean>1</boolean></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Bool(true), value);
         let data = r#"<?xml version="1.0"?><value><boolean>0</boolean></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Bool(false), value);
     }
 
@@ -346,7 +349,7 @@ mod tests {
   </data></array></value>
 </data></array></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
                                            XmlRpcValue::Bool(true),
                                            XmlRpcValue::Array(vec![
@@ -383,7 +386,7 @@ mod tests {
   </member>
 </struct></value>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcValue::new(&mut cursor).unwrap();
+        let value = XmlRpcValue::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(XmlRpcValue::Struct(vec![(String::from("a"), XmlRpcValue::Int(41)),
                                             (String::from("b"), XmlRpcValue::Bool(true)),
                                             (String::from("c"),
@@ -416,7 +419,7 @@ mod tests {
   </params>
 </methodCall>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcRequest::new(&mut cursor).unwrap();
+        let value = XmlRpcRequest::new(&mut cursor).expect(BAD_DATA);
         assert_eq!("mytype.mymethod", value.method);
         assert_eq!(vec![XmlRpcValue::Int(33),
                         XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
@@ -449,7 +452,7 @@ mod tests {
   </params>
 </methodResponse>"#;
         let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcResponse::new(&mut cursor).unwrap();
+        let value = XmlRpcResponse::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(vec![XmlRpcValue::Int(33),
                         XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
                                                 XmlRpcValue::Bool(true),

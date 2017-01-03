@@ -41,59 +41,62 @@ mod tests {
     use super::*;
     use super::super::path::{Buffer, Path};
 
+    static FAILED_TO_MAP: &'static str = "Failed to map";
+
     #[test]
     fn matches_existing_paths() {
         let mut mapper = Mapper::new();
-        let src1 = "/foo/bar".parse::<Buffer>().unwrap();
-        let dst = "/a/b/c".parse::<Buffer>().unwrap();
+        let src1 = "/foo/bar".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst = "/a/b/c".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src1.get(), dst);
-        let src2 = "/foo/ter".parse::<Buffer>().unwrap();
-        let dst = "/d/e/f".parse::<Buffer>().unwrap();
+        let src2 = "/foo/ter".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst = "/d/e/f".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src2.get(), dst);
         assert_eq!("/a/b/c",
-                   format!("{}", mapper.translate(src1.get()).unwrap()));
+                   format!("{}", mapper.translate(src1.get()).expect(FAILED_TO_MAP)));
         assert_eq!("/d/e/f",
-                   format!("{}", mapper.translate(src2.get()).unwrap()));
+                   format!("{}", mapper.translate(src2.get()).expect(FAILED_TO_MAP)));
     }
 
     #[test]
     fn allows_root_path() {
         let mut mapper = Mapper::new();
-        let src1 = "/".parse::<Buffer>().unwrap();
-        let dst = "/a/b/c".parse::<Buffer>().unwrap();
+        let src1 = "/".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst = "/a/b/c".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src1.get(), dst);
-        let src2 = "/foo/ter".parse::<Buffer>().unwrap();
-        let dst = "/".parse::<Buffer>().unwrap();
+        let src2 = "/foo/ter".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst = "/".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src2.get(), dst);
         assert_eq!("/a/b/c",
-                   format!("{}", mapper.translate(src1.get()).unwrap()));
-        assert_eq!("", format!("{}", mapper.translate(src2.get()).unwrap()));
+                   format!("{}", mapper.translate(src1.get()).expect(FAILED_TO_MAP)));
+        assert_eq!("",
+                   format!("{}", mapper.translate(src2.get()).expect(FAILED_TO_MAP)));
     }
 
     #[test]
     fn fails_missing_paths() {
         let mut mapper = Mapper::new();
-        let src1 = "/foo/bar".parse::<Buffer>().unwrap();
-        let dst = "/a/b/c".parse::<Buffer>().unwrap();
+        let src1 = "/foo/bar".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst = "/a/b/c".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src1.get(), dst);
-        let src2 = "/foo/ter".parse::<Buffer>().unwrap();
-        let dst = "/d/e/f".parse::<Buffer>().unwrap();
+        let src2 = "/foo/ter".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst = "/d/e/f".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src2.get(), dst);
-        let src3 = "/foo/bla".parse::<Buffer>().unwrap();
+        let src3 = "/foo/bla".parse::<Buffer>().expect(FAILED_TO_MAP);
         assert!(mapper.translate(src3.get()).is_none());
     }
 
     #[test]
     fn allows_to_redefine() {
         let mut mapper = Mapper::new();
-        let src = "/foo/bar".parse::<Buffer>().unwrap();
-        let dst1 = "/a/b/c".parse::<Buffer>().unwrap();
+        let src = "/foo/bar".parse::<Buffer>().expect(FAILED_TO_MAP);
+        let dst1 = "/a/b/c".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src.get(), dst1);
         assert_eq!("/a/b/c",
-                   format!("{}", mapper.translate(src.get()).unwrap()));
-        let dst2 = "/d/e/f".parse::<Buffer>().unwrap();
+                   format!("{}", mapper.translate(src.get()).expect(FAILED_TO_MAP)));
+        let dst2 = "/d/e/f".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src.get(), dst2);
         assert_eq!("/d/e/f",
-                   format!("{}", mapper.translate(src.get()).unwrap()));
+                   format!("{}", mapper.translate(src.get()).expect(FAILED_TO_MAP)));
     }
 }

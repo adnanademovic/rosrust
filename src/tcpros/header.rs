@@ -73,11 +73,15 @@ mod tests {
     use std;
     use std::collections::HashMap;
 
+    static WRITE_TO_VECTOR: &'static str = "Writing to vector shouldn't fail";
+    static FAILED_TO_ENCODE: &'static str = "Failed to encode";
+    static FAILED_TO_DECODE: &'static str = "Failed to decode";
+
     #[test]
     fn writes_empty_map() {
         let mut cursor = std::io::Cursor::new(Vec::new());
         let data = HashMap::<String, String>::new();
-        encode(data).unwrap().write_to(&mut cursor).unwrap();
+        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
 
         assert_eq!(vec![0, 0, 0, 0], cursor.into_inner());
     }
@@ -87,7 +91,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(Vec::new());
         let mut data = HashMap::<String, String>::new();
         data.insert(String::from("abc"), String::from("123"));
-        encode(data).unwrap().write_to(&mut cursor).unwrap();
+        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
         assert_eq!(vec![11, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51],
                    cursor.into_inner());
     }
@@ -99,7 +103,7 @@ mod tests {
         let mut data = HashMap::<String, String>::new();
         data.insert(String::from("abc"), String::from("123"));
         data.insert(String::from("AAA"), String::from("B0"));
-        encode(data).unwrap().write_to(&mut cursor).unwrap();
+        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
         let data = cursor.into_inner();
         assert!(vec![21, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51, 6, 0, 0, 0, 65, 65,
                      65, 61, 66, 48] == data ||
@@ -110,14 +114,14 @@ mod tests {
     #[test]
     fn reads_empty_map() {
         let input = vec![0, 0, 0, 0];
-        let data = decode(&mut std::io::Cursor::new(input)).unwrap();
+        let data = decode(&mut std::io::Cursor::new(input)).expect(FAILED_TO_DECODE);
         assert_eq!(0, data.len());
     }
 
     #[test]
     fn reads_single_element() {
         let input = vec![11, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51];
-        let data = decode(&mut std::io::Cursor::new(input)).unwrap();
+        let data = decode(&mut std::io::Cursor::new(input)).expect(FAILED_TO_DECODE);
         assert_eq!(1, data.len());
         assert_eq!(Some(&String::from("123")), data.get("abc"));
     }
@@ -139,7 +143,7 @@ mod tests {
                          0x70, 0x69, 0x63, 0x3d, 0x2f, 0x63, 0x68, 0x61, 0x74, 0x74, 0x65, 0x72,
                          0x14, 0x00, 0x00, 0x00, 0x74, 0x79, 0x70, 0x65, 0x3d, 0x73, 0x74, 0x64,
                          0x5f, 0x6d, 0x73, 0x67, 0x73, 0x2f, 0x53, 0x74, 0x72, 0x69, 0x6e, 0x67];
-        let data = decode(&mut std::io::Cursor::new(input)).unwrap();
+        let data = decode(&mut std::io::Cursor::new(input)).expect(FAILED_TO_DECODE);
         assert_eq!(6, data.len());
         assert_eq!(Some(&String::from("string data\n\n")),
                    data.get("message_definition"));

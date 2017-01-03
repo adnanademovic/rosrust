@@ -188,7 +188,8 @@ fn extract_error_code(err: ReError) -> Error {
     use super::error::api::ErrorKind as ApiErrorKind;
     if let ReError(ReErrorKind::Serde(SeErrorKind::Msg(ref v)), _) = err {
         lazy_static!{
-            static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$").unwrap();
+            static ref RE: Regex = Regex::new("^ROS MASTER ERROR CODE ([01]): (.*)$")
+                .expect("Failed to compile regex");
         }
         if let Some(cap) = RE.captures(&v) {
             let message = String::from(cap.at(2).unwrap_or(""));

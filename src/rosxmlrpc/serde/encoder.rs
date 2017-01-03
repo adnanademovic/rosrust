@@ -250,12 +250,14 @@ mod tests {
     use rustc_serialize::Encodable;
     use std;
 
+    static FAILED_TO_ENCODE: &'static str = "Failed to encode";
+
     #[test]
     fn writes_response() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        String::from("Hello").encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        String::from("Hello").encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -264,15 +266,15 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_request() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        String::from("Hello").encode(&mut encoder).unwrap();
-        encoder.write_request("something", &mut data).unwrap();
+        String::from("Hello").encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_request("something", &mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodCall>"#,
                            r#"<methodName>"#,
@@ -284,17 +286,17 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodCall>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_string() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        String::from("Hello").encode(&mut encoder).unwrap();
-        String::from("There").encode(&mut encoder).unwrap();
-        String::from("Friend").encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        String::from("Hello").encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        String::from("There").encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        String::from("Friend").encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -309,17 +311,17 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_int() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        43i32.encode(&mut encoder).unwrap();
-        27i32.encode(&mut encoder).unwrap();
-        12i32.encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        43i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        27i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        12i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -334,17 +336,17 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_float() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        33.5f64.encode(&mut encoder).unwrap();
-        11.25f64.encode(&mut encoder).unwrap();
-        77.125f64.encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        33.5f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        11.25f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        77.125f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -359,16 +361,16 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_bool() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        true.encode(&mut encoder).unwrap();
-        false.encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        true.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        false.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -380,15 +382,15 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_array() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        vec![1i32, 2, 3, 4, 5].encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        vec![1i32, 2, 3, 4, 5].encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -403,7 +405,7 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[derive(Debug,PartialEq,RustcEncodable)]
@@ -413,8 +415,10 @@ mod tests {
     fn writes_tuple() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        ExampleTuple(5, 0.5, String::from("abc"), false).encode(&mut encoder).unwrap();
-        encoder.write_response(&mut data).unwrap();
+        ExampleTuple(5, 0.5, String::from("abc"), false)
+            .encode(&mut encoder)
+            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -428,7 +432,7 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[derive(Debug,PartialEq,RustcEncodable)]
@@ -457,8 +461,8 @@ mod tests {
                 },
             }
             .encode(&mut encoder)
-            .unwrap();
-        encoder.write_response(&mut data).unwrap();
+            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -474,16 +478,18 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 
     #[test]
     fn writes_multiple_parameters() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        ExampleTuple(5, 0.5, String::from("abc"), false).encode(&mut encoder).unwrap();
-        27i32.encode(&mut encoder).unwrap();
-        String::from("Hello").encode(&mut encoder).unwrap();
+        ExampleTuple(5, 0.5, String::from("abc"), false)
+            .encode(&mut encoder)
+            .expect(FAILED_TO_ENCODE);
+        27i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
+        String::from("Hello").encode(&mut encoder).expect(FAILED_TO_ENCODE);
         ExampleRequestStruct {
                 a: 41,
                 b: true,
@@ -493,8 +499,8 @@ mod tests {
                 },
             }
             .encode(&mut encoder)
-            .unwrap();
-        encoder.write_response(&mut data).unwrap();
+            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -524,6 +530,6 @@ mod tests {
                            r#"</param>"#,
                            r#"</params>"#,
                            r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).unwrap());
+                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
     }
 }

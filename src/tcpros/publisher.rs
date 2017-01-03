@@ -126,7 +126,7 @@ impl<T: Message> PublisherStream<T> {
         message.encode(&mut encoder)?;
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
-        self.stream.send(encoder).unwrap();
+        self.stream.send(encoder).expect("Connected thread died");
         Ok(())
     }
 }

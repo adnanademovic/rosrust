@@ -41,7 +41,7 @@ impl Subscriber {
             // Failure could only be caused by the join_connections
             // thread not running, which only happens after
             // Subscriber has been deconstructed
-            self.publishers_stream.send(address).unwrap();
+            self.publishers_stream.send(address).expect("Connected thread died");
         }
         Ok(())
     }

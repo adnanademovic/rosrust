@@ -100,7 +100,7 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
                 message.encode(&mut encoder)?;
             }
         }
-        encoder.write_to(&mut stream).unwrap();
+        encoder.write_to(&mut stream)?;
     }
     let mut encoder = Encoder::new();
     false.encode(&mut encoder)?;

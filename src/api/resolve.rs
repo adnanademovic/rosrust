@@ -41,7 +41,9 @@ pub fn mappings() -> Vec<(String, String)> {
         .map(|v| v.split(":=").map(String::from).collect::<Vec<String>>())
         .filter(|v| v.len() == 2)
         .map(|v| v.into_iter().map(fix_prefix))
-        .map(|mut v| (v.next().unwrap(), v.next().unwrap()))
+        .map(|mut v| {
+            (v.next().expect(UNEXPECTED_EMPTY_ARRAY), v.next().expect(UNEXPECTED_EMPTY_ARRAY))
+        })
         .collect()
 }
 
@@ -85,11 +87,15 @@ fn args() -> std::vec::IntoIter<String> {
     tests::args_mock()
 }
 
+static UNEXPECTED_EMPTY_ARRAY: &'static str = "Popping failure from this array is impossible";
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Mutex;
     use std::{self, env};
+
+    static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
 
     lazy_static!{
         static ref DATA: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -97,11 +103,11 @@ mod tests {
     }
 
     pub fn args_mock() -> std::vec::IntoIter<String> {
-        DATA.lock().unwrap().clone().into_iter()
+        DATA.lock().expect(FAILED_TO_LOCK).clone().into_iter()
     }
 
     fn set_args(args: &Vec<&str>) {
-        let mut data = DATA.lock().unwrap();
+        let mut data = DATA.lock().expect(FAILED_TO_LOCK);
         data.clear();
         data.push(String::from("IGNORE"));
         for &arg in args {
@@ -112,7 +118,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn mappings_default_to_empty_vector() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         assert_eq!(Vec::<(String, String)>::new(), mappings());
     }
@@ -120,7 +126,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn maps_good_and_ignores_everything_else() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         assert_eq!(Vec::<(String, String)>::new(), mappings());
         set_args(&vec!["a:=x",
@@ -142,7 +148,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn name_uses_passed_value_by_default() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         assert_eq!(String::from("myname"), name("myname"));
         set_args(&vec!["unimportant", "also_unimportant"]);
@@ -152,7 +158,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn name_uses_argument_when_provided() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         assert_eq!(String::from("myname"), name("myname"));
         set_args(&vec!["__name:=othername"]);
@@ -162,7 +168,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn namespace_uses_empty_string_by_default() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_NAMESPACE");
         assert_eq!(String::from(""), namespace());
@@ -173,7 +179,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn namespace_uses_environment_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_NAMESPACE");
         assert_eq!(String::from(""), namespace());
@@ -184,7 +190,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn namespace_uses_argument_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_NAMESPACE");
         assert_eq!(String::from(""), namespace());
@@ -195,7 +201,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn namespace_prioritizes_argument_when_both_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_NAMESPACE");
         assert_eq!(String::from(""), namespace());
@@ -207,7 +213,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn master_uses_default_uri_by_default() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_MASTER_URI");
         assert_eq!(String::from("http://localhost:11311/"), master());
@@ -218,7 +224,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn master_uses_environment_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_MASTER_URI");
         assert_eq!(String::from("http://localhost:11311/"), master());
@@ -229,7 +235,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn master_uses_argument_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_MASTER_URI");
         assert_eq!(String::from("http://localhost:11311/"), master());
@@ -240,7 +246,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn master_prioritizes_argument_when_both_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_MASTER_URI");
         assert_eq!(String::from("http://localhost:11311/"), master());
@@ -253,7 +259,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_uses_default_uri_by_default() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -265,7 +271,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_uses_hostname_environment_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -277,7 +283,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_uses_ip_environment_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -289,7 +295,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_prioritizes_hostname_over_ip_environment_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -302,7 +308,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_uses_hostname_argument_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -314,7 +320,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_uses_ip_argument_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -326,7 +332,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_prioritizes_hostname_over_ip_argument_when_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");
@@ -338,7 +344,7 @@ mod tests {
     #[test]
     #[allow(unused_variables)]
     fn hostname_prioritizes_argument_when_both_passed() {
-        let testcase = TESTCASE.lock().unwrap();
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         env::remove_var("ROS_HOSTNAME");
         env::remove_var("ROS_IP");

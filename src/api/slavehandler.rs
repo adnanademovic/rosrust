@@ -134,7 +134,7 @@ impl SlaveHandler {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
         info!("Server is shutting down because: {}", message);
-        if let Err(..) = self.shutdown_signal.lock().unwrap().send(()) {
+        if let Err(..) = self.shutdown_signal.lock().expect(FAILED_TO_LOCK).send(()) {
             bail!(ErrorKind::Critical("Slave API is down already".into()));
         }
         Ok(0)
@@ -147,7 +147,7 @@ impl SlaveHandler {
         }
         Ok(self.publications
             .lock()
-            .unwrap()
+            .expect(FAILED_TO_LOCK)
             .values()
             .map(|ref v| {
                 return Topic {
@@ -165,7 +165,7 @@ impl SlaveHandler {
         }
         Ok(self.subscriptions
             .lock()
-            .unwrap()
+            .expect(FAILED_TO_LOCK)
             .values()
             .map(|ref v| {
                 return Topic {
@@ -183,7 +183,7 @@ impl SlaveHandler {
         if caller_id == "" || topic == "" || publishers.iter().any(|ref x| x.as_str() == "") {
             bail!(ErrorKind::Protocol("Empty strings given".into()));
         }
-        add_publishers_to_subscription(&mut self.subscriptions.lock().unwrap(),
+        add_publishers_to_subscription(&mut self.subscriptions.lock().expect(FAILED_TO_LOCK),
                                        &self.name,
                                        &topic,
                                        publishers.into_iter())
@@ -206,7 +206,7 @@ impl SlaveHandler {
             .value();
         let (ip, port) = match self.publications
             .lock()
-            .unwrap()
+            .expect(FAILED_TO_LOCK)
             .get(&topic) {
             Some(publisher) => (self.hostname.clone(), publisher.port as i32),
             None => {
@@ -358,3 +358,5 @@ pub struct BusInfo {
     pub topic: String,
     pub connected: bool,
 }
+
+static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
