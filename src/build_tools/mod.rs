@@ -5,11 +5,11 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 
-#[export_macro]
+#[macro_export]
 macro_rules! rosmsg_main {
     ($($msg:expr),*)=> {
         fn main() {
-            ::rosrust::build_tools::depend_on_messages(&[
+            $crate::build_tools::depend_on_messages(&[
             $(
                 $msg,
             )*
@@ -18,7 +18,7 @@ macro_rules! rosmsg_main {
     }
 }
 
-#[export_macro]
+#[macro_export]
 macro_rules! rosmsg_include {
     () => (include!(concat!(env!("OUT_DIR"), "/msg.rs")))
 }
