@@ -10,7 +10,7 @@ extern crate lazy_static;
 extern crate log;
 extern crate nix;
 extern crate regex;
-extern crate rustc_serialize;
+pub extern crate rustc_serialize;
 extern crate xml;
 
 pub use api::Ros;
