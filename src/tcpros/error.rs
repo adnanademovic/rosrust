@@ -7,6 +7,10 @@ error_chain! {
         Encoder(self::encoder::Error, self::encoder::ErrorKind);
     }
     errors {
+        ServiceConnectionFail(service: String, uri: String) {
+            description("Failed to connect to service")
+            display("Failed to connect with client to service {} at uri {}", service, uri)
+        }
         TopicConnectionFail(topic:String) {
             description("Failed to connect to topic")
             display("Failed to connect to topic '{}'", topic)

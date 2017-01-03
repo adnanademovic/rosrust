@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::error::{Error, ErrorKind, ResultExt};
+use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode};
 use super::{ServicePair, ServiceResult};
 use super::decoder::DecoderSource;
@@ -20,18 +20,18 @@ impl<T: ServicePair> Client<T> {
     pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
         Client {
             caller_id: String::from(caller_id),
-            uri: String::from(uri.trim_left_matches("rosrpc://")),
+            uri: String::from(uri),
             service: String::from(service),
             phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>, Error> {
+    pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
         Self::request_body(args, &self.uri, &self.caller_id, &self.service)
     }
 
     pub fn req_callback<F>(&self, args: T::Request, callback: F)
-        where F: FnOnce(Result<ServiceResult<T::Response>, Error>) + Send + 'static
+        where F: FnOnce(Result<ServiceResult<T::Response>>) + Send + 'static
     {
         let uri = self.uri.clone();
         let caller_id = self.caller_id.clone();
@@ -43,8 +43,10 @@ impl<T: ServicePair> Client<T> {
                     uri: &str,
                     caller_id: &str,
                     service: &str)
-                    -> Result<ServiceResult<T::Response>, Error> {
-        let mut stream = TcpStream::connect(uri)?;
+                    -> Result<ServiceResult<T::Response>> {
+        let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
+        let mut stream =
+            connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
         let mut encoder = Encoder::new();
@@ -64,7 +66,7 @@ impl<T: ServicePair> Client<T> {
     }
 }
 
-fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<(), Error>
+fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
     where T: ServicePair,
           U: std::io::Write
 {
@@ -77,7 +79,7 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
     Ok(())
 }
 
-fn read_response<T, U>(mut stream: &mut U) -> Result<(), Error>
+fn read_response<T, U>(mut stream: &mut U) -> Result<()>
     where T: ServicePair,
           U: std::io::Read
 {
@@ -88,7 +90,7 @@ fn read_response<T, U>(mut stream: &mut U) -> Result<(), Error>
     Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<(), Error>
+fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
     where T: ServicePair,
           U: std::io::Write + std::io::Read
 {
