@@ -48,6 +48,7 @@ pub fn depend_on_messages(messages: &[&str]) {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("msg.rs");
     let mut f = File::create(&dest_path).unwrap();
+    f.write(b"extern crate rustc_serialize;\n").unwrap();
     f.write(b"mod msg {\n").unwrap();
     for (package, names) in messages {
         f.write_fmt(format_args!("pub mod {} {{\n", package)).unwrap();
