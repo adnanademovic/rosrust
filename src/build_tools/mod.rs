@@ -51,8 +51,6 @@ pub fn depend_on_messages(messages: &[&str]) {
     f.write(b"mod msg {\n").unwrap();
     for (package, names) in messages {
         f.write_fmt(format_args!("pub mod {} {{\n", package)).unwrap();
-        f.write(b"use ::std;\n").unwrap();
-        f.write(b"use ::rosrust;\n").unwrap();
         for name in names {
             f.write_fmt(format_args!("// Content for message: {}/{}\n", package, name)).unwrap();
             f.write_all(&append_message(&paths, &package, &name)).unwrap();
