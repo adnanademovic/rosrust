@@ -20,7 +20,7 @@ macro_rules! rosmsg_main {
 
 #[macro_export]
 macro_rules! rosmsg_include {
-    () => (include!(concat!(env!("OUT_DIR"), "/msg.rs")))
+    () => {include!(concat!(env!("OUT_DIR"), "/msg.rs"))}
 }
 
 pub fn depend_on_messages(messages: &[&str]) {
