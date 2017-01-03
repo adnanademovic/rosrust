@@ -9,6 +9,24 @@ use super::{ServicePair, ServiceResult};
 use super::decoder::DecoderSource;
 use super::encoder::Encoder;
 
+pub struct ClientResponse<T> {
+    handle: thread::JoinHandle<Result<ServiceResult<T>>>,
+}
+
+impl<T> ClientResponse<T> {
+    pub fn read(self) -> Result<ServiceResult<T>> {
+        self.handle.join().unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
+    }
+}
+
+impl<T: Send + 'static> ClientResponse<T> {
+    pub fn callback<F>(self, callback: F)
+        where F: FnOnce(Result<ServiceResult<T>>) + Send + 'static
+    {
+        thread::spawn(move || callback(self.read()));
+    }
+}
+
 pub struct Client<T: ServicePair> {
     caller_id: String,
     uri: String,
@@ -30,13 +48,13 @@ impl<T: ServicePair> Client<T> {
         Self::request_body(args, &self.uri, &self.caller_id, &self.service)
     }
 
-    pub fn req_callback<F>(&self, args: T::Request, callback: F)
-        where F: FnOnce(Result<ServiceResult<T::Response>>) + Send + 'static
-    {
+    pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
         let uri = self.uri.clone();
         let caller_id = self.caller_id.clone();
         let service = self.service.clone();
-        thread::spawn(move || callback(Self::request_body(&args, &uri, &caller_id, &service)));
+        ClientResponse {
+            handle: thread::spawn(move || Self::request_body(&args, &uri, &caller_id, &service)),
+        }
     }
 
     fn request_body(args: &T::Request,

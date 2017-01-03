@@ -32,6 +32,10 @@ error_chain! {
             description("Data stream interrupted while reading service response")
             display("Data stream interrupted while reading service response")
         }
+        ServiceResponseUnknown {
+            description("Unknown error caused service response to panic")
+            display("Unknown error caused service response to panic")
+        }
     }
 }
 
