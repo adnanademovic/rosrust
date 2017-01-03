@@ -20,7 +20,7 @@ macro_rules! rosmsg_main {
 
 #[macro_export]
 macro_rules! rosmsg_include {
-    () => {include!(concat!(env!("OUT_DIR"), "/msg.rs"));}
+    () => include!(concat!(env!("OUT_DIR"), "/msg.rs"));
 }
 
 pub fn depend_on_messages(messages: &[&str]) {
@@ -48,8 +48,9 @@ pub fn depend_on_messages(messages: &[&str]) {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("msg.rs");
     let mut f = File::create(&dest_path).unwrap();
-    f.write(b"extern crate rustc_serialize;\n").unwrap();
     f.write(b"mod msg {\n").unwrap();
+    f.write(b"use ::std;\n").unwrap();
+    f.write(b"use ::rosrust;\n").unwrap();
     for (package, names) in messages {
         f.write_fmt(format_args!("pub mod {} {{\n", package)).unwrap();
         for name in names {
