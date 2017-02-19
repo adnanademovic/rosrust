@@ -5,6 +5,7 @@ error_chain! {
     links {
         Decoder(self::decoder::Error, self::decoder::ErrorKind);
         Encoder(self::encoder::Error, self::encoder::ErrorKind);
+        SerdeRosmsg(::serde_rosmsg::error::Error, ::serde_rosmsg::error::ErrorKind);
     }
     errors {
         ServiceConnectionFail(service: String, uri: String) {

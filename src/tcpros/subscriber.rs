@@ -121,7 +121,7 @@ fn write_request<T: Message, U: std::io::Write>(mut stream: &mut U,
     fields.insert(String::from("topic"), String::from(topic));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields)?.write_to(&mut stream)?;
+    encode(&mut stream, &fields)?;
     Ok(())
 }
 

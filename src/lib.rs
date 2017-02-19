@@ -11,6 +11,7 @@ extern crate log;
 extern crate nix;
 extern crate regex;
 extern crate rustc_serialize;
+extern crate serde_rosmsg;
 extern crate xml;
 
 pub use api::Ros;

@@ -38,7 +38,7 @@ fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<()>
     fields.insert(String::from("callerid"), String::from(node_name));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields)?.write_to(&mut stream)?;
+    encode(&mut stream, &fields)?;
     Ok(())
 }
 
@@ -65,12 +65,10 @@ fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F
             continue;
         }
         let h = handler.clone();
-        thread::spawn(move || {
-            if let Err(err) = respond_to::<T, U, F>(stream, h) {
-                let info =
-                    err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
-                error!("{}", info);
-            }
+        thread::spawn(move || if let Err(err) = respond_to::<T, U, F>(stream, h) {
+            let info =
+                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            error!("{}", info);
         });
     }
 }
@@ -173,19 +171,17 @@ impl TcpIterator {
         let (tx, rx) = channel();
         let killer = TcpRaii { killer: tx.clone() };
         let service = String::from(service);
-        thread::spawn(move || {
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        if tx.send(Some(stream)).is_err() {
-                            break;
-                        }
+        thread::spawn(move || for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    if tx.send(Some(stream)).is_err() {
+                        break;
                     }
-                    Err(err) => {
-                        error!("TCP connection to subscriber failed on service '{}': {}",
-                               service,
-                               err);
-                    }
+                }
+                Err(err) => {
+                    error!("TCP connection to subscriber failed on service '{}': {}",
+                           service,
+                           err);
                 }
             }
         });
