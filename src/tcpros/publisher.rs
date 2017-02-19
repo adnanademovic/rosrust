@@ -2,7 +2,7 @@ use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::encoder::Encoder;
+use serde_rosmsg::to_vec;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode, match_field};
 use super::Message;
@@ -121,12 +121,11 @@ impl<T: Message> PublisherStream<T> {
         })
     }
 
-    pub fn send(&mut self, message: T) -> super::error::encoder::Result<()> {
-        let mut encoder = Encoder::new();
-        message.encode(&mut encoder)?;
+    pub fn send(&mut self, message: T) -> Result<()> {
+        let bytes = to_vec(&message)?;
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
-        self.stream.send(encoder).expect("Connected thread died");
+        self.stream.send(bytes).expect("Connected thread died");
         Ok(())
     }
 }

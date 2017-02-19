@@ -1,13 +1,13 @@
-use rustc_serialize::{Encodable, Decodable};
+use rustc_serialize::Decodable;
 use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
+use serde_rosmsg::to_writer;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode};
 use super::{ServicePair, ServiceResult};
 use super::decoder::DecoderSource;
-use super::encoder::Encoder;
 
 pub struct ClientResponse<T> {
     handle: thread::JoinHandle<Result<ServiceResult<T>>>,
@@ -67,9 +67,7 @@ impl<T: ServicePair> Client<T> {
             connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
-        let mut encoder = Encoder::new();
-        args.encode(&mut encoder)?;
-        encoder.write_to(&mut stream)?;
+        to_writer(&mut stream, &args)?;
 
         let mut decoder = DecoderSource::new(&mut stream);
         let success = decoder.pop_verification_byte()

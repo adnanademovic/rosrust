@@ -15,6 +15,7 @@ log = "0.3"
 nix = "0.7"
 regex = "0.1"
 rustc-serialize = "0.3"
+serde = "0.9.7"
 serde_rosmsg = "0.1.0"
 xml-rs = "0.3"
 

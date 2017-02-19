@@ -1,12 +1,12 @@
-use rustc_serialize::{Encodable, Decodable};
+use rustc_serialize::Decodable;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::collections::HashMap;
 use std;
+use serde_rosmsg::to_writer;
 use super::decoder::DecoderSource;
-use super::encoder::Encoder;
 use super::error::{ErrorKind, Result};
 use super::header::{encode, decode, match_field};
 use super::{ServicePair, ServiceResult};
@@ -73,13 +73,15 @@ fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F
     }
 }
 
+const TRUE_BUFFER: [u8; 1] = [1];
+const FALSE_BUFFER: [u8; 1] = [0];
+
 fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
     where T: ServicePair,
           U: std::io::Read + std::io::Write + Send,
           F: Fn(T::Request) -> ServiceResult<T::Response>
 {
     loop {
-        let mut encoder = Encoder::new();
         let mut decoder = match DecoderSource::new(&mut stream).next() {
             Some(decoder) => decoder,
             None => break,
@@ -90,20 +92,17 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
         };
         match handler(req) {
             Ok(res) => {
-                true.encode(&mut encoder)?;
-                res.encode(&mut encoder)?;
+                stream.write_all(&TRUE_BUFFER)?;
+                to_writer(&mut stream, &res)?;
             }
             Err(message) => {
-                false.encode(&mut encoder)?;
-                message.encode(&mut encoder)?;
+                stream.write_all(&FALSE_BUFFER)?;
+                to_writer(&mut stream, &message)?;
             }
         }
-        encoder.write_to(&mut stream)?;
     }
-    let mut encoder = Encoder::new();
-    false.encode(&mut encoder)?;
-    "Failed to parse passed arguments".encode(&mut encoder)?;
-    encoder.write_to(&mut stream)?;
+    stream.write_all(&FALSE_BUFFER)?;
+    to_writer(&mut stream, &"Failed to parse passed arguments")?;
     Ok(())
 }
 
