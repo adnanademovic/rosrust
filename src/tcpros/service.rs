@@ -1,12 +1,10 @@
-use rustc_serialize::Decodable;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::collections::HashMap;
 use std;
-use serde_rosmsg::to_writer;
-use super::decoder::DecoderSource;
+use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result};
 use super::header::{encode, decode, match_field};
 use super::{ServicePair, ServiceResult};
@@ -82,11 +80,7 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
           F: Fn(T::Request) -> ServiceResult<T::Response>
 {
     loop {
-        let mut decoder = match DecoderSource::new(&mut stream).next() {
-            Some(decoder) => decoder,
-            None => break,
-        };
-        let req = match T::Request::decode(&mut decoder) {
+        let req = match from_reader(&mut stream) {
             Ok(req) => req,
             Err(_) => break,
         };

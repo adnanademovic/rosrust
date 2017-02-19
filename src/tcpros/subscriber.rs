@@ -1,15 +1,16 @@
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
 use std::collections::HashMap;
 use std;
+use serde_rosmsg::from_slice;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode, match_field};
 use super::Message;
-use super::decoder::{Decoder, DecoderSource};
 
 pub struct Subscriber {
-    data_stream: Sender<Option<Decoder>>,
+    data_stream: Sender<Option<Vec<u8>>>,
     publishers_stream: Sender<SocketAddr>,
     pub topic: String,
     pub msg_type: String,
@@ -56,23 +57,23 @@ impl Drop for Subscriber {
     }
 }
 
-fn handle_data<T, F>(data: Receiver<Option<Decoder>>, callback: F)
+fn handle_data<T, F>(data: Receiver<Option<Vec<u8>>>, callback: F)
     where T: Message,
           F: Fn(T) -> ()
 {
-    for decoder_option in data {
-        let mut decoder = match decoder_option {
+    for buffer_option in data {
+        let buffer = match buffer_option {
             Some(v) => v,
             None => break, // Only the Subscriber destructor can send this signal
         };
-        match T::decode(&mut decoder) {
+        match from_slice(&buffer) {
             Ok(value) => callback(value),
             Err(err) => error!("Failed to decode message: {}", err),
         }
     }
 }
 
-fn join_connections<T>(data_stream: Sender<Option<Decoder>>,
+fn join_connections<T>(data_stream: Sender<Option<Vec<u8>>>,
                        publishers: Receiver<SocketAddr>,
                        caller_id: &str,
                        topic: &str)
@@ -90,7 +91,7 @@ fn join_connections<T>(data_stream: Sender<Option<Decoder>>,
     }
 }
 
-fn join_connection<T>(data_stream: &Sender<Option<Decoder>>,
+fn join_connection<T>(data_stream: &Sender<Option<Vec<u8>>>,
                       publisher: &SocketAddr,
                       caller_id: &str,
                       topic: &str)
@@ -101,8 +102,8 @@ fn join_connection<T>(data_stream: &Sender<Option<Decoder>>,
     exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
     let target = data_stream.clone();
     thread::spawn(move || {
-        for decoder in DecoderSource::new(stream) {
-            if target.send(Some(decoder)).is_err() {
+        while let Ok(buffer) = package_to_vector(&mut stream) {
+            if target.send(Some(buffer)).is_err() {
                 // Data receiver has been destroyed after Subscriber destructor's kill signal
                 break;
             }
@@ -137,4 +138,66 @@ fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, topic: &str) -> R
 {
     write_request::<T, U>(stream, caller_id, topic)?;
     read_response::<T, U>(stream)
+}
+
+#[inline]
+fn package_to_vector<R: std::io::Read>(mut stream: &mut R) -> std::io::Result<Vec<u8>> {
+    let length = stream.read_u32::<LittleEndian>()?;
+    let mut buffer = length_vector(length)?;
+    buffer.resize(length as usize + 4, 0);
+    stream.read_exact(&mut buffer[4..])?;
+    Ok(buffer)
+}
+
+#[inline]
+fn length_vector(length: u32) -> std::io::Result<Vec<u8>> {
+    let mut cursor = std::io::Cursor::new(Vec::new());
+    cursor.write_u32::<LittleEndian>(length)?;
+    Ok(cursor.into_inner())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std;
+
+    static FAILED_TO_READ_WRITE_VECTOR: &'static str = "Failed to read or write from vector";
+
+    #[test]
+    fn length_vector_properly_encodes() {
+        let data = length_vector(0x01234567).expect(FAILED_TO_READ_WRITE_VECTOR);
+        assert_eq!(data, [0x67, 0x45, 0x23, 0x01]);
+    }
+
+    #[test]
+    fn package_to_vector_creates_right_buffer_from_reader() {
+        let input = [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7];
+        let data = package_to_vector(&mut std::io::Cursor::new(input))
+            .expect(FAILED_TO_READ_WRITE_VECTOR);
+        assert_eq!(data, [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn package_to_vector_respects_provided_length() {
+        let input = [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let data = package_to_vector(&mut std::io::Cursor::new(input))
+            .expect(FAILED_TO_READ_WRITE_VECTOR);
+        assert_eq!(data, [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn package_to_vector_fails_if_stream_is_shorter_than_annotated() {
+        let input = [7, 0, 0, 0, 1, 2, 3, 4, 5];
+        package_to_vector(&mut std::io::Cursor::new(input)).unwrap_err();
+    }
+
+    #[test]
+    fn package_to_vector_fails_leaves_cursor_at_end_of_reading() {
+        let input = [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 4, 0, 0, 0, 11, 12, 13, 14];
+        let mut cursor = std::io::Cursor::new(input);
+        let data = package_to_vector(&mut cursor).expect(FAILED_TO_READ_WRITE_VECTOR);
+        assert_eq!(data, [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7]);
+        let data = package_to_vector(&mut cursor).expect(FAILED_TO_READ_WRITE_VECTOR);
+        assert_eq!(data, [4, 0, 0, 0, 11, 12, 13, 14]);
+    }
 }

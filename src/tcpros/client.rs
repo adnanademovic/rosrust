@@ -1,13 +1,11 @@
-use rustc_serialize::Decodable;
 use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
-use serde_rosmsg::to_writer;
+use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode};
 use super::{ServicePair, ServiceResult};
-use super::decoder::DecoderSource;
 
 pub struct ClientResponse<T> {
     handle: thread::JoinHandle<Result<ServiceResult<T>>>,
@@ -69,17 +67,20 @@ impl<T: ServicePair> Client<T> {
 
         to_writer(&mut stream, &args)?;
 
-        let mut decoder = DecoderSource::new(&mut stream);
-        let success = decoder.pop_verification_byte()
-            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
-        let mut decoder = decoder.pop_decoder()
+        let success = read_verification_byte(&mut stream)
             .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
-            Ok(T::Response::decode(&mut decoder)?)
+            Ok(from_reader(&mut stream)?)
         } else {
-            Err(String::decode(&mut decoder)?)
+            Err(from_reader(&mut stream)?)
         })
     }
+}
+
+#[inline]
+fn read_verification_byte<R: std::io::Read>(reader: &mut R) -> std::io::Result<bool> {
+    let mut buffer = [0];
+    reader.read_exact(&mut buffer).map(|_| buffer[0] != 0)
 }
 
 fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>

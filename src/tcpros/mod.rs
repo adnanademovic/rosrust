@@ -7,7 +7,6 @@ pub use self::service::Service;
 pub use self::client::Client;
 pub use self::error::Error;
 
-mod decoder;
 mod header;
 pub mod error;
 mod publisher;
