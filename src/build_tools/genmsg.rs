@@ -1,16 +1,27 @@
 use regex::Regex;
 
+static IGNORE_WHITESPACE: &'static str = r"\s*";
+static ANY_WHITESPACE: &'static str = r"\s+";
+static COMMENT: &'static str = r"(#.*)?";
+static FIELD_TYPE: &'static str = r"([a-zA-Z0-9_/]+)";
+static FIELD_NAME: &'static str = r"([a-zA-Z][a-zA-Z0-9_]*)";
+static EMPTY_BRACKETS: &'static str = r"\[\s*\]";
+static NUMBER_BRACKETS: &'static str = r"\[\s*([0-9]+)\s*\]";
+
 fn match_nothing(data: &str) -> Option<String> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"^\s*(#.*)?$").unwrap();
+        static ref MATCHER: String = format!("^{}{}$", IGNORE_WHITESPACE, COMMENT);
+        static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     RE.captures(data).map(|captures| captures.get(1).map_or("", |v| v.as_str()).into())
 }
 
 fn match_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(
-            r"^\s*([a-zA-Z0-9_/]+)\s+([a-zA-Z][a-zA-Z0-9_]*)\s*(#.*)?$").unwrap();
+        static ref MATCHER: String = format!(
+            "^{}{}{}{}{}{}$", IGNORE_WHITESPACE, FIELD_TYPE, ANY_WHITESPACE,
+            FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
+        static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
         Some(v) => v,
@@ -25,8 +36,10 @@ fn match_field(data: &str) -> Option<FieldLine> {
 
 fn match_vector_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(
-            r"^\s*([a-zA-Z0-9_/]+)\s*\[\s*\]\s+([a-zA-Z][a-zA-Z0-9_]*)\s*(#.*)?$").unwrap();
+        static ref MATCHER: String = format!(
+            "^{}{}{}{}{}{}{}{}$", IGNORE_WHITESPACE, FIELD_TYPE, IGNORE_WHITESPACE,
+            EMPTY_BRACKETS, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
+        static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
         Some(v) => v,
@@ -41,9 +54,10 @@ fn match_vector_field(data: &str) -> Option<FieldLine> {
 
 fn match_array_field(data: &str) -> Option<(FieldLine, usize)> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(
-            r"^\s*([a-zA-Z0-9_/]+)\s*\[\s*([0-9]+)\s*\]\s+([a-zA-Z][a-zA-Z0-9_]*)\s*(#.*)?$"
-        ).unwrap();
+        static ref MATCHER: String = format!(
+            "^{}{}{}{}{}{}{}{}$", IGNORE_WHITESPACE, FIELD_TYPE, IGNORE_WHITESPACE,
+            NUMBER_BRACKETS, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
+        static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
         Some(v) => v,
