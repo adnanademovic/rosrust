@@ -19,8 +19,7 @@ fn match_nothing(data: &str) -> Option<String> {
 fn match_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            "^{}{}{}{}{}{}$", IGNORE_WHITESPACE, FIELD_TYPE, ANY_WHITESPACE,
-            FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
+            "^{}{}{}{}{}$", FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -37,8 +36,8 @@ fn match_field(data: &str) -> Option<FieldLine> {
 fn match_vector_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            "^{}{}{}{}{}{}{}{}$", IGNORE_WHITESPACE, FIELD_TYPE, IGNORE_WHITESPACE,
-            EMPTY_BRACKETS, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
+            "^{}{}{}{}{}{}{}$", FIELD_TYPE, IGNORE_WHITESPACE, EMPTY_BRACKETS, ANY_WHITESPACE,
+            FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -55,8 +54,8 @@ fn match_vector_field(data: &str) -> Option<FieldLine> {
 fn match_array_field(data: &str) -> Option<(FieldLine, usize)> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            "^{}{}{}{}{}{}{}{}$", IGNORE_WHITESPACE, FIELD_TYPE, IGNORE_WHITESPACE,
-            NUMBER_BRACKETS, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
+            "^{}{}{}{}{}{}{}$", FIELD_TYPE, IGNORE_WHITESPACE, NUMBER_BRACKETS, ANY_WHITESPACE,
+            FIELD_NAME, IGNORE_WHITESPACE, COMMENT);
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -71,7 +70,46 @@ fn match_array_field(data: &str) -> Option<(FieldLine, usize)> {
           captures.get(2).unwrap().as_str().parse().unwrap()))
 }
 
+fn match_const_string(data: &str) -> Option<(FieldLine, String)> {
+    lazy_static! {
+        static ref MATCHER: String = format!(
+            r"^{}{}{}{}={}(.*)$", FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE,
+            IGNORE_WHITESPACE);
+        static ref RE: Regex = Regex::new(&MATCHER).unwrap();
+    }
+    let captures = match RE.captures(data) {
+        Some(v) => v,
+        None => return None,
+    };
+    Some((FieldLine {
+              field_type: captures.get(1).unwrap().as_str().into(),
+              field_name: captures.get(2).unwrap().as_str().into(),
+              comment: "".into(),
+          },
+          captures.get(3).unwrap().as_str().into()))
+}
+
+fn match_const_numeric(data: &str) -> Option<(FieldLine, String)> {
+    lazy_static! {
+        static ref MATCHER: String = format!(
+            r"^{}{}{}{}={}(-?[0-9]+){}{}$", FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME,
+            IGNORE_WHITESPACE, IGNORE_WHITESPACE, IGNORE_WHITESPACE, COMMENT);
+        static ref RE: Regex = Regex::new(&MATCHER).unwrap();
+    }
+    let captures = match RE.captures(data) {
+        Some(v) => v,
+        None => return None,
+    };
+    Some((FieldLine {
+              field_type: captures.get(1).unwrap().as_str().into(),
+              field_name: captures.get(2).unwrap().as_str().into(),
+              comment: captures.get(4).map_or("", |v| v.as_str()).into(),
+          },
+          captures.get(3).unwrap().as_str().into()))
+}
+
 fn match_line(data: &str) -> Result<Option<FieldInfo>, ()> {
+    let data = data.trim();
     if let Some(_) = match_nothing(data) {
         return Ok(None);
     }
@@ -96,6 +134,20 @@ fn match_line(data: &str) -> Result<Option<FieldInfo>, ()> {
             case: FieldCase::Array(count),
         }));
     }
+    if let Some((info, data)) = match_const_numeric(data) {
+        return Ok(Some(FieldInfo {
+            datatype: info.field_type,
+            name: info.field_name,
+            case: FieldCase::Const(data),
+        }));
+    }
+    if let Some((info, data)) = match_const_string(data) {
+        return Ok(Some(FieldInfo {
+            datatype: info.field_type,
+            name: info.field_name,
+            case: FieldCase::Const(data),
+        }));
+    }
     Err(())
 }
 
@@ -111,6 +163,7 @@ enum FieldCase {
     Unit,
     Vector,
     Array(usize),
+    Const(String),
 }
 
 #[derive(Debug,PartialEq)]
@@ -128,13 +181,13 @@ mod tests {
     fn match_nothing_matches_comment() {
         assert_eq!(String::from("#just a comment"),
                    match_nothing("#just a comment").unwrap());
-        assert_eq!(String::from("#  YOLO !   "),
-                   match_nothing("#  YOLO !   ").unwrap());
+        assert_eq!(String::from("#  YOLO !"),
+                   match_nothing("#  YOLO !").unwrap());
     }
 
     #[test]
     fn match_nothing_matches_whitespace() {
-        assert_eq!(String::from(""), match_nothing("      ").unwrap());
+        assert_eq!(String::from(""), match_nothing("").unwrap());
     }
 
     #[test]
@@ -149,7 +202,7 @@ mod tests {
                        field_name: "myname".into(),
                        comment: "# this clearly should succeed".into(),
                    },
-                   match_field("  geom_msgs/Twist   myname    # this clearly should succeed")
+                   match_field("geom_msgs/Twist   myname    # this clearly should succeed")
                        .unwrap());
     }
 
@@ -160,7 +213,7 @@ mod tests {
                        field_name: "myname".into(),
                        comment: "# ...".into(),
                    },
-                   match_vector_field("  geom_msgs/Twist [  ]   myname  # ...").unwrap());
+                   match_vector_field("geom_msgs/Twist [  ]   myname  # ...").unwrap());
     }
 
     #[test]
@@ -171,7 +224,29 @@ mod tests {
                         comment: "# comment".into(),
                     },
                     127),
-                   match_array_field("  geom_msgs/Twist   [   127 ]   myname# comment").unwrap());
+                   match_array_field("geom_msgs/Twist   [   127 ]   myname# comment").unwrap());
+    }
+
+    #[test]
+    fn match_const_string_matches_legal_field() {
+        assert_eq!((FieldLine {
+                        field_type: "mytype".into(),
+                        field_name: "myname".into(),
+                        comment: "".into(),
+                    },
+                    "this is # data".into()),
+                   match_const_string("mytype   myname  =  this is # data").unwrap());
+    }
+
+    #[test]
+    fn match_const_numeric_matches_legal_field() {
+        assert_eq!((FieldLine {
+                        field_type: "mytype".into(),
+                        field_name: "myname".into(),
+                        comment: "# data".into(),
+                    },
+                    "-444".into()),
+                   match_const_numeric("mytype   myname  =  -444 # data").unwrap());
     }
 
     #[test]
@@ -202,5 +277,17 @@ mod tests {
                        case: FieldCase::Array(127),
                    },
                    match_line("  geom_msgs/Twist   [   127 ]   myname# comment").unwrap().unwrap());
+        assert_eq!(FieldInfo {
+                       datatype: "geom_msgs/Twist".into(),
+                       name: "myname".into(),
+                       case: FieldCase::Const("this is # data".into()),
+                   },
+                   match_line("  geom_msgs/Twist  myname =   this is # data  ").unwrap().unwrap());
+        assert_eq!(FieldInfo {
+                       datatype: "geom_msgs/Twist".into(),
+                       name: "myname".into(),
+                       case: FieldCase::Const("-444".into()),
+                   },
+                   match_line("  geom_msgs/Twist  myname =   -444 # data  ").unwrap().unwrap());
     }
 }
