@@ -1,3 +1,5 @@
+pub mod genmsg;
+
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -119,8 +121,8 @@ fn get_dependencies(paths: &Vec<String>, msg: &Message) -> Vec<Message> {
             for line in BufReader::new(f).lines() {
                 if let Some(capture) = RE.captures(&line.unwrap()) {
                     dependencies.push(Message {
-                        package: capture.at(1).unwrap().to_owned(),
-                        name: capture.at(2).unwrap().to_owned(),
+                        package: capture.get(1).unwrap().as_str().to_owned(),
+                        name: capture.get(2).unwrap().as_str().to_owned(),
                     });
                 } else {
                     break;
