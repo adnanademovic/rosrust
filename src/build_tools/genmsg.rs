@@ -156,11 +156,98 @@ enum FieldCase {
     Const(String),
 }
 
+#[derive(Clone,Debug,PartialEq)]
+enum MemberCase {
+    Unit,
+    Vector,
+    Array(usize),
+}
+
+impl<'a> From<&'a FieldCase> for MemberCase {
+    fn from(case: &'a FieldCase) -> MemberCase {
+        match *case {
+            FieldCase::Unit => MemberCase::Unit,
+            FieldCase::Vector => MemberCase::Vector,
+            FieldCase::Array(v) => MemberCase::Array(v),
+            _ => panic!("Conversion not supported"),
+        }
+    }
+}
+
 #[derive(Debug,PartialEq)]
 struct FieldInfo {
     datatype: String,
     name: String,
     case: FieldCase,
+}
+
+#[derive(Debug,PartialEq)]
+enum DataType {
+    Bool,
+    I8,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+    F32,
+    F64,
+    String,
+    Time,
+    Duration,
+    LocalStruct(String),
+    RemoteStruct(String, String),
+}
+
+#[derive(Debug,PartialEq)]
+struct MemberInfo {
+    datatype: DataType,
+    name: String,
+    case: MemberCase,
+}
+
+fn parse_members(fields: &[FieldInfo]) -> Result<Vec<MemberInfo>, ()> {
+    fields.iter()
+        .map(|v| {
+            Ok(MemberInfo {
+                datatype: parse_datatype(&v.datatype).ok_or(())?,
+                name: v.name.clone(),
+                case: MemberCase::from(&v.case),
+            })
+        })
+        .collect()
+}
+
+fn parse_datatype(datatype: &str) -> Option<DataType> {
+    match datatype {
+        "bool" => Some(DataType::Bool),
+        "int8" => Some(DataType::I8),
+        "int16" => Some(DataType::I16),
+        "int32" => Some(DataType::I32),
+        "int64" => Some(DataType::I64),
+        "uint8" => Some(DataType::U8),
+        "uint16" => Some(DataType::U16),
+        "uint32" => Some(DataType::U32),
+        "uint64" => Some(DataType::U64),
+        "float32" => Some(DataType::F32),
+        "float64" => Some(DataType::F64),
+        "string" => Some(DataType::String),
+        "time" => Some(DataType::Time),
+        "duration" => Some(DataType::Duration),
+        _ => {
+            let parts = datatype.split('/').collect::<Vec<_>>();
+            if parts.iter().any(|v| v.len() == 0) {
+                return None;
+            }
+            match parts.len() {
+                2 => Some(DataType::RemoteStruct(parts[0].to_owned(), parts[1].to_owned())),
+                1 => Some(DataType::LocalStruct(parts[0].to_owned())),
+                _ => None,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -269,6 +356,23 @@ mod tests {
                             datatype: "float64".into(),
                             name: "covariance".into(),
                             case: FieldCase::Array(36),
+                        }],
+                   data);
+    }
+
+    #[test]
+    fn parse_members_parses_real_message() {
+        let data = parse_members(&match_lines(include_str!("TwistWithCovariance.msg")).unwrap())
+            .unwrap();
+        assert_eq!(vec![MemberInfo {
+                            datatype: DataType::LocalStruct("Twist".into()),
+                            name: "twist".into(),
+                            case: MemberCase::Unit,
+                        },
+                        MemberInfo {
+                            datatype: DataType::F64,
+                            name: "covariance".into(),
+                            case: MemberCase::Array(36),
                         }],
                    data);
     }
