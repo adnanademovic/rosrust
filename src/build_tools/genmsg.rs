@@ -1,5 +1,36 @@
 use regex::Regex;
 use super::error::{Result, ResultExt};
+use std::collections::HashSet;
+
+pub struct Msg {
+    package: String,
+    name: String,
+    fields: Vec<FieldInfo>,
+    dependencies: HashSet<(String, String)>,
+}
+
+impl Msg {
+    pub fn new(package: &str, name: &str, source: &str) -> Result<Msg> {
+        let fields = match_lines(source)?;
+        let dependencies = fields.iter()
+            .filter_map(|ref v| match v.datatype {
+                DataType::LocalStruct(ref dep_name) => {
+                    Some((package.to_owned(), dep_name.to_owned()))
+                }
+                DataType::RemoteStruct(ref dep_pkg, ref dep_name) => {
+                    Some((dep_pkg.to_owned(), dep_name.to_owned()))
+                }
+                _ => None,
+            })
+            .collect();
+        Ok(Msg {
+            package: package.to_owned(),
+            name: name.to_owned(),
+            fields: fields,
+            dependencies: dependencies,
+        })
+    }
+}
 
 static IGNORE_WHITESPACE: &'static str = r"\s*";
 static ANY_WHITESPACE: &'static str = r"\s+";
@@ -208,6 +239,7 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
         "string" => Some(DataType::String),
         "time" => Some(DataType::Time),
         "duration" => Some(DataType::Duration),
+        "Header" => Some(DataType::RemoteStruct("std_msgs".into(), "Header".into())),
         _ => {
             let parts = datatype.split('/').collect::<Vec<_>>();
             if parts.iter().any(|v| v.len() == 0) {
@@ -317,8 +349,9 @@ mod tests {
     }
 
     #[test]
-    fn match_lines_parses_real_message() {
-        let data = match_lines(include_str!("TwistWithCovariance.msg")).unwrap();
+    fn match_lines_parses_real_messages() {
+        let data = match_lines(include_str!("msg_examples/geometry_msgs/TwistWithCovariance.msg"))
+            .unwrap();
         assert_eq!(vec![FieldInfo {
                             datatype: DataType::LocalStruct("Twist".into()),
                             name: "twist".into(),
@@ -330,5 +363,112 @@ mod tests {
                             case: FieldCase::Array(36),
                         }],
                    data);
+
+        let data = match_lines(include_str!("msg_examples/geometry_msgs/PoseStamped.msg")).unwrap();
+        assert_eq!(vec![FieldInfo {
+                            datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
+                            name: "header".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::LocalStruct("Pose".into()),
+                            name: "pose".into(),
+                            case: FieldCase::Unit,
+                        }],
+                   data);
+    }
+
+    #[test]
+    fn msg_constructor_parses_real_message() {
+        let data = Msg::new("geometry_msgs",
+                            "TwistWithCovariance",
+                            include_str!("msg_examples/geometry_msgs/TwistWithCovariance.msg"))
+            .unwrap();
+        assert_eq!(data.package, "geometry_msgs");
+        assert_eq!(data.name, "TwistWithCovariance");
+        assert_eq!(data.fields,
+                   vec![FieldInfo {
+                            datatype: DataType::LocalStruct("Twist".into()),
+                            name: "twist".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::F64,
+                            name: "covariance".into(),
+                            case: FieldCase::Array(36),
+                        }]);
+        assert_eq!(data.dependencies.len(), 1);
+        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Twist".into())));
+
+        let data = Msg::new("geometry_msgs",
+                            "PoseStamped",
+                            include_str!("msg_examples/geometry_msgs/PoseStamped.msg"))
+            .unwrap();
+        assert_eq!(data.package, "geometry_msgs");
+        assert_eq!(data.name, "PoseStamped");
+        assert_eq!(data.fields,
+                   vec![FieldInfo {
+                            datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
+                            name: "header".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::LocalStruct("Pose".into()),
+                            name: "pose".into(),
+                            case: FieldCase::Unit,
+                        }]);
+        assert_eq!(data.dependencies.len(), 2);
+        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Pose".into())));
+        assert!(data.dependencies.contains(&("std_msgs".into(), "Header".into())));
+
+        let data = Msg::new("sensor_msgs",
+                            "Imu",
+                            include_str!("msg_examples/sensor_msgs/Imu.msg"))
+            .unwrap();
+        assert_eq!(data.package, "sensor_msgs");
+        assert_eq!(data.name, "Imu");
+        assert_eq!(data.fields,
+                   vec![FieldInfo {
+                            datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
+                            name: "header".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::RemoteStruct("geometry_msgs".into(),
+                                                             "Quaternion".into()),
+                            name: "orientation".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::F64,
+                            name: "orientation_covariance".into(),
+                            case: FieldCase::Array(9),
+                        },
+                        FieldInfo {
+                            datatype: DataType::RemoteStruct("geometry_msgs".into(),
+                                                             "Vector3".into()),
+                            name: "angular_velocity".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::F64,
+                            name: "angular_velocity_covariance".into(),
+                            case: FieldCase::Array(9),
+                        },
+                        FieldInfo {
+                            datatype: DataType::RemoteStruct("geometry_msgs".into(),
+                                                             "Vector3".into()),
+                            name: "linear_acceleration".into(),
+                            case: FieldCase::Unit,
+                        },
+                        FieldInfo {
+                            datatype: DataType::F64,
+                            name: "linear_acceleration_covariance".into(),
+                            case: FieldCase::Array(9),
+                        }]);
+        assert_eq!(data.dependencies.len(), 3);
+        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Vector3".into())));
+        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Quaternion".into())));
+        assert!(data.dependencies.contains(&("std_msgs".into(), "Header".into())));
     }
 }
