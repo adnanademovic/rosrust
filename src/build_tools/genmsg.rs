@@ -1,4 +1,5 @@
 use regex::Regex;
+use super::error::{Result, ResultExt};
 
 static IGNORE_WHITESPACE: &'static str = r"\s*";
 static ANY_WHITESPACE: &'static str = r"\s+";
@@ -93,11 +94,15 @@ fn match_const_numeric(data: &str) -> Option<(FieldLine, String)> {
           captures.get(3).unwrap().as_str().into()))
 }
 
-fn match_line(data: &str) -> Option<Result<FieldInfo, ()>> {
+fn match_line(data: &str) -> Option<Result<FieldInfo>> {
     if let Some((info, data)) = match_const_string(data.trim()) {
         return Some(FieldInfo::new(&info.field_type, &info.field_name, FieldCase::Const(data)));
     }
-    let data = data.splitn(2, '#').next().unwrap().trim();
+    let data = match strip_useless(data) {
+        Ok(v) => v,
+        Err(v) => return Some(Err(v)),
+    };
+
     if data == "" {
         return None;
     }
@@ -113,12 +118,26 @@ fn match_line(data: &str) -> Option<Result<FieldInfo, ()>> {
     if let Some((info, data)) = match_const_numeric(data) {
         return Some(FieldInfo::new(&info.field_type, &info.field_name, FieldCase::Const(data)));
     }
-    Some(Err(()))
+    Some(Err(format!("Unsupported content of line: {}", data).into()))
 }
 
 #[inline]
-fn match_lines(data: &str) -> Result<Vec<FieldInfo>, ()> {
-    data.split('\n').filter_map(match_line).collect()
+fn strip_useless<'a>(data: &'a str) -> Result<&'a str> {
+    Ok(data.splitn(2, '#')
+        .next()
+        .ok_or_else(|| {
+            format!("Somehow splitting a line resulted in 0 parts?! Happened here: {}",
+                    data)
+        })?
+        .trim())
+}
+
+#[inline]
+fn match_lines(data: &str) -> Result<Vec<FieldInfo>> {
+    data.split('\n')
+        .filter_map(match_line)
+        .collect::<Result<_>>()
+        .chain_err(|| "Failed to parse line in data string")
 }
 
 #[derive(Debug,PartialEq)]
@@ -143,9 +162,10 @@ struct FieldInfo {
 }
 
 impl FieldInfo {
-    fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo, ()> {
+    fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
-            datatype: parse_datatype(&datatype).ok_or(())?,
+            datatype: parse_datatype(&datatype).ok_or_else(
+                || format!("Unsupported datatype: {}", datatype))?,
             name: name.to_owned(),
             case: case,
         })
