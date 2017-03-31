@@ -1,4 +1,5 @@
 pub mod msg;
+pub mod genmsg;
 pub mod error;
 
 use regex::Regex;

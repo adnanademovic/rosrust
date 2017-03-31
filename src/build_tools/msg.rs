@@ -3,10 +3,11 @@ use super::error::{Result, ResultExt};
 use std::collections::HashSet;
 
 pub struct Msg {
-    package: String,
-    name: String,
-    fields: Vec<FieldInfo>,
-    dependencies: HashSet<(String, String)>,
+    pub package: String,
+    pub name: String,
+    pub fields: Vec<FieldInfo>,
+    pub dependencies: HashSet<(String, String)>,
+    pub source: String,
 }
 
 impl Msg {
@@ -28,6 +29,7 @@ impl Msg {
             name: name.to_owned(),
             fields: fields,
             dependencies: dependencies,
+            source: source.into(),
         })
     }
 }
@@ -178,7 +180,7 @@ struct FieldLine {
 }
 
 #[derive(Debug,PartialEq)]
-enum FieldCase {
+pub enum FieldCase {
     Unit,
     Vector,
     Array(usize),
@@ -186,7 +188,7 @@ enum FieldCase {
 }
 
 #[derive(Debug,PartialEq)]
-struct FieldInfo {
+pub struct FieldInfo {
     datatype: DataType,
     name: String,
     case: FieldCase,
@@ -204,7 +206,7 @@ impl FieldInfo {
 }
 
 #[derive(Debug,PartialEq)]
-enum DataType {
+pub enum DataType {
     Bool,
     I8,
     I16,
