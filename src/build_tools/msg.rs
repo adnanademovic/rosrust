@@ -1,6 +1,6 @@
 use regex::Regex;
 use super::error::{Result, ResultExt};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub struct Msg {
     pub package: String,
@@ -31,6 +31,27 @@ impl Msg {
             dependencies: dependencies,
             source: source.into(),
         })
+    }
+
+    pub fn calculate_md5(&self,
+                         hashes: &HashMap<(String, String), String>)
+                         -> ::std::result::Result<String, ()> {
+        use crypto::md5::Md5;
+        use crypto::digest::Digest;
+        let mut hasher = Md5::new();
+        let constants = self.fields
+            .iter()
+            .filter(|ref v| v.is_constant())
+            .map(|ref v| v.md5_string(&self.package, hashes))
+            .collect::<::std::result::Result<Vec<String>, ()>>()?;
+        let fields = self.fields
+            .iter()
+            .filter(|ref v| !v.is_constant())
+            .map(|ref v| v.md5_string(&self.package, hashes))
+            .collect::<::std::result::Result<Vec<String>, ()>>()?;
+        let representation = constants.into_iter().chain(fields).collect::<Vec<_>>().join("\n");
+        hasher.input_str(&representation);
+        Ok(hasher.result_str())
     }
 }
 
@@ -195,6 +216,28 @@ pub struct FieldInfo {
 }
 
 impl FieldInfo {
+    fn is_constant(&self) -> bool {
+        match self.case {
+            FieldCase::Const(..) => true,
+            _ => false,
+        }
+    }
+
+    fn md5_string(&self,
+                  package: &str,
+                  hashes: &HashMap<(String, String), String>)
+                  -> ::std::result::Result<String, ()> {
+        let datatype = self.datatype.md5_string(package, hashes)?;
+        Ok(match self.case {
+            FieldCase::Unit => format!("{} {}", datatype, self.name),
+            FieldCase::Vector => format!("{}[] {}", datatype, self.name),
+            FieldCase::Array(l) => format!("{}[{}] {}", datatype, l, self.name),
+            FieldCase::Const(ref v) => format!("{} {}={}", datatype, self.name, v),
+        })
+    }
+}
+
+impl FieldInfo {
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
             datatype: parse_datatype(&datatype).ok_or_else(
@@ -223,6 +266,37 @@ pub enum DataType {
     Duration,
     LocalStruct(String),
     RemoteStruct(String, String),
+}
+
+impl DataType {
+    fn md5_string(&self,
+                  package: &str,
+                  hashes: &HashMap<(String, String), String>)
+                  -> ::std::result::Result<String, ()> {
+        Ok(match *self {
+                DataType::Bool => "bool",
+                DataType::I8 => "int8",
+                DataType::I16 => "int16",
+                DataType::I32 => "int32",
+                DataType::I64 => "int64",
+                DataType::U8 => "uint8",
+                DataType::U16 => "uint16",
+                DataType::U32 => "uint32",
+                DataType::U64 => "uint64",
+                DataType::F32 => "float32",
+                DataType::F64 => "float64",
+                DataType::String => "string",
+                DataType::Time => "time",
+                DataType::Duration => "duration",
+                DataType::LocalStruct(ref name) => {
+                    hashes.get(&(package.to_owned(), name.clone())).ok_or(())?.as_str()
+                }
+                DataType::RemoteStruct(ref pkg, ref name) => {
+                    hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
+                }
+            }
+            .into())
+    }
 }
 
 fn parse_datatype(datatype: &str) -> Option<DataType> {
@@ -259,6 +333,94 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn datatype_md5_string_correct() {
+        let mut hashes = HashMap::new();
+        hashes.insert(("p1".into(), "xx".into()), "ABCD".into());
+        hashes.insert(("p2".into(), "xx".into()), "EFGH".into());
+        assert_eq!(DataType::I64.md5_string("", &hashes).unwrap(),
+                   "int64".to_owned());
+        assert_eq!(DataType::F32.md5_string("", &hashes).unwrap(),
+                   "float32".to_owned());
+        assert_eq!(DataType::String.md5_string("", &hashes).unwrap(),
+                   "string".to_owned());
+        assert_eq!(DataType::LocalStruct("xx".into()).md5_string("p1", &hashes).unwrap(),
+                   "ABCD".to_owned());
+        assert_eq!(DataType::LocalStruct("xx".into()).md5_string("p2", &hashes).unwrap(),
+                   "EFGH".to_owned());
+        assert_eq!(DataType::RemoteStruct("p1".into(), "xx".into())
+                       .md5_string("p2", &hashes)
+                       .unwrap(),
+                   "ABCD".to_owned());
+    }
+
+    #[test]
+    fn fieldinfo_md5_string_correct() {
+        let mut hashes = HashMap::new();
+        hashes.insert(("p1".into(), "xx".into()), "ABCD".into());
+        hashes.insert(("p2".into(), "xx".into()), "EFGH".into());
+        assert_eq!(FieldInfo::new("int64", "abc", FieldCase::Unit)
+                       .unwrap()
+                       .md5_string("", &hashes)
+                       .unwrap(),
+                   "int64 abc".to_owned());
+        assert_eq!(FieldInfo::new("float32", "abc", FieldCase::Array(3))
+                       .unwrap()
+                       .md5_string("", &hashes)
+                       .unwrap(),
+                   "float32[3] abc".to_owned());
+        assert_eq!(FieldInfo::new("string", "abc", FieldCase::Const("something".into()))
+                       .unwrap()
+                       .md5_string("", &hashes)
+                       .unwrap(),
+                   "string abc=something".to_owned());
+        assert_eq!(FieldInfo::new("xx", "abc", FieldCase::Vector)
+                       .unwrap()
+                       .md5_string("p1", &hashes)
+                       .unwrap(),
+                   "ABCD[] abc".to_owned());
+        assert_eq!(FieldInfo::new("p2/xx", "abc", FieldCase::Unit)
+                       .unwrap()
+                       .md5_string("p1", &hashes)
+                       .unwrap(),
+                   "EFGH abc".to_owned());
+    }
+
+    #[test]
+    fn message_md5_string_correct() {
+        assert_eq!(Msg::new("std_msgs", "String", "string data")
+                       .unwrap()
+                       .calculate_md5(&HashMap::new())
+                       .unwrap(),
+                   "992ce8a1687cec8c8bd883ec73ca41d1".to_owned());
+        assert_eq!(Msg::new("geometry_msgs",
+                            "Point",
+                            include_str!("msg_examples/geometry_msgs/Point.msg"))
+                       .unwrap()
+                       .calculate_md5(&HashMap::new())
+                       .unwrap(),
+                   "4a842b65f413084dc2b10fb484ea7f17".to_owned());
+        assert_eq!(Msg::new("geometry_msgs",
+                            "Quaternion",
+                            include_str!("msg_examples/geometry_msgs/Quaternion.msg"))
+                       .unwrap()
+                       .calculate_md5(&HashMap::new())
+                       .unwrap(),
+                   "a779879fadf0160734f906b8c19c7004".to_owned());
+        let mut hashes = HashMap::new();
+        hashes.insert(("geometry_msgs".into(), "Point".into()),
+                      "4a842b65f413084dc2b10fb484ea7f17".into());
+        hashes.insert(("geometry_msgs".into(), "Quaternion".into()),
+                      "a779879fadf0160734f906b8c19c7004".into());
+        assert_eq!(Msg::new("geometry_msgs",
+                            "Pose",
+                            include_str!("msg_examples/geometry_msgs/Pose.msg"))
+                       .unwrap()
+                       .calculate_md5(&hashes)
+                       .unwrap(),
+                   "e45d45a5a1ce597b249e23fb30fc871f".to_owned());
+    }
 
     #[test]
     fn match_field_matches_legal_field() {
