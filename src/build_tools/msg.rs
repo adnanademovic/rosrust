@@ -3,8 +3,8 @@ use super::error::{Result, ResultExt};
 use std::collections::{HashMap, HashSet};
 
 pub struct Msg {
-    package: String,
-    name: String,
+    pub package: String,
+    pub name: String,
     fields: Vec<FieldInfo>,
     dependencies: HashSet<(String, String)>,
     pub source: String,
@@ -67,6 +67,18 @@ impl Msg {
         let representation = constants.into_iter().chain(fields).collect::<Vec<_>>().join("\n");
         hasher.input_str(&representation);
         Ok(hasher.result_str())
+    }
+
+    pub fn struct_string(&self) -> String {
+        let mut output = Vec::<String>::new();
+        output.push(format!("        pub struct {} {{", self.name));
+        for field in &self.fields {
+            if let Some(s) = field.to_string() {
+                output.push(format!("            pub {}", s));
+            }
+        }
+        output.push("        }".into());
+        output.join("\n")
     }
 }
 
@@ -250,9 +262,17 @@ impl FieldInfo {
             FieldCase::Const(ref v) => format!("{} {}={}", datatype, self.name, v),
         })
     }
-}
 
-impl FieldInfo {
+    fn to_string(&self) -> Option<String> {
+        let datatype = self.datatype.rust_type();
+        match self.case {
+            FieldCase::Unit => Some(format!("{}: {},", self.name, datatype)),
+            FieldCase::Vector => Some(format!("{}: Vec<{}>,", self.name, datatype)),
+            FieldCase::Array(l) => Some(format!("{}: [{}; {}],", self.name, datatype, l)),
+            FieldCase::Const(_) => None,
+        }
+    }
+
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
             datatype: parse_datatype(&datatype).ok_or_else(
@@ -284,6 +304,27 @@ enum DataType {
 }
 
 impl DataType {
+    fn rust_type(&self) -> String {
+        match *self {
+            DataType::Bool => "bool".into(),
+            DataType::I8 => "i8".into(),
+            DataType::I16 => "i16".into(),
+            DataType::I32 => "i32".into(),
+            DataType::I64 => "i64".into(),
+            DataType::U8 => "u8".into(),
+            DataType::U16 => "u16".into(),
+            DataType::U32 => "u32".into(),
+            DataType::U64 => "u64".into(),
+            DataType::F32 => "f32".into(),
+            DataType::F64 => "f64".into(),
+            DataType::String => "std::string::String".into(),
+            DataType::Time => "::rosrust::msg::Time".into(),
+            DataType::Duration => "::rosrust::msg::Duration".into(),
+            DataType::LocalStruct(ref name) => name.clone(),
+            DataType::RemoteStruct(ref pkg, ref name) => format!("super::{}::{}", pkg, name),
+        }
+    }
+
     fn md5_string(&self,
                   package: &str,
                   hashes: &HashMap<(String, String), String>)

@@ -1,6 +1,7 @@
 pub mod msg;
 pub mod helpers;
 pub mod error;
+pub mod genmsg;
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
