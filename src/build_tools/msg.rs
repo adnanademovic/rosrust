@@ -3,10 +3,10 @@ use super::error::{Result, ResultExt};
 use std::collections::{HashMap, HashSet};
 
 pub struct Msg {
-    pub package: String,
-    pub name: String,
-    pub fields: Vec<FieldInfo>,
-    pub dependencies: HashSet<(String, String)>,
+    package: String,
+    name: String,
+    fields: Vec<FieldInfo>,
+    dependencies: HashSet<(String, String)>,
     pub source: String,
 }
 
@@ -29,8 +29,23 @@ impl Msg {
             name: name.to_owned(),
             fields: fields,
             dependencies: dependencies,
-            source: source.into(),
+            source: source.trim().into(),
         })
+    }
+
+    pub fn get_type(&self) -> String {
+        format!("{}/{}", self.package, self.name)
+    }
+
+    pub fn list_dependencies(&self) -> Vec<(String, String)> {
+        self.fields
+            .iter()
+            .filter_map(|field| match field.datatype {
+                DataType::LocalStruct(ref name) => Some((self.package.clone(), name.clone())),
+                DataType::RemoteStruct(ref pkg, ref name) => Some((pkg.clone(), name.clone())),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn calculate_md5(&self,
@@ -201,7 +216,7 @@ struct FieldLine {
 }
 
 #[derive(Debug,PartialEq)]
-pub enum FieldCase {
+enum FieldCase {
     Unit,
     Vector,
     Array(usize),
@@ -209,7 +224,7 @@ pub enum FieldCase {
 }
 
 #[derive(Debug,PartialEq)]
-pub struct FieldInfo {
+struct FieldInfo {
     datatype: DataType,
     name: String,
     case: FieldCase,
@@ -249,7 +264,7 @@ impl FieldInfo {
 }
 
 #[derive(Debug,PartialEq)]
-pub enum DataType {
+enum DataType {
     Bool,
     I8,
     I16,
