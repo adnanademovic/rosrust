@@ -20,8 +20,8 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             .filter(|&(&(ref pack, ref _name), ref _value)| pack == &package)
             .map(|(&(ref _pack, ref name), ref _value)| name.clone())
             .collect::<HashSet<String>>();
-        for name in names {
-            let key = (package.clone(), name);
+        for name in &names {
+            let key = (package.clone(), name.clone());
             let message = message_map.get(&key)
                 .expect("Internal implementation contains mismatch in map keys");
             let hash = hashes.get(&key)
@@ -34,6 +34,13 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             output.push(create_function("msg_type", &message.get_type()));
             output.push("        }".into());
         }
+        output.push("        pub mod CONST {".into());
+        for name in &names {
+            let message = message_map.get(&(package.clone(), name.clone()))
+                .expect("Internal implementation contains mismatch in map keys");
+            output.push(message.const_string());
+        }
+        output.push("        }".into());
         output.push("    }".into());
     }
     output.push("}".into());
@@ -80,9 +87,17 @@ mod tests {
 
     #[test]
     fn depend_on_messages_printout() {
-        let _data = depend_on_messages(&[&FILEPATH],
-                                       &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"])
+        let data = depend_on_messages(&[&FILEPATH],
+                                      &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"])
             .unwrap();
+        println!("{}", data);
+        // TODO: actually test this output data
+    }
+
+    #[test]
+    fn benchmark_genmsg() {
+        let data = depend_on_messages(&[&FILEPATH], &["benchmark_msgs/Overall"]).unwrap();
+        println!("{}", data);
         // TODO: actually test this output data
     }
 }

@@ -33,7 +33,7 @@ pub fn generate_message_definition(message_map: &HashMap<(String, String), Msg>,
                                    -> Result<String> {
     let mut handled_messages = HashSet::<(String, String)>::new();
     let mut result = message.source.clone();
-    let mut pending = message.list_dependencies().into_iter().collect::<LinkedList<_>>();
+    let mut pending = message.dependencies().into_iter().collect::<LinkedList<_>>();
     while let Some(value) = pending.pop_front() {
         if handled_messages.contains(&value) {
             continue;
@@ -46,7 +46,7 @@ pub fn generate_message_definition(message_map: &HashMap<(String, String), Msg>,
             Some(msg) => msg,
             None => bail!("Message map does not contain all needed elements"),
         };
-        for dependency in message.list_dependencies() {
+        for dependency in message.dependencies() {
             pending.push_back(dependency);
         }
         result += &message.source;
@@ -67,7 +67,7 @@ pub fn get_message_map(folders: &[&str],
         let name = value.1.clone();
         if let collections::hash_map::Entry::Vacant(entry) = result.entry(value) {
             let message = get_message(folders, &package, &name)?;
-            for dependency in &message.list_dependencies() {
+            for dependency in &message.dependencies() {
                 pending.push(dependency.clone());
             }
             entry.insert(message);

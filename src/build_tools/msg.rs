@@ -1,34 +1,21 @@
 use regex::Regex;
 use super::error::{Result, ResultExt};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub struct Msg {
     pub package: String,
     pub name: String,
     fields: Vec<FieldInfo>,
-    dependencies: HashSet<(String, String)>,
     pub source: String,
 }
 
 impl Msg {
     pub fn new(package: &str, name: &str, source: &str) -> Result<Msg> {
         let fields = match_lines(source)?;
-        let dependencies = fields.iter()
-            .filter_map(|ref v| match v.datatype {
-                DataType::LocalStruct(ref dep_name) => {
-                    Some((package.to_owned(), dep_name.to_owned()))
-                }
-                DataType::RemoteStruct(ref dep_pkg, ref dep_name) => {
-                    Some((dep_pkg.to_owned(), dep_name.to_owned()))
-                }
-                _ => None,
-            })
-            .collect();
         Ok(Msg {
             package: package.to_owned(),
             name: name.to_owned(),
             fields: fields,
-            dependencies: dependencies,
             source: source.trim().into(),
         })
     }
@@ -37,7 +24,7 @@ impl Msg {
         format!("{}/{}", self.package, self.name)
     }
 
-    pub fn list_dependencies(&self) -> Vec<(String, String)> {
+    pub fn dependencies(&self) -> Vec<(String, String)> {
         self.fields
             .iter()
             .filter_map(|field| match field.datatype {
@@ -67,6 +54,18 @@ impl Msg {
         let representation = constants.into_iter().chain(fields).collect::<Vec<_>>().join("\n");
         hasher.input_str(&representation);
         Ok(hasher.result_str())
+    }
+
+    pub fn const_string(&self) -> String {
+        let mut output = Vec::<String>::new();
+        output.push(format!("            pub mod {} {{", self.name));
+        for field in &self.fields {
+            if let Some(s) = field.to_const_string() {
+                output.push(format!("                pub {}", s));
+            }
+        }
+        output.push("            }".into());
+        output.join("\n")
     }
 
     pub fn struct_string(&self) -> String {
@@ -273,6 +272,27 @@ impl FieldInfo {
         }
     }
 
+    fn to_const_string(&self) -> Option<String> {
+        let value = match self.case {
+            FieldCase::Const(ref value) => value,
+            _ => return None,
+        };
+        Some(match self.datatype {
+            DataType::Bool => format!("const {}: bool = {:?};", self.name, value != "0"),
+            DataType::String => format!("static {}: &'static str = {:?};", self.name, value),
+            DataType::Time => return None,
+            DataType::Duration => return None,
+            DataType::LocalStruct(..) => return None,
+            DataType::RemoteStruct(..) => return None,
+            _ => {
+                format!("const {}: {} = {};",
+                        self.name,
+                        self.datatype.rust_type(),
+                        value)
+            }
+        })
+    }
+
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
             datatype: parse_datatype(&datatype).ok_or_else(
@@ -389,6 +409,7 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn datatype_md5_string_correct() {
@@ -600,6 +621,10 @@ mod tests {
                    data);
     }
 
+    fn get_dependency_set(message: &Msg) -> HashSet<(String, String)> {
+        message.dependencies().into_iter().collect()
+    }
+
     #[test]
     fn msg_constructor_parses_real_message() {
         let data = Msg::new("geometry_msgs",
@@ -619,8 +644,9 @@ mod tests {
                             name: "covariance".into(),
                             case: FieldCase::Array(36),
                         }]);
-        assert_eq!(data.dependencies.len(), 1);
-        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Twist".into())));
+        let dependencies = get_dependency_set(&data);
+        assert_eq!(dependencies.len(), 1);
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Twist".into())));
 
         let data = Msg::new("geometry_msgs",
                             "PoseStamped",
@@ -639,9 +665,10 @@ mod tests {
                             name: "pose".into(),
                             case: FieldCase::Unit,
                         }]);
-        assert_eq!(data.dependencies.len(), 2);
-        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Pose".into())));
-        assert!(data.dependencies.contains(&("std_msgs".into(), "Header".into())));
+        let dependencies = get_dependency_set(&data);
+        assert_eq!(dependencies.len(), 2);
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Pose".into())));
+        assert!(dependencies.contains(&("std_msgs".into(), "Header".into())));
 
         let data = Msg::new("sensor_msgs",
                             "Imu",
@@ -688,9 +715,10 @@ mod tests {
                             name: "linear_acceleration_covariance".into(),
                             case: FieldCase::Array(9),
                         }]);
-        assert_eq!(data.dependencies.len(), 3);
-        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Vector3".into())));
-        assert!(data.dependencies.contains(&("geometry_msgs".into(), "Quaternion".into())));
-        assert!(data.dependencies.contains(&("std_msgs".into(), "Header".into())));
+        let dependencies = get_dependency_set(&data);
+        assert_eq!(dependencies.len(), 3);
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Vector3".into())));
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Quaternion".into())));
+        assert!(dependencies.contains(&("std_msgs".into(), "Header".into())));
     }
 }
