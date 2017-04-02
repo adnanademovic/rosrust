@@ -452,14 +452,14 @@ mod tests {
                    "992ce8a1687cec8c8bd883ec73ca41d1".to_owned());
         assert_eq!(Msg::new("geometry_msgs",
                             "Point",
-                            include_str!("msg_examples/geometry_msgs/Point.msg"))
+                            include_str!("msg_examples/geometry_msgs/msg/Point.msg"))
                        .unwrap()
                        .calculate_md5(&HashMap::new())
                        .unwrap(),
                    "4a842b65f413084dc2b10fb484ea7f17".to_owned());
         assert_eq!(Msg::new("geometry_msgs",
                             "Quaternion",
-                            include_str!("msg_examples/geometry_msgs/Quaternion.msg"))
+                            include_str!("msg_examples/geometry_msgs/msg/Quaternion.msg"))
                        .unwrap()
                        .calculate_md5(&HashMap::new())
                        .unwrap(),
@@ -471,7 +471,7 @@ mod tests {
                       "a779879fadf0160734f906b8c19c7004".into());
         assert_eq!(Msg::new("geometry_msgs",
                             "Pose",
-                            include_str!("msg_examples/geometry_msgs/Pose.msg"))
+                            include_str!("msg_examples/geometry_msgs/msg/Pose.msg"))
                        .unwrap()
                        .calculate_md5(&hashes)
                        .unwrap(),
@@ -570,7 +570,8 @@ mod tests {
 
     #[test]
     fn match_lines_parses_real_messages() {
-        let data = match_lines(include_str!("msg_examples/geometry_msgs/TwistWithCovariance.msg"))
+        let data = match_lines(include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.\
+                                             msg"))
             .unwrap();
         assert_eq!(vec![FieldInfo {
                             datatype: DataType::LocalStruct("Twist".into()),
@@ -584,7 +585,8 @@ mod tests {
                         }],
                    data);
 
-        let data = match_lines(include_str!("msg_examples/geometry_msgs/PoseStamped.msg")).unwrap();
+        let data = match_lines(include_str!("msg_examples/geometry_msgs/msg/PoseStamped.msg"))
+            .unwrap();
         assert_eq!(vec![FieldInfo {
                             datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
                             name: "header".into(),
@@ -602,7 +604,7 @@ mod tests {
     fn msg_constructor_parses_real_message() {
         let data = Msg::new("geometry_msgs",
                             "TwistWithCovariance",
-                            include_str!("msg_examples/geometry_msgs/TwistWithCovariance.msg"))
+                            include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"))
             .unwrap();
         assert_eq!(data.package, "geometry_msgs");
         assert_eq!(data.name, "TwistWithCovariance");
@@ -622,7 +624,7 @@ mod tests {
 
         let data = Msg::new("geometry_msgs",
                             "PoseStamped",
-                            include_str!("msg_examples/geometry_msgs/PoseStamped.msg"))
+                            include_str!("msg_examples/geometry_msgs/msg/PoseStamped.msg"))
             .unwrap();
         assert_eq!(data.package, "geometry_msgs");
         assert_eq!(data.name, "PoseStamped");
@@ -643,7 +645,7 @@ mod tests {
 
         let data = Msg::new("sensor_msgs",
                             "Imu",
-                            include_str!("msg_examples/sensor_msgs/Imu.msg"))
+                            include_str!("msg_examples/sensor_msgs/msg/Imu.msg"))
             .unwrap();
         assert_eq!(data.package, "sensor_msgs");
         assert_eq!(data.name, "Imu");

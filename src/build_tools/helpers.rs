@@ -79,7 +79,8 @@ pub fn get_message_map(folders: &[&str],
 fn get_message(folders: &[&str], package: &str, name: &str) -> Result<Msg> {
     use std::io::Read;
     for folder in folders {
-        let full_path = Path::new(&folder).join(&package).join(&name).with_extension("msg");
+        let full_path =
+            Path::new(&folder).join(&package).join("msg").join(&name).with_extension("msg");
         if let Ok(mut f) = File::open(&full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents).chain_err(|| "Failed to read file to string!")?;
