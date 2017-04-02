@@ -4,6 +4,7 @@ use super::error::Result;
 
 pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String> {
     let mut output = Vec::<String>::new();
+    output.push("#[macro_use]\nextern crate serde_derive;".into());
     output.push("pub mod msg {".into());
     let mut message_pairs = Vec::<(&str, &str)>::new();
     for message in messages {
