@@ -106,7 +106,7 @@ fn main() {
     let mut ros = Ros::new("node_name").unwrap();
     let mut publisher = ros.publish::<Uint64>("some_topic").unwrap();
     loop {
-        thread::sleep(time::Duration::from_secs(1);
+        thread::sleep(time::Duration::from_secs(1));
         publisher.send(UInt64 { data: 42 }).unwrap();
     }
 }
@@ -125,7 +125,7 @@ fn main() {
     let mut ros = Ros::new("node_name").unwrap();
     ros.subscribe("some_topic", |v: UInt64| println!("{}", v.data)).unwrap();
     loop {
-        thread::sleep(time::Duration::from_secs(100);
+        thread::sleep(time::Duration::from_secs(100));
     }
 }
 ```
