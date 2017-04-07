@@ -34,6 +34,9 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             output.push(create_function("md5sum", &hash));
             output.push(create_function("msg_type", &message.get_type()));
             output.push("        }".into());
+            output.push(format!("        impl {} {{", message.name));
+            output.push(message.new_string());
+            output.push("        }".into());
         }
         output.push("        #[allow(non_snake_case)]".into());
         output.push("        pub mod CONST {".into());

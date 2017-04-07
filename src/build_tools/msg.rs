@@ -1,3 +1,4 @@
+use itertools::{self, Itertools};
 use regex::Regex;
 use super::error::{Result, ResultExt};
 use std::collections::HashMap;
@@ -18,6 +19,34 @@ impl Msg {
             fields: fields,
             source: source.trim().into(),
         })
+    }
+
+    pub fn new_string(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("            pub fn new() -> {} {{", self.name));
+        lines.push(format!("                {} {{", self.name));
+        for field in self.fields.iter() {
+            match field.case {
+                FieldCase::Unit => {
+                    lines.push(format!("                    {}: {},",
+                                       field.name,
+                                       field.datatype.rust_newtype()));
+                }
+                FieldCase::Vector => {
+                    lines.push(format!("                    {}: Vec::new(),", field.name));
+                }
+                FieldCase::Array(l) => {
+                    let newtype = field.datatype.rust_newtype();
+                    lines.push(format!("                    {}: [{}],",
+                                       field.name,
+                                       itertools::repeat_n(newtype.as_str(), l).join(", ")));
+                }
+                FieldCase::Const(..) => {}
+            }
+        }
+        lines.push("                }".into());
+        lines.push("            }".into());
+        lines.join("\n")
     }
 
     pub fn get_type(&self) -> String {
@@ -348,6 +377,23 @@ impl DataType {
             DataType::Duration => "::rosrust::msg::Duration".into(),
             DataType::LocalStruct(ref name) => name.clone(),
             DataType::RemoteStruct(ref pkg, ref name) => format!("super::{}::{}", pkg, name),
+        }
+    }
+
+    fn rust_newtype(&self) -> String {
+        match *self {
+            DataType::Bool => "false".into(),
+            DataType::I8 => "0i8".into(),
+            DataType::I16 => "0i16".into(),
+            DataType::I32 => "0i32".into(),
+            DataType::I64 => "0i64".into(),
+            DataType::U8 => "0u8".into(),
+            DataType::U16 => "0u16".into(),
+            DataType::U32 => "0u32".into(),
+            DataType::U64 => "0u64".into(),
+            DataType::F32 => "0f32".into(),
+            DataType::F64 => "0f64".into(),
+            _ => format!("{}::new()", self.rust_type()),
         }
     }
 
