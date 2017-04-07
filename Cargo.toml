@@ -17,6 +17,7 @@ regex = "0.2.1"
 rust-crypto = "0.2.36"
 rustc-serialize = "0.3"
 serde = "0.9.7"
+serde_derive = "0.9.13"
 serde_rosmsg = "0.1.0"
 xml-rs = "0.3"
 

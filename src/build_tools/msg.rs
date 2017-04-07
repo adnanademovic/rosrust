@@ -58,6 +58,7 @@ impl Msg {
 
     pub fn const_string(&self) -> String {
         let mut output = Vec::<String>::new();
+        output.push("            #[allow(non_snake_case)]".into());
         output.push(format!("            pub mod {} {{", self.name));
         for field in &self.fields {
             if let Some(s) = field.to_const_string() {
@@ -72,7 +73,7 @@ impl Msg {
     pub fn struct_string(&self) -> String {
         let mut output = Vec::<String>::new();
         output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
-        output.push("        #[derive(Serialize,Deserialize,Debug,Send)]".into());
+        output.push("        #[derive(Serialize,Deserialize,Debug)]".into());
         output.push(format!("        pub struct {} {{", self.name));
         for field in &self.fields {
             if let Some(s) = field.to_string() {
@@ -288,10 +289,12 @@ impl FieldInfo {
             DataType::LocalStruct(..) => return None,
             DataType::RemoteStruct(..) => return None,
             _ => {
-                format!("const {}: {} = {};",
+                let datatype = self.datatype.rust_type();
+                format!("const {}: {} = {} as {};",
                         self.name,
-                        self.datatype.rust_type(),
-                        value)
+                        datatype,
+                        value,
+                        datatype)
             }
         })
     }
@@ -340,7 +343,7 @@ impl DataType {
             DataType::U64 => "u64".into(),
             DataType::F32 => "f32".into(),
             DataType::F64 => "f64".into(),
-            DataType::String => "std::string::String".into(),
+            DataType::String => "::std::string::String".into(),
             DataType::Time => "::rosrust::msg::Time".into(),
             DataType::Duration => "::rosrust::msg::Duration".into(),
             DataType::LocalStruct(ref name) => name.clone(),

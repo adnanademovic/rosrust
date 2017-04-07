@@ -13,6 +13,8 @@ extern crate nix;
 extern crate regex;
 extern crate rustc_serialize;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_rosmsg;
 extern crate xml;
 
@@ -26,6 +28,7 @@ mod api;
 pub mod build_tools;
 mod rosxmlrpc;
 mod tcpros;
+pub mod msg;
 
 #[cfg(test)]
 mod tests {
