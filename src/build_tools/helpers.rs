@@ -1,4 +1,4 @@
-use std::collections::{self, LinkedList, HashMap, HashSet};
+use std::collections::{LinkedList, HashMap, HashSet};
 use super::msg::Msg;
 use super::error::{Result, ResultExt};
 use std::fs::File;
@@ -55,28 +55,54 @@ pub fn generate_message_definition(message_map: &HashMap<(String, String), Msg>,
     Ok(result)
 }
 
-pub fn get_message_map(folders: &[&str],
-                       messages: &[(&str, &str)])
-                       -> Result<HashMap<(String, String), Msg>> {
-    let mut result = HashMap::<(String, String), Msg>::new();
+pub struct MessageMap {
+    pub messages: HashMap<(String, String), Msg>,
+    pub services: HashSet<(String, String)>,
+}
+
+pub fn get_message_map(folders: &[&str], messages: &[(&str, &str)]) -> Result<MessageMap> {
+    let mut msgs = HashMap::new();
+    let mut srvs = HashSet::new();
     let mut pending = messages.iter()
         .map(|&(key, val)| (key.into(), val.into()))
         .collect::<Vec<(String, String)>>();
     while let Some(value) = pending.pop() {
         let package = value.0.clone();
         let name = value.1.clone();
-        if let collections::hash_map::Entry::Vacant(entry) = result.entry(value) {
-            let message = get_message(folders, &package, &name)?;
-            for dependency in &message.dependencies() {
-                pending.push(dependency.clone());
-            }
-            entry.insert(message);
+        if !msgs.contains_key(&value) {
+            match get_message(folders, &package, &name)? {
+                MessageCase::Message(message) => {
+                    for dependency in &message.dependencies() {
+                        pending.push(dependency.clone());
+                    }
+                    msgs.insert(value, message);
+                }
+                MessageCase::Service(service_name, req, res) => {
+                    for dependency in &req.dependencies() {
+                        pending.push(dependency.clone());
+                    }
+                    for dependency in &res.dependencies() {
+                        pending.push(dependency.clone());
+                    }
+                    msgs.insert((package.clone(), req.name.clone()), req);
+                    msgs.insert((package.clone(), res.name.clone()), res);
+                    srvs.insert((package, service_name));
+                }
+            };
         }
     }
-    Ok(result)
+    Ok(MessageMap {
+        messages: msgs,
+        services: srvs,
+    })
 }
 
-fn get_message(folders: &[&str], package: &str, name: &str) -> Result<Msg> {
+enum MessageCase {
+    Message(Msg),
+    Service(String, Msg, Msg),
+}
+
+fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
     use std::io::Read;
     for folder in folders {
         let full_path =
@@ -84,7 +110,28 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<Msg> {
         if let Ok(mut f) = File::open(&full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents).chain_err(|| "Failed to read file to string!")?;
-            return Msg::new(&package, &name, &contents);
+            return Msg::new(&package, &name, &contents).map(|v| MessageCase::Message(v));
+        }
+        let full_path =
+            Path::new(&folder).join(&package).join("srv").join(&name).with_extension("srv");
+        if let Ok(mut f) = File::open(&full_path) {
+            let mut contents = String::new();
+            f.read_to_string(&mut contents).chain_err(|| "Failed to read file to string!")?;
+            let mut parts = contents.split("\n---");
+            let req = match parts.next() {
+                Some(v) => v,
+                None => bail!("Service needs to have content"),
+            };
+            let res = match parts.next() {
+                Some(v) => v,
+                None => bail!("Service needs to be split into two parts"),
+            };
+            if parts.next().is_some() {
+                bail!("Too many splits in service");
+            }
+            let req = Msg::new(&package, &format!("{}Req", name), req)?;
+            let res = Msg::new(&package, &format!("{}Res", name), res)?;
+            return Ok(MessageCase::Service(name.into(), req, res));
         }
     }
     bail!(format!("Could not find requested message in provided folders: {}/{}",
@@ -106,14 +153,16 @@ mod tests {
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Point")]).unwrap();
+        let message_map =
+            get_message_map(&[&FILEPATH], &[("geometry_msgs", "Point")]).unwrap().messages;
         assert_eq!(message_map.len(), 1);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
     }
 
     #[test]
     fn get_message_map_fetches_message_and_dependencies() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Pose")]).unwrap();
+        let message_map =
+            get_message_map(&[&FILEPATH], &[("geometry_msgs", "Pose")]).unwrap().messages;
         assert_eq!(message_map.len(), 3);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Pose".into())));
@@ -123,7 +172,8 @@ mod tests {
     #[test]
     fn get_message_map_traverses_whole_dependency_tree() {
         let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "PoseStamped")])
-            .unwrap();
+            .unwrap()
+            .messages;
         assert_eq!(message_map.len(), 5);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Pose".into())));
@@ -137,7 +187,8 @@ mod tests {
         let message_map = get_message_map(&[&FILEPATH],
                                           &[("geometry_msgs", "PoseStamped"),
                                             ("sensor_msgs", "Imu")])
-            .unwrap();
+            .unwrap()
+            .messages;
         assert_eq!(message_map.len(), 7);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Vector3".into())));
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
@@ -153,7 +204,8 @@ mod tests {
         let message_map = get_message_map(&[&FILEPATH],
                                           &[("geometry_msgs", "PoseStamped"),
                                             ("sensor_msgs", "Imu")])
-            .unwrap();
+            .unwrap()
+            .messages;
         let hashes = calculate_md5(&message_map).unwrap();
         assert_eq!(hashes.len(), 7);
         assert_eq!(*hashes.get(&("geometry_msgs".into(), "Vector3".into())).unwrap(),
@@ -174,7 +226,8 @@ mod tests {
 
     #[test]
     fn generate_message_definition_works() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Vector3")]).unwrap();
+        let message_map =
+            get_message_map(&[&FILEPATH], &[("geometry_msgs", "Vector3")]).unwrap().messages;
         let definition = generate_message_definition(&message_map,
                                                      &message_map.get(&("geometry_msgs".into(),
                                                                 "Vector3".into()))
@@ -188,7 +241,8 @@ mod tests {
                     too, use the\n# geometry_msgs/Point message instead.\n\nfloat64 x\nfloat64 \
                     y\nfloat64 z\n");
         let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "PoseStamped")])
-            .unwrap();
+            .unwrap()
+            .messages;
         let definition = generate_message_definition(&message_map,
                                                      &message_map.get(&("geometry_msgs".into(),
                                                                 "PoseStamped".into()))
