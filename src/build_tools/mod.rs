@@ -31,7 +31,8 @@ pub fn depend_on_messages(messages: &[&str]) {
         .iter()
         .filter_map(|v| env::var(v).ok())
         .collect::<Vec<String>>();
-    let paths = variables.iter()
+    let paths = variables
+        .iter()
         .flat_map(|v| v.split(":"))
         .collect::<Vec<&str>>();
     let output = genmsg::depend_on_messages(paths.as_slice(), messages).unwrap();

@@ -42,8 +42,8 @@ pub fn mappings() -> Vec<(String, String)> {
         .filter(|v| v.len() == 2)
         .map(|v| v.into_iter().map(fix_prefix))
         .map(|mut v| {
-            (v.next().expect(UNEXPECTED_EMPTY_ARRAY), v.next().expect(UNEXPECTED_EMPTY_ARRAY))
-        })
+                 (v.next().expect(UNEXPECTED_EMPTY_ARRAY), v.next().expect(UNEXPECTED_EMPTY_ARRAY))
+             })
         .collect()
 }
 
@@ -68,7 +68,11 @@ fn system_hostname() -> String {
     let mut hostname = [0u8; 256];
     gethostname(&mut hostname)
         .expect("Hostname is either unavailable or too long to fit into buffer");
-    let hostname = hostname.into_iter().take_while(|&v| *v != 0u8).map(|v| *v).collect::<Vec<_>>();
+    let hostname = hostname
+        .into_iter()
+        .take_while(|&v| *v != 0u8)
+        .map(|v| *v)
+        .collect::<Vec<_>>();
     String::from_utf8(hostname).expect("Hostname is not legal UTF-8")
 }
 

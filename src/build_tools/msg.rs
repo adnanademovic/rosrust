@@ -14,11 +14,11 @@ impl Msg {
     pub fn new(package: &str, name: &str, source: &str) -> Result<Msg> {
         let fields = match_lines(source)?;
         Ok(Msg {
-            package: package.to_owned(),
-            name: name.to_owned(),
-            fields: fields,
-            source: source.trim().into(),
-        })
+               package: package.to_owned(),
+               name: name.to_owned(),
+               fields: fields,
+               source: source.trim().into(),
+           })
     }
 
     pub fn new_string(&self) -> String {
@@ -57,10 +57,14 @@ impl Msg {
         self.fields
             .iter()
             .filter_map(|field| match field.datatype {
-                DataType::LocalStruct(ref name) => Some((self.package.clone(), name.clone())),
-                DataType::RemoteStruct(ref pkg, ref name) => Some((pkg.clone(), name.clone())),
-                _ => None,
-            })
+                            DataType::LocalStruct(ref name) => {
+                                Some((self.package.clone(), name.clone()))
+                            }
+                            DataType::RemoteStruct(ref pkg, ref name) => {
+                                Some((pkg.clone(), name.clone()))
+                            }
+                            _ => None,
+                        })
             .collect()
     }
 
@@ -80,7 +84,11 @@ impl Msg {
             .filter(|ref v| !v.is_constant())
             .map(|ref v| v.md5_string(&self.package, hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
-        let representation = constants.into_iter().chain(fields).collect::<Vec<_>>().join("\n");
+        let representation = constants
+            .into_iter()
+            .chain(fields)
+            .collect::<Vec<_>>()
+            .join("\n");
         hasher.input_str(&representation);
         Ok(hasher.result_str())
     }
@@ -131,9 +139,9 @@ fn match_field(data: &str) -> Option<FieldLine> {
         None => return None,
     };
     Some(FieldLine {
-        field_type: captures.get(1).unwrap().as_str().into(),
-        field_name: captures.get(2).unwrap().as_str().into(),
-    })
+             field_type: captures.get(1).unwrap().as_str().into(),
+             field_name: captures.get(2).unwrap().as_str().into(),
+         })
 }
 
 fn match_vector_field(data: &str) -> Option<FieldLine> {
@@ -148,9 +156,9 @@ fn match_vector_field(data: &str) -> Option<FieldLine> {
         None => return None,
     };
     Some(FieldLine {
-        field_type: captures.get(1).unwrap().as_str().into(),
-        field_name: captures.get(2).unwrap().as_str().into(),
-    })
+             field_type: captures.get(1).unwrap().as_str().into(),
+             field_name: captures.get(2).unwrap().as_str().into(),
+         })
 }
 
 fn match_array_field(data: &str) -> Option<(FieldLine, usize)> {
@@ -288,11 +296,11 @@ impl FieldInfo {
                   -> ::std::result::Result<String, ()> {
         let datatype = self.datatype.md5_string(package, hashes)?;
         Ok(match self.case {
-            FieldCase::Unit => format!("{} {}", datatype, self.name),
-            FieldCase::Vector => format!("{}[] {}", datatype, self.name),
-            FieldCase::Array(l) => format!("{}[{}] {}", datatype, l, self.name),
-            FieldCase::Const(ref v) => format!("{} {}={}", datatype, self.name, v),
-        })
+               FieldCase::Unit => format!("{} {}", datatype, self.name),
+               FieldCase::Vector => format!("{}[] {}", datatype, self.name),
+               FieldCase::Array(l) => format!("{}[{}] {}", datatype, l, self.name),
+               FieldCase::Const(ref v) => format!("{} {}={}", datatype, self.name, v),
+           })
     }
 
     fn to_string(&self) -> Option<String> {
@@ -311,30 +319,30 @@ impl FieldInfo {
             _ => return None,
         };
         Some(match self.datatype {
-            DataType::Bool => format!("const {}: bool = {:?};", self.name, value != "0"),
-            DataType::String => format!("static {}: &'static str = {:?};", self.name, value),
-            DataType::Time => return None,
-            DataType::Duration => return None,
-            DataType::LocalStruct(..) => return None,
-            DataType::RemoteStruct(..) => return None,
-            _ => {
-                let datatype = self.datatype.rust_type();
-                format!("const {}: {} = {} as {};",
-                        self.name,
-                        datatype,
-                        value,
-                        datatype)
-            }
-        })
+                 DataType::Bool => format!("const {}: bool = {:?};", self.name, value != "0"),
+                 DataType::String => format!("static {}: &'static str = {:?};", self.name, value),
+                 DataType::Time => return None,
+                 DataType::Duration => return None,
+                 DataType::LocalStruct(..) => return None,
+                 DataType::RemoteStruct(..) => return None,
+                 _ => {
+            let datatype = self.datatype.rust_type();
+            format!("const {}: {} = {} as {};",
+                    self.name,
+                    datatype,
+                    value,
+                    datatype)
+        }
+             })
     }
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
-            datatype: parse_datatype(&datatype).ok_or_else(
-                || format!("Unsupported datatype: {}", datatype))?,
-            name: name.to_owned(),
-            case: case,
-        })
+               datatype: parse_datatype(&datatype)
+                   .ok_or_else(|| format!("Unsupported datatype: {}", datatype))?,
+               name: name.to_owned(),
+               case: case,
+           })
     }
 }
 
@@ -402,28 +410,34 @@ impl DataType {
                   hashes: &HashMap<(String, String), String>)
                   -> ::std::result::Result<String, ()> {
         Ok(match *self {
-                DataType::Bool => "bool",
-                DataType::I8 => "int8",
-                DataType::I16 => "int16",
-                DataType::I32 => "int32",
-                DataType::I64 => "int64",
-                DataType::U8 => "uint8",
-                DataType::U16 => "uint16",
-                DataType::U32 => "uint32",
-                DataType::U64 => "uint64",
-                DataType::F32 => "float32",
-                DataType::F64 => "float64",
-                DataType::String => "string",
-                DataType::Time => "time",
-                DataType::Duration => "duration",
-                DataType::LocalStruct(ref name) => {
-                    hashes.get(&(package.to_owned(), name.clone())).ok_or(())?.as_str()
-                }
-                DataType::RemoteStruct(ref pkg, ref name) => {
-                    hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
-                }
-            }
-            .into())
+                   DataType::Bool => "bool",
+                   DataType::I8 => "int8",
+                   DataType::I16 => "int16",
+                   DataType::I32 => "int32",
+                   DataType::I64 => "int64",
+                   DataType::U8 => "uint8",
+                   DataType::U16 => "uint16",
+                   DataType::U32 => "uint32",
+                   DataType::U64 => "uint64",
+                   DataType::F32 => "float32",
+                   DataType::F64 => "float64",
+                   DataType::String => "string",
+                   DataType::Time => "time",
+                   DataType::Duration => "duration",
+                   DataType::LocalStruct(ref name) => {
+                       hashes
+                           .get(&(package.to_owned(), name.clone()))
+                           .ok_or(())?
+                           .as_str()
+                   }
+                   DataType::RemoteStruct(ref pkg, ref name) => {
+                       hashes
+                           .get(&(pkg.clone(), name.clone()))
+                           .ok_or(())?
+                           .as_str()
+                   }
+               }
+               .into())
     }
 }
 
@@ -474,9 +488,13 @@ mod tests {
                    "float32".to_owned());
         assert_eq!(DataType::String.md5_string("", &hashes).unwrap(),
                    "string".to_owned());
-        assert_eq!(DataType::LocalStruct("xx".into()).md5_string("p1", &hashes).unwrap(),
+        assert_eq!(DataType::LocalStruct("xx".into())
+                       .md5_string("p1", &hashes)
+                       .unwrap(),
                    "ABCD".to_owned());
-        assert_eq!(DataType::LocalStruct("xx".into()).md5_string("p2", &hashes).unwrap(),
+        assert_eq!(DataType::LocalStruct("xx".into())
+                       .md5_string("p2", &hashes)
+                       .unwrap(),
                    "EFGH".to_owned());
         assert_eq!(DataType::RemoteStruct("p1".into(), "xx".into())
                        .md5_string("p2", &hashes)
@@ -526,16 +544,16 @@ mod tests {
         assert_eq!(Msg::new("geometry_msgs",
                             "Point",
                             include_str!("msg_examples/geometry_msgs/msg/Point.msg"))
-                       .unwrap()
-                       .calculate_md5(&HashMap::new())
-                       .unwrap(),
+                           .unwrap()
+                           .calculate_md5(&HashMap::new())
+                           .unwrap(),
                    "4a842b65f413084dc2b10fb484ea7f17".to_owned());
         assert_eq!(Msg::new("geometry_msgs",
                             "Quaternion",
                             include_str!("msg_examples/geometry_msgs/msg/Quaternion.msg"))
-                       .unwrap()
-                       .calculate_md5(&HashMap::new())
-                       .unwrap(),
+                           .unwrap()
+                           .calculate_md5(&HashMap::new())
+                           .unwrap(),
                    "a779879fadf0160734f906b8c19c7004".to_owned());
         let mut hashes = HashMap::new();
         hashes.insert(("geometry_msgs".into(), "Point".into()),
@@ -545,9 +563,9 @@ mod tests {
         assert_eq!(Msg::new("geometry_msgs",
                             "Pose",
                             include_str!("msg_examples/geometry_msgs/msg/Pose.msg"))
-                       .unwrap()
-                       .calculate_md5(&hashes)
-                       .unwrap(),
+                           .unwrap()
+                           .calculate_md5(&hashes)
+                           .unwrap(),
                    "e45d45a5a1ce597b249e23fb30fc871f".to_owned());
     }
 
@@ -619,33 +637,41 @@ mod tests {
                        name: "myname".into(),
                        case: FieldCase::Vector,
                    },
-                   match_line("  geom_msgs/Twist [  ]   myname  # ...").unwrap().unwrap());
+                   match_line("  geom_msgs/Twist [  ]   myname  # ...")
+                       .unwrap()
+                       .unwrap());
 
         assert_eq!(FieldInfo {
                        datatype: DataType::U8,
                        name: "myname".into(),
                        case: FieldCase::Array(127),
                    },
-                   match_line("  char   [   127 ]   myname# comment").unwrap().unwrap());
+                   match_line("  char   [   127 ]   myname# comment")
+                       .unwrap()
+                       .unwrap());
         assert_eq!(FieldInfo {
                        datatype: DataType::String,
                        name: "myname".into(),
                        case: FieldCase::Const("this is # data".into()),
                    },
-                   match_line("  string  myname =   this is # data  ").unwrap().unwrap());
+                   match_line("  string  myname =   this is # data  ")
+                       .unwrap()
+                       .unwrap());
         assert_eq!(FieldInfo {
                        datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
                        name: "myname".into(),
                        case: FieldCase::Const("-444".into()),
                    },
-                   match_line("  geom_msgs/Twist  myname =   -444 # data  ").unwrap().unwrap());
+                   match_line("  geom_msgs/Twist  myname =   -444 # data  ")
+                       .unwrap()
+                       .unwrap());
     }
 
     #[test]
     fn match_lines_parses_real_messages() {
         let data = match_lines(include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.\
                                              msg"))
-            .unwrap();
+                .unwrap();
         assert_eq!(vec![FieldInfo {
                             datatype: DataType::LocalStruct("Twist".into()),
                             name: "twist".into(),
@@ -682,7 +708,7 @@ mod tests {
         let data = Msg::new("geometry_msgs",
                             "TwistWithCovariance",
                             include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"))
-            .unwrap();
+                .unwrap();
         assert_eq!(data.package, "geometry_msgs");
         assert_eq!(data.name, "TwistWithCovariance");
         assert_eq!(data.fields,
@@ -703,7 +729,7 @@ mod tests {
         let data = Msg::new("geometry_msgs",
                             "PoseStamped",
                             include_str!("msg_examples/geometry_msgs/msg/PoseStamped.msg"))
-            .unwrap();
+                .unwrap();
         assert_eq!(data.package, "geometry_msgs");
         assert_eq!(data.name, "PoseStamped");
         assert_eq!(data.fields,
@@ -725,7 +751,7 @@ mod tests {
         let data = Msg::new("sensor_msgs",
                             "Imu",
                             include_str!("msg_examples/sensor_msgs/msg/Imu.msg"))
-            .unwrap();
+                .unwrap();
         assert_eq!(data.package, "sensor_msgs");
         assert_eq!(data.name, "Imu");
         assert_eq!(data.fields,

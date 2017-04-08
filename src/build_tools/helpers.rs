@@ -33,7 +33,10 @@ pub fn generate_message_definition(message_map: &HashMap<(String, String), Msg>,
                                    -> Result<String> {
     let mut handled_messages = HashSet::<(String, String)>::new();
     let mut result = message.source.clone();
-    let mut pending = message.dependencies().into_iter().collect::<LinkedList<_>>();
+    let mut pending = message
+        .dependencies()
+        .into_iter()
+        .collect::<LinkedList<_>>();
     while let Some(value) = pending.pop_front() {
         if handled_messages.contains(&value) {
             continue;
@@ -63,7 +66,8 @@ pub struct MessageMap {
 pub fn get_message_map(folders: &[&str], messages: &[(&str, &str)]) -> Result<MessageMap> {
     let mut msgs = HashMap::new();
     let mut srvs = HashSet::new();
-    let mut pending = messages.iter()
+    let mut pending = messages
+        .iter()
         .map(|&(key, val)| (key.into(), val.into()))
         .collect::<Vec<(String, String)>>();
     while let Some(value) = pending.pop() {
@@ -92,9 +96,9 @@ pub fn get_message_map(folders: &[&str], messages: &[(&str, &str)]) -> Result<Me
         }
     }
     Ok(MessageMap {
-        messages: msgs,
-        services: srvs,
-    })
+           messages: msgs,
+           services: srvs,
+       })
 }
 
 enum MessageCase {
@@ -105,18 +109,26 @@ enum MessageCase {
 fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
     use std::io::Read;
     for folder in folders {
-        let full_path =
-            Path::new(&folder).join(&package).join("msg").join(&name).with_extension("msg");
+        let full_path = Path::new(&folder)
+            .join(&package)
+            .join("msg")
+            .join(&name)
+            .with_extension("msg");
         if let Ok(mut f) = File::open(&full_path) {
             let mut contents = String::new();
-            f.read_to_string(&mut contents).chain_err(|| "Failed to read file to string!")?;
+            f.read_to_string(&mut contents)
+                .chain_err(|| "Failed to read file to string!")?;
             return Msg::new(&package, &name, &contents).map(|v| MessageCase::Message(v));
         }
-        let full_path =
-            Path::new(&folder).join(&package).join("srv").join(&name).with_extension("srv");
+        let full_path = Path::new(&folder)
+            .join(&package)
+            .join("srv")
+            .join(&name)
+            .with_extension("srv");
         if let Ok(mut f) = File::open(&full_path) {
             let mut contents = String::new();
-            f.read_to_string(&mut contents).chain_err(|| "Failed to read file to string!")?;
+            f.read_to_string(&mut contents)
+                .chain_err(|| "Failed to read file to string!")?;
             let mut parts = contents.split("\n---");
             let req = match parts.next() {
                 Some(v) => v,
@@ -153,16 +165,18 @@ mod tests {
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
-        let message_map =
-            get_message_map(&[&FILEPATH], &[("geometry_msgs", "Point")]).unwrap().messages;
+        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Point")])
+            .unwrap()
+            .messages;
         assert_eq!(message_map.len(), 1);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
     }
 
     #[test]
     fn get_message_map_fetches_message_and_dependencies() {
-        let message_map =
-            get_message_map(&[&FILEPATH], &[("geometry_msgs", "Pose")]).unwrap().messages;
+        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Pose")])
+            .unwrap()
+            .messages;
         assert_eq!(message_map.len(), 3);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Pose".into())));
@@ -187,8 +201,8 @@ mod tests {
         let message_map = get_message_map(&[&FILEPATH],
                                           &[("geometry_msgs", "PoseStamped"),
                                             ("sensor_msgs", "Imu")])
-            .unwrap()
-            .messages;
+                .unwrap()
+                .messages;
         assert_eq!(message_map.len(), 7);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Vector3".into())));
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into())));
@@ -204,35 +218,51 @@ mod tests {
         let message_map = get_message_map(&[&FILEPATH],
                                           &[("geometry_msgs", "PoseStamped"),
                                             ("sensor_msgs", "Imu")])
-            .unwrap()
-            .messages;
+                .unwrap()
+                .messages;
         let hashes = calculate_md5(&message_map).unwrap();
         assert_eq!(hashes.len(), 7);
-        assert_eq!(*hashes.get(&("geometry_msgs".into(), "Vector3".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("geometry_msgs".into(), "Vector3".into()))
+                        .unwrap(),
                    "4a842b65f413084dc2b10fb484ea7f17".to_owned());
-        assert_eq!(*hashes.get(&("geometry_msgs".into(), "Point".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("geometry_msgs".into(), "Point".into()))
+                        .unwrap(),
                    "4a842b65f413084dc2b10fb484ea7f17".to_owned());
-        assert_eq!(*hashes.get(&("geometry_msgs".into(), "Quaternion".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("geometry_msgs".into(), "Quaternion".into()))
+                        .unwrap(),
                    "a779879fadf0160734f906b8c19c7004".to_owned());
-        assert_eq!(*hashes.get(&("geometry_msgs".into(), "Pose".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("geometry_msgs".into(), "Pose".into()))
+                        .unwrap(),
                    "e45d45a5a1ce597b249e23fb30fc871f".to_owned());
-        assert_eq!(*hashes.get(&("std_msgs".into(), "Header".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("std_msgs".into(), "Header".into()))
+                        .unwrap(),
                    "2176decaecbce78abc3b96ef049fabed".to_owned());
-        assert_eq!(*hashes.get(&("geometry_msgs".into(), "PoseStamped".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("geometry_msgs".into(), "PoseStamped".into()))
+                        .unwrap(),
                    "d3812c3cbc69362b77dc0b19b345f8f5".to_owned());
-        assert_eq!(*hashes.get(&("sensor_msgs".into(), "Imu".into())).unwrap(),
+        assert_eq!(*hashes
+                        .get(&("sensor_msgs".into(), "Imu".into()))
+                        .unwrap(),
                    "6a62c6daae103f4ff57a132d6f95cec2".to_owned());
     }
 
     #[test]
     fn generate_message_definition_works() {
-        let message_map =
-            get_message_map(&[&FILEPATH], &[("geometry_msgs", "Vector3")]).unwrap().messages;
+        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Vector3")])
+            .unwrap()
+            .messages;
         let definition = generate_message_definition(&message_map,
-                                                     &message_map.get(&("geometry_msgs".into(),
-                                                                "Vector3".into()))
-                                                         .unwrap())
-            .unwrap();
+                                                     &message_map
+                                                          .get(&("geometry_msgs".into(),
+                                                                 "Vector3".into()))
+                                                          .unwrap())
+                .unwrap();
         assert_eq!(definition,
                    "# This represents a vector in free space. \n# It is only meant to represent \
                     a direction. Therefore, it does not\n# make sense to apply a translation to \
@@ -244,10 +274,11 @@ mod tests {
             .unwrap()
             .messages;
         let definition = generate_message_definition(&message_map,
-                                                     &message_map.get(&("geometry_msgs".into(),
-                                                                "PoseStamped".into()))
-                                                         .unwrap())
-            .unwrap();
+                                                     &message_map
+                                                          .get(&("geometry_msgs".into(),
+                                                                 "PoseStamped".into()))
+                                                          .unwrap())
+                .unwrap();
         assert_eq!(definition,
                    "# A Pose with reference coordinate frame and timestamp\n\
 Header header\n\

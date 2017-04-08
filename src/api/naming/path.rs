@@ -101,7 +101,9 @@ impl std::str::FromStr for Buffer {
             Some("") => {}
             Some(_) | None => bail!(ErrorKind::LeadingSlashMissing(s.into())),
         }
-        let words = word_iter.map(process_name).collect::<Result<Vec<String>, Error>>()?;
+        let words = word_iter
+            .map(process_name)
+            .collect::<Result<Vec<String>, Error>>()?;
         Ok(Buffer { chain: words })
     }
 }
@@ -155,9 +157,17 @@ mod tests {
         assert_eq!(vec![String::from("foo")],
                    "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
         assert_eq!(vec![String::from("foo"), String::from("bar")],
-                   "/foo/bar".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
-        assert_eq!(vec![String::from("f1_aA"), String::from("Ba02"), String::from("Xx")],
-                   "/f1_aA/Ba02/Xx".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
+                   "/foo/bar"
+                       .parse::<Buffer>()
+                       .expect(FAILED_TO_HANDLE)
+                       .get());
+        assert_eq!(vec![String::from("f1_aA"),
+                        String::from("Ba02"),
+                        String::from("Xx")],
+                   "/f1_aA/Ba02/Xx"
+                       .parse::<Buffer>()
+                       .expect(FAILED_TO_HANDLE)
+                       .get());
     }
 
     #[test]
@@ -168,7 +178,9 @@ mod tests {
                    format!("{}", "/foo/bar".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
         assert_eq!("/f1_aA/Ba02/Xx",
                    format!("{}",
-                           "/f1_aA/Ba02/Xx".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
+                           "/f1_aA/Ba02/Xx"
+                               .parse::<Buffer>()
+                               .expect(FAILED_TO_HANDLE)));
     }
 
     #[test]
@@ -194,14 +206,18 @@ mod tests {
                                .expect(FAILED_TO_HANDLE)
                                .parent()
                                .expect(FAILED_TO_HANDLE)));
-        assert!("/".parse::<Buffer>().expect(FAILED_TO_HANDLE).parent().is_err());
+        assert!("/"
+                    .parse::<Buffer>()
+                    .expect(FAILED_TO_HANDLE)
+                    .parent()
+                    .is_err());
         assert!("/foo"
-            .parse::<Buffer>()
-            .expect(FAILED_TO_HANDLE)
-            .parent()
-            .expect(FAILED_TO_HANDLE)
-            .parent()
-            .is_err());
+                    .parse::<Buffer>()
+                    .expect(FAILED_TO_HANDLE)
+                    .parent()
+                    .expect(FAILED_TO_HANDLE)
+                    .parent()
+                    .is_err());
     }
 
     #[test]

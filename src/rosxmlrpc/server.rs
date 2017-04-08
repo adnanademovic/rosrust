@@ -18,9 +18,9 @@ impl Server {
             .handle(XmlRpcHandler::new(responder))?;
         let uri = format!("http://{}:{}/", hostname, listener.socket.port());
         Ok(Server {
-            listener: listener,
-            uri: uri,
-        })
+               listener: listener,
+               uri: uri,
+           })
     }
 
     pub fn shutdown(&mut self) -> hyper::Result<()> {
@@ -47,8 +47,8 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
     fn process(&self, req: Request, res: Response) -> Result<()> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
         res.send(&self.handler
-                .handle(&method_name, parameters.into_iter().map(Parameter::new))?
-                .write_response()?)?;
+                       .handle(&method_name, parameters.into_iter().map(Parameter::new))?
+                       .write_response()?)?;
         Ok(())
     }
 }
@@ -56,8 +56,10 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
 impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
     fn handle(&self, req: Request, res: Response) {
         if let Err(err) = self.process(req, res) {
-            let info =
-                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            let info = err.iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<_>>()
+                .join("\nCaused by:");
             error!("Server handler error: {}", info);
         }
     }

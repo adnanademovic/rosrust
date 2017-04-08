@@ -13,7 +13,9 @@ pub struct ClientResponse<T> {
 
 impl<T> ClientResponse<T> {
     pub fn read(self) -> Result<ServiceResult<T>> {
-        self.handle.join().unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
+        self.handle
+            .join()
+            .unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
     }
 }
 
@@ -62,7 +64,8 @@ impl<T: ServicePair> Client<T> {
                     -> Result<ServiceResult<T::Response>> {
         let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
         let mut stream =
-            connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
+            connection
+                .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
         to_writer(&mut stream, &args)?;
@@ -70,10 +73,10 @@ impl<T: ServicePair> Client<T> {
         let success = read_verification_byte(&mut stream)
             .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
-            Ok(from_reader(&mut stream)?)
-        } else {
-            Err(from_reader(&mut stream)?)
-        })
+               Ok(from_reader(&mut stream)?)
+           } else {
+               Err(from_reader(&mut stream)?)
+           })
     }
 }
 

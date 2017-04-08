@@ -53,8 +53,10 @@ fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: TargetList
         let result = exchange_headers::<T, _>(&mut stream, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info =
-                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            let info = err.iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<_>>()
+                .join("\nCaused by:");
             error!("{}", info);
             continue;
         }
@@ -116,9 +118,9 @@ impl<T: Message> PublisherStream<T> {
             bail!(ErrorKind::MessageTypeMismatch(publisher.msg_type.clone(), msg_type));
         }
         Ok(PublisherStream {
-            stream: publisher.subscriptions.clone(),
-            datatype: std::marker::PhantomData,
-        })
+               stream: publisher.subscriptions.clone(),
+               datatype: std::marker::PhantomData,
+           })
     }
 
     pub fn send(&mut self, message: T) -> Result<()> {

@@ -64,10 +64,12 @@ fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F
         }
         let h = handler.clone();
         thread::spawn(move || if let Err(err) = respond_to::<T, U, F>(stream, h) {
-            let info =
-                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
-            error!("{}", info);
-        });
+                          let info = err.iter()
+                              .map(|v| format!("{}", v))
+                              .collect::<Vec<_>>()
+                              .join("\nCaused by:");
+                          error!("{}", info);
+                      });
     }
 }
 
@@ -132,8 +134,11 @@ impl Service {
         let service_name = String::from(service);
         let node_name = String::from(node_name);
         thread::spawn(move || {
-            listen_for_clients::<T, _, _, _>(service_name, node_name, handler, listener)
-        });
+                          listen_for_clients::<T, _, _, _>(service_name,
+                                                           node_name,
+                                                           handler,
+                                                           listener)
+                      });
         Service {
             api: String::from(api),
             msg_type: T::msg_type(),
@@ -165,19 +170,19 @@ impl TcpIterator {
         let killer = TcpRaii { killer: tx.clone() };
         let service = String::from(service);
         thread::spawn(move || for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    if tx.send(Some(stream)).is_err() {
-                        break;
-                    }
-                }
-                Err(err) => {
-                    error!("TCP connection to subscriber failed on service '{}': {}",
-                           service,
-                           err);
-                }
+                          match stream {
+                              Ok(stream) => {
+                                  if tx.send(Some(stream)).is_err() {
+                                      break;
+                                  }
+                              }
+                              Err(err) => {
+                error!("TCP connection to subscriber failed on service '{}': {}",
+                       service,
+                       err);
             }
-        });
+                          }
+                      });
         (killer, TcpIterator { listener: rx })
     }
 }

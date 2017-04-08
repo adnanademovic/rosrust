@@ -43,16 +43,18 @@ impl Ros {
         let slave = Slave::new(&master_uri, &hostname, 0, &name)?;
         let master = Master::new(&master_uri, &name, &slave.uri());
         Ok(Ros {
-            master: master,
-            slave: slave,
-            hostname: String::from(hostname),
-            resolver: resolver,
-            name: name,
-        })
+               master: master,
+               slave: slave,
+               hostname: String::from(hostname),
+               resolver: resolver,
+               name: name,
+           })
     }
 
     fn map(&mut self, source: &str, destination: &str) -> Result<()> {
-        self.resolver.map(source, destination).map_err(|v| v.into())
+        self.resolver
+            .map(source, destination)
+            .map_err(|v| v.into())
     }
 
     pub fn uri(&self) -> &str {
@@ -60,12 +62,15 @@ impl Ros {
     }
 
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
-        self.resolver.translate(name).ok().map(|v| {
-            Parameter {
-                master: &self.master,
-                name: v,
-            }
-        })
+        self.resolver
+            .translate(name)
+            .ok()
+            .map(|v| {
+                     Parameter {
+                         master: &self.master,
+                         name: v,
+                     }
+                 })
     }
 
     pub fn parameters(&self) -> MasterResult<Vec<String>> {
@@ -91,7 +96,8 @@ impl Ros {
               F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
     {
         let name = self.resolver.translate(service)?;
-        let api = self.slave.add_service::<T, F>(&self.hostname, &name, handler)?;
+        let api = self.slave
+            .add_service::<T, F>(&self.hostname, &name, handler)?;
 
         if let Err(err) = self.master.register_service(&name, &api) {
             self.slave.remove_service(&name);
@@ -112,8 +118,9 @@ impl Ros {
 
         match self.master.register_subscriber(&name, &T::msg_type()) {
             Ok(publishers) => {
-                if let Err(err) = self.slave
-                    .add_publishers_to_subscription(&name, publishers.into_iter()) {
+                if let Err(err) =
+                    self.slave
+                        .add_publishers_to_subscription(&name, publishers.into_iter()) {
                     error!("Failed to subscribe to all publishers of topic '{}': {}",
                            name,
                            err);
@@ -166,7 +173,9 @@ impl<'a> Parameter<'a> {
     }
 
     pub fn set<T: Encodable>(&self, value: &T) -> MasterResult<()> {
-        self.master.set_param::<T>(&self.name, value).and(Ok(()))
+        self.master
+            .set_param::<T>(&self.name, value)
+            .and(Ok(()))
     }
 
     pub fn delete(&self) -> MasterResult<()> {

@@ -42,7 +42,9 @@ impl Subscriber {
             // Failure could only be caused by the join_connections
             // thread not running, which only happens after
             // Subscriber has been deconstructed
-            self.publishers_stream.send(address).expect("Connected thread died");
+            self.publishers_stream
+                .send(address)
+                .expect("Connected thread died");
         }
         Ok(())
     }
@@ -84,8 +86,10 @@ fn join_connections<T>(data_stream: Sender<Option<Vec<u8>>>,
         let result = join_connection::<T>(&data_stream, &publisher, caller_id, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info =
-                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            let info = err.iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<_>>()
+                .join("\nCaused by:");
             error!("{}", info);
         }
     }
@@ -104,7 +108,8 @@ fn join_connection<T>(data_stream: &Sender<Option<Vec<u8>>>,
     thread::spawn(move || {
         while let Ok(buffer) = package_to_vector(&mut stream) {
             if target.send(Some(buffer)).is_err() {
-                // Data receiver has been destroyed after Subscriber destructor's kill signal
+                // Data receiver has been destroyed after
+                // Subscriber destructor's kill signal
                 break;
             }
         }

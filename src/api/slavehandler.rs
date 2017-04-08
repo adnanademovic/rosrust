@@ -122,12 +122,17 @@ impl SlaveHandler {
 
     fn shutdown(&self, req: &mut ParameterIterator) -> HandleResult<i32> {
         let caller_id = pop!(req; String);
-        let message = pop::<String>(req).unwrap_or(Err("".into())).unwrap_or("".into());
+        let message = pop::<String>(req)
+            .unwrap_or(Err("".into()))
+            .unwrap_or("".into());
         if caller_id == "" {
             return Ok(Err("Empty strings given".into()));
         }
         info!("Server is shutting down because: {}", message);
-        if let Err(..) = self.shutdown_signal.lock().expect(FAILED_TO_LOCK).send(()) {
+        if let Err(..) = self.shutdown_signal
+               .lock()
+               .expect(FAILED_TO_LOCK)
+               .send(()) {
             bail!("Slave API is down already");
         }
         Ok(Ok(0))
@@ -139,16 +144,16 @@ impl SlaveHandler {
             return Ok(Err("Empty strings given".into()));
         }
         Ok(Ok(self.publications
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .values()
-            .map(|ref v| {
-                return Topic {
-                    name: v.topic.clone(),
-                    datatype: v.msg_type.clone(),
-                };
-            })
-            .collect()))
+                  .lock()
+                  .expect(FAILED_TO_LOCK)
+                  .values()
+                  .map(|ref v| {
+                           return Topic {
+                                      name: v.topic.clone(),
+                                      datatype: v.msg_type.clone(),
+                                  };
+                       })
+                  .collect()))
     }
 
     fn get_subscriptions(&self, req: &mut ParameterIterator) -> HandleResult<Vec<Topic>> {
@@ -157,16 +162,16 @@ impl SlaveHandler {
             return Ok(Err("Empty strings given".into()));
         }
         Ok(Ok(self.subscriptions
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .values()
-            .map(|ref v| {
-                return Topic {
-                    name: v.topic.clone(),
-                    datatype: v.msg_type.clone(),
-                };
-            })
-            .collect()))
+                  .lock()
+                  .expect(FAILED_TO_LOCK)
+                  .values()
+                  .map(|ref v| {
+                           return Topic {
+                                      name: v.topic.clone(),
+                                      datatype: v.msg_type.clone(),
+                                  };
+                       })
+                  .collect()))
     }
 
     fn publisher_update(&self, req: &mut ParameterIterator) -> HandleResult<i32> {
@@ -180,7 +185,7 @@ impl SlaveHandler {
                                        &self.name,
                                        &topic,
                                        publishers.into_iter())
-            .and(Ok(Ok(0)))
+                .and(Ok(Ok(0)))
     }
 
     fn get_master_uri(&self, req: &mut ParameterIterator) -> HandleResult<&str> {
@@ -199,9 +204,9 @@ impl SlaveHandler {
             None => return Ok(Err("Missing parameter".into())),
         };
         let (ip, port) = match self.publications
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .get(&topic) {
+                  .lock()
+                  .expect(FAILED_TO_LOCK)
+                  .get(&topic) {
             Some(publisher) => (self.hostname.clone(), publisher.port as i32),
             None => {
                 return Ok(Err("Requested topic not published by node".into()));
@@ -215,7 +220,7 @@ impl SlaveHandler {
             _ => {
                 return Ok(Err("Protocols need to be provided as [ [String, \
                                            XmlRpcLegalValue] ]"
-                    .into()));
+                                      .into()));
             }
         };
         let mut has_tcpros = false;
@@ -244,8 +249,10 @@ pub fn add_publishers_to_subscription<T>(subscriptions: &mut HashMap<String, Sub
     if let Some(mut subscription) = subscriptions.get_mut(topic) {
         for publisher in publishers {
             if let Err(err) = connect_to_publisher(&mut subscription, &name, &publisher, &topic) {
-                let info =
-                    err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+                let info = err.iter()
+                    .map(|v| format!("{}", v))
+                    .collect::<Vec<_>>()
+                    .join("\nCaused by:");
                 error!("Failed to connect to publisher '{}': {}", publisher, info);
                 return Err(err);
             }
@@ -277,10 +284,11 @@ fn encode_response<T: Encodable>(response: HandleResult<T>,
 
 fn pop<T: Decodable>(req: &mut ParameterIterator) -> HandleResult<T> {
     Ok(Ok(match req.next() {
-            Some(v) => v,
-            None => return Ok(Err("Missing parameter".into())),
-        }.read::<T>()
-        .map_err(|v| error::rosxmlrpc::Error::from(v))?))
+                  Some(v) => v,
+                  None => return Ok(Err("Missing parameter".into())),
+              }
+              .read::<T>()
+              .map_err(|v| error::rosxmlrpc::Error::from(v))?))
 }
 
 fn connect_to_publisher(subscriber: &mut Subscriber,
@@ -293,7 +301,9 @@ fn connect_to_publisher(subscriber: &mut Subscriber,
         bail!("Publisher responded with a non-TCPROS protocol: {}",
               protocol)
     }
-    subscriber.connect_to((hostname.as_str(), port as u16)).map_err(|err| ErrorKind::Io(err).into())
+    subscriber
+        .connect_to((hostname.as_str(), port as u16))
+        .map_err(|err| ErrorKind::Io(err).into())
 }
 
 fn request_topic(publisher_uri: &str,
@@ -305,7 +315,8 @@ fn request_topic(publisher_uri: &str,
     request.add(&topic)?;
     request.add(&[["TCPROS"]])?;
     let client = rosxmlrpc::Client::new(publisher_uri);
-    let protocols = client.request::<(i32, String, (String, String, i32))>(request)?;
+    let protocols = client
+        .request::<(i32, String, (String, String, i32))>(request)?;
     Ok(protocols.2)
 }
 

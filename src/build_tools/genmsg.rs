@@ -12,26 +12,31 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
     }
     let message_map = helpers::get_message_map(folders, &message_pairs)?;
     let hashes = helpers::calculate_md5(&message_map.messages)?;
-    let packages = message_map.messages
+    let packages = message_map
+        .messages
         .iter()
         .map(|(&(ref pack, ref _name), ref _value)| pack.clone())
-        .chain(message_map.services
-            .iter()
-            .map(|&(ref pack, ref _name)| pack.clone()))
+        .chain(message_map
+                   .services
+                   .iter()
+                   .map(|&(ref pack, ref _name)| pack.clone()))
         .collect::<HashSet<String>>();
     for package in packages {
         output.push(format!("    pub mod {} {{", package));
-        let names = message_map.messages
+        let names = message_map
+            .messages
             .iter()
             .filter(|&(&(ref pack, ref _name), ref _value)| pack == &package)
             .map(|(&(ref _pack, ref name), ref _value)| name.clone())
             .collect::<HashSet<String>>();
         for name in &names {
             let key = (package.clone(), name.clone());
-            let message = message_map.messages
+            let message = message_map
+                .messages
                 .get(&key)
                 .expect("Internal implementation contains mismatch in map keys");
-            let hash = hashes.get(&key)
+            let hash = hashes
+                .get(&key)
                 .expect("Internal implementation contains mismatch in map keys");
             let definition = helpers::generate_message_definition(&message_map.messages, &message)?;
             output.push(message.struct_string());
@@ -47,13 +52,15 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
         output.push("        #[allow(non_snake_case)]".into());
         output.push("        pub mod CONST {".into());
         for name in &names {
-            let message = message_map.messages
+            let message = message_map
+                .messages
                 .get(&(package.clone(), name.clone()))
                 .expect("Internal implementation contains mismatch in map keys");
             output.push(message.const_string());
         }
         output.push("        }".into());
-        let names = message_map.services
+        let names = message_map
+            .services
             .iter()
             .filter(|&&(ref pack, ref _name)| pack == &package)
             .map(|&(ref _pack, ref name)| name.clone())
@@ -121,7 +128,7 @@ mod tests {
     fn depend_on_messages_printout() {
         let data = depend_on_messages(&[&FILEPATH],
                                       &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"])
-            .unwrap();
+                .unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }

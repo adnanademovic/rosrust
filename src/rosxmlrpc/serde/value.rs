@@ -78,29 +78,31 @@ impl std::fmt::Display for XmlRpcResponse {
 
 impl XmlRpcRequest {
     pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcRequest> {
-        let tree = Tree::new(body).chain_err(|| "Failed to transform XML data into tree")?;
+        let tree = Tree::new(body)
+            .chain_err(|| "Failed to transform XML data into tree")?;
         let (key, mut children) = match tree {
             Tree::Node(key, children) => (key, children),
             Tree::Leaf(_) => {
-                bail!("XML-RPC request should contain a node called 'methodCall' with two children")
+                bail!("XML-RPC request should contain a node called 'methodCall' with 2 children");
             }
         };
         if key != "methodCall" || children.len() != 2 {
-            bail!("XML-RPC request should contain a node called 'methodCall' with two children")
+            bail!("XML-RPC request should contain a node called 'methodCall' with 2 children")
         }
         // We checked the array length, so it's safe to pop
         let parameters_tree = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
         let method = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
-        match method.peel_layer("methodName")
-            .chain_err(|| "Bad XML-RPC Request method name value")? {
+        match method
+                  .peel_layer("methodName")
+                  .chain_err(|| "Bad XML-RPC Request method name value")? {
             Tree::Leaf(method_name) => {
                 Ok(XmlRpcRequest {
-                    method: method_name,
-                    parameters: extract_parameters(parameters_tree)?,
-                })
+                       method: method_name,
+                       parameters: extract_parameters(parameters_tree)?,
+                   })
             }
             Tree::Node(_, _) => {
-                bail!("Node 'methodName' should just contain a string representing the method name")
+                bail!("Node 'methodName' contain a string representing the method name");
             }
         }
     }
@@ -108,19 +110,21 @@ impl XmlRpcRequest {
 
 impl XmlRpcResponse {
     pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcResponse> {
-        extract_parameters(Tree::new(body).chain_err(|| "Failed to transform XML data into tree")?
-                .peel_layer("methodResponse")?)
-            .map(|parameters| XmlRpcResponse { parameters: parameters })
+        extract_parameters(Tree::new(body)
+                               .chain_err(|| "Failed to transform XML data into tree")?
+                               .peel_layer("methodResponse")?)
+                .map(|parameters| XmlRpcResponse { parameters: parameters })
     }
 }
 
 fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>> {
     if let Tree::Node(key, parameters) = parameters {
         if key == "params" {
-            return parameters.into_iter()
-                .map(XmlRpcValue::from_parameter)
-                .collect::<Result<_>>()
-                .chain_err(|| "Failed to parse parameters");
+            return parameters
+                       .into_iter()
+                       .map(XmlRpcValue::from_parameter)
+                       .collect::<Result<_>>()
+                       .chain_err(|| "Failed to parse parameters");
         }
     }
     bail!("Parameters need to be contained within a node called params")
@@ -129,7 +133,7 @@ fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>> {
 impl XmlRpcValue {
     pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcValue> {
         XmlRpcValue::from_tree(Tree::new(body)
-                               .chain_err(|| "Couldn't generate XML tree to form value")?)
+                                   .chain_err(|| "Couldn't generate XML tree to form value")?)
     }
 
     fn read_member(tree: Tree) -> Result<(String, XmlRpcValue)> {
@@ -146,13 +150,15 @@ impl XmlRpcValue {
         // We tested the vector length already, so it's safe to pop
         let value = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
         let name_node = children.pop().expect(UNEXPECTED_EMPTY_ARRAY);
-        let name = match name_node.peel_layer("name")
-            .chain_err(|| "First struct member field should be a node called 'name'")? {
-            Tree::Leaf(name) => name,
-            Tree::Node(_, _) => {
-                bail!("Struct member's name node should just contain the member's name")
-            }
-        };
+        let name =
+            match name_node
+                      .peel_layer("name")
+                      .chain_err(|| "First struct member field should be a node called 'name'")? {
+                Tree::Leaf(name) => name,
+                Tree::Node(_, _) => {
+                    bail!("Struct member's name node should just contain the member's name");
+                }
+            };
 
         XmlRpcValue::from_tree(value)
             .chain_err(|| format!("Failed to parse subtree of struct field {}", name))
@@ -181,17 +187,17 @@ impl XmlRpcValue {
         }
         if key == "array" {
             return if let Some(Tree::Node(key, children)) = values.pop() {
-                if key != "data" {
-                    bail!("Node 'array' must contain 'data' node, but '{}' detected",
-                          key);
-                }
-                Ok(XmlRpcValue::Array(children.into_iter()
+                       if key != "data" {
+                           bail!("Node 'array' must contain 'data' node, but '{}' detected",
+                                 key);
+                       }
+                       Ok(XmlRpcValue::Array(children.into_iter()
                     .map(XmlRpcValue::from_tree)
                     .collect::<Result<_>>()
                     .chain_err(|| "Failed to parse array's children")?))
-            } else {
-                bail!("Node 'array' must contain 'data' node with child values");
-            };
+                   } else {
+                       bail!("Node 'array' must contain 'data' node with child values");
+                   };
         }
         let value = match values.pop().unwrap_or(Tree::Leaf(String::from(""))) {
             Tree::Leaf(value) => value,
@@ -199,8 +205,12 @@ impl XmlRpcValue {
         };
         match key.as_str() {
             "i4" | "int" => {
-                Ok(XmlRpcValue::Int(value.parse()
-                    .chain_err(|| format!("Failed to parse integer (i32) {}", value))?))
+                Ok(XmlRpcValue::Int(value
+                                        .parse()
+                                        .chain_err(|| {
+                                                       format!("Failed to parse integer (i32) {}",
+                                                               value)
+                                                   })?))
             }
             "boolean" => {
                 Ok(XmlRpcValue::Bool(value.parse::<i32>()
@@ -209,8 +219,12 @@ impl XmlRpcValue {
             }
             "string" => Ok(XmlRpcValue::String(value)),
             "double" => {
-                Ok(XmlRpcValue::Double(value.parse()
-                    .chain_err(|| format!("Failed to parse double (f64) {}", value))?))
+                Ok(XmlRpcValue::Double(value
+                                           .parse()
+                                           .chain_err(|| {
+                                                          format!("Failed to parse double (f64) {}",
+                                                                  value)
+                                                      })?))
             }
             _ => bail!("Unsupported data type '{}'", key),
         }
@@ -224,8 +238,7 @@ enum Tree {
 
 impl Tree {
     fn new<T: std::io::Read>(body: T) -> Result<Tree> {
-        parse_tree(&mut xml::EventReader::new(body))
-            ?
+        parse_tree(&mut xml::EventReader::new(body))?
             .ok_or("XML data started with a closing tag".into())
     }
 
@@ -246,13 +259,14 @@ enum Node {
 }
 
 fn parse_tree<T: std::io::Read>(reader: &mut xml::EventReader<T>) -> Result<Option<Tree>> {
-    match next_node(reader).chain_err(|| "Unexpected end of XML data")? {
+    match next_node(reader)
+              .chain_err(|| "Unexpected end of XML data")? {
         Node::Close(..) => Ok(None),
         Node::Data(value) => Ok(Some(Tree::Leaf(value))),
         Node::Open(name) => {
             let mut children = Vec::<Tree>::new();
-            while let Some(node) =
-                parse_tree(reader).chain_err(|| ErrorKind::TreeParsing(name.clone()))? {
+            while let Some(node) = parse_tree(reader)
+                      .chain_err(|| ErrorKind::TreeParsing(name.clone()))? {
                 children.push(node);
             }
             Ok(Some(Tree::Node(name, children)))
