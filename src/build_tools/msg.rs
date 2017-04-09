@@ -74,6 +74,13 @@ impl Msg {
         use crypto::md5::Md5;
         use crypto::digest::Digest;
         let mut hasher = Md5::new();
+        hasher.input_str(&self.get_md5_representation(hashes)?);
+        Ok(hasher.result_str())
+    }
+
+    pub fn get_md5_representation(&self,
+                                  hashes: &HashMap<(String, String), String>)
+                                  -> ::std::result::Result<String, ()> {
         let constants = self.fields
             .iter()
             .filter(|ref v| v.is_constant())
@@ -89,8 +96,7 @@ impl Msg {
             .chain(fields)
             .collect::<Vec<_>>()
             .join("\n");
-        hasher.input_str(&representation);
-        Ok(hasher.result_str())
+        Ok(representation)
     }
 
     pub fn const_string(&self) -> String {

@@ -4,17 +4,18 @@ use super::error::{Result, ResultExt};
 use std::fs::File;
 use std::path::Path;
 
-pub fn calculate_md5(message_map: &HashMap<(String, String), Msg>)
-                     -> Result<HashMap<(String, String), String>> {
-    let mut result = HashMap::<(String, String), String>::new();
-    while result.len() < message_map.len() {
+pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String), String>> {
+    let mut representations = HashMap::<(String, String), String>::new();
+    let mut hashes = HashMap::<(String, String), String>::new();
+    while hashes.len() < message_map.messages.len() {
         let mut changed = false;
-        for (key, value) in message_map {
-            if result.contains_key(key) {
+        for (key, value) in &message_map.messages {
+            if hashes.contains_key(key) {
                 continue;
             }
-            if let Ok(answer) = value.calculate_md5(&result) {
-                result.insert(key.clone(), answer);
+            if let Ok(answer) = value.get_md5_representation(&hashes) {
+                hashes.insert(key.clone(), calculate_md5_from_representation(&answer));
+                representations.insert(key.clone(), answer);
                 changed = true;
             }
         }
@@ -22,10 +23,33 @@ pub fn calculate_md5(message_map: &HashMap<(String, String), Msg>)
             break;
         }
     }
-    if result.len() < message_map.len() {
+    for &(ref pack, ref name) in &message_map.services {
+        let key_req = (pack.clone(), format!("{}Req", name));
+        let key_res = (pack.clone(), format!("{}Res", name));
+        let req = match representations.get(&key_req) {
+            Some(v) => v,
+            None => bail!("Message map does not contain all needed elements"),
+        };
+        let res = match representations.get(&key_res) {
+            Some(v) => v,
+            None => bail!("Message map does not contain all needed elements"),
+        };
+        println!("|{}|{}|", req, res);
+        hashes.insert((pack.clone(), name.clone()),
+                      calculate_md5_from_representation(&format!("{}{}", req, res)));
+    }
+    if hashes.len() < message_map.messages.len() + message_map.services.len() {
         bail!("Message map does not contain all needed elements");
     }
-    Ok(result)
+    Ok(hashes)
+}
+
+fn calculate_md5_from_representation(v: &str) -> String {
+    use crypto::md5::Md5;
+    use crypto::digest::Digest;
+    let mut hasher = Md5::new();
+    hasher.input_str(v);
+    hasher.result_str()
 }
 
 pub fn generate_message_definition(message_map: &HashMap<(String, String), Msg>,
@@ -218,8 +242,7 @@ mod tests {
         let message_map = get_message_map(&[&FILEPATH],
                                           &[("geometry_msgs", "PoseStamped"),
                                             ("sensor_msgs", "Imu")])
-                .unwrap()
-                .messages;
+                .unwrap();
         let hashes = calculate_md5(&message_map).unwrap();
         assert_eq!(hashes.len(), 7);
         assert_eq!(*hashes
@@ -324,5 +347,23 @@ float64 y\n\
 float64 z\n\
 float64 w\n\
 ");
+    }
+
+    #[test]
+    fn calculate_md5_works_for_services() {
+        let message_map = get_message_map(&[&FILEPATH],
+                                          &[("diagnostic_msgs", "AddDiagnostics"),
+                                            ("simple_srv", "Something")])
+                .unwrap();
+        let hashes = calculate_md5(&message_map).unwrap();
+        assert_eq!(hashes.len(), 11);
+        assert_eq!(*hashes
+                        .get(&("diagnostic_msgs".into(), "AddDiagnostics".into()))
+                        .unwrap(),
+                   "e6ac9bbde83d0d3186523c3687aecaee".to_owned());
+        assert_eq!(*hashes
+                        .get(&("simple_srv".into(), "Something".into()))
+                        .unwrap(),
+                   "63715c08716373d8624430cde1434192".to_owned());
     }
 }

@@ -11,7 +11,7 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
         message_pairs.push(string_into_pair(message)?);
     }
     let message_map = helpers::get_message_map(folders, &message_pairs)?;
-    let hashes = helpers::calculate_md5(&message_map.messages)?;
+    let hashes = helpers::calculate_md5(&message_map)?;
     let packages = message_map
         .messages
         .iter()
@@ -66,12 +66,15 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             .map(|&(ref _pack, ref name)| name.clone())
             .collect::<HashSet<String>>();
         for name in &names {
+            let hash = hashes
+                .get(&(package.clone(), name.clone()))
+                .expect("Internal implementation contains mismatch in map keys");
             output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
             output.push("        #[derive(Serialize,Deserialize,Debug)]".into());
             output.push(format!("        pub struct {} {{}}", name));
             output.push(format!("        impl ::rosrust::Message for {} {{", name));
             output.push(create_function("msg_definition", ""));
-            output.push(create_function("md5sum", ""));
+            output.push(create_function("md5sum", &hash));
             output.push(create_function("msg_type", &format!("{}/{}", package, name)));
             output.push("        }".into());
 
