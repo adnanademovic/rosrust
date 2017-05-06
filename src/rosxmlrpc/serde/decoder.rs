@@ -21,13 +21,26 @@ impl Decoder {
     pub fn new_request<T: std::io::Read>(body: T) -> Result<(String, Vec<Decoder>)> {
         value::XmlRpcRequest::new(body)
             .chain_err(|| ErrorKind::XmlRpcReading("request".into()))
-            .map(|value| (value.method, value.parameters.into_iter().map(Decoder::new).collect()))
+            .map(|value| {
+                     (value.method,
+                      value
+                          .parameters
+                          .into_iter()
+                          .map(Decoder::new)
+                          .collect())
+                 })
     }
 
     pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>> {
         value::XmlRpcResponse::new(body)
             .chain_err(|| ErrorKind::XmlRpcReading("response".into()))
-            .map(|value| value.parameters.into_iter().map(Decoder::new).collect())
+            .map(|value| {
+                     value
+                         .parameters
+                         .into_iter()
+                         .map(Decoder::new)
+                         .collect()
+                 })
     }
 
     pub fn value(self) -> value::XmlRpcValue {
@@ -306,7 +319,7 @@ mod tests {
                        XmlRpcValue::Int(4),
                        XmlRpcValue::Int(5),
                    ])))
-                       .expect(FAILED_TO_DECODE));
+                           .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,PartialEq,RustcDecodable)]
@@ -321,7 +334,7 @@ mod tests {
                        XmlRpcValue::String(String::from("abc")),
                        XmlRpcValue::Bool(false),
                    ])))
-                       .expect(FAILED_TO_DECODE));
+                           .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,PartialEq,RustcDecodable)]
@@ -345,7 +358,7 @@ mod tests {
                            XmlRpcValue::Bool(false),
                        ]),
                    ])))
-                       .expect(FAILED_TO_DECODE));
+                           .expect(FAILED_TO_DECODE));
     }
 
     #[derive(Debug,PartialEq,RustcDecodable)]

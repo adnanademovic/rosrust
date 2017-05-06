@@ -1,6 +1,6 @@
-pub use ::api::naming::error as naming;
-pub use ::rosxmlrpc::error as rosxmlrpc;
-pub use ::tcpros::error as tcpros;
+pub use api::naming::error as naming;
+pub use rosxmlrpc::error as rosxmlrpc;
+pub use tcpros::error as tcpros;
 
 error_chain! {
     foreign_links {

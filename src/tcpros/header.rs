@@ -1,55 +1,15 @@
-use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
 use std;
-use super::decoder::DecoderSource;
-use super::encoder::Encoder;
+use serde_rosmsg::{from_reader, to_writer, Error};
 
-pub fn decode<T: std::io::Read>
-    (data: &mut T)
-     -> Result<HashMap<String, String>, super::error::decoder::Error> {
-    use super::error::decoder::{ErrorKind, ResultExt};
-    let mut decoder = DecoderSource::new(data);
-    let length = decoder.pop_length().chain_err(|| ErrorKind::EndOfBuffer)? as usize;
-    let mut result = HashMap::<String, String>::new();
-    let mut size_count = 0;
-    while length > size_count {
-        let mut decoder = match decoder.pop_decoder() {
-            Ok(decoder) => decoder,
-            Err(err) => return Err(err).chain_err(|| ErrorKind::EndOfBuffer),
-        };
-        let point = String::decode(&mut decoder)?;
-        size_count += point.len() + 4;
-        let mut point = point.splitn(2, '=');
-        let key = match point.next() {
-            Some(v) => v,
-            None => bail!(ErrorKind::FailedToDecode("map key, because it was empty".into())),
-        };
-        let value = match point.next() {
-            Some(v) => v,
-            None => {
-                bail!(ErrorKind::FailedToDecode("map element, because equal sign was missing"
-                    .into()))
-            }
-        };
-        result.insert(String::from(key), String::from(value));
-    }
-    Ok(result)
+pub fn decode<R: std::io::Read>(data: &mut R) -> Result<HashMap<String, String>, Error> {
+    from_reader(data)
 }
 
-pub fn encode(data: HashMap<String, String>) -> Result<Encoder, super::error::encoder::Error> {
-    use rustc_serialize::Encoder as EncoderTrait;
-    use super::error::encoder::{ErrorKind, ResultExt};
-    let mut encoder = Encoder::new();
-    encoder.emit_tuple(data.len(), |e| {
-            for (key, value) in data {
-                [key, value].join("=")
-                .encode(e)
-                .chain_err(|| ErrorKind::UnsupportedDataType("non-UTF-8 map key/value".into()))?;
-            }
-            Ok(())
-        })
-        .chain_err(|| ErrorKind::UnsupportedDataType("map".into()))?;
-    Ok(encoder)
+pub fn encode<W: std::io::Write>(writer: &mut W,
+                                 data: &HashMap<String, String>)
+                                 -> Result<(), Error> {
+    to_writer(writer, data)
 }
 
 pub fn match_field(fields: &HashMap<String, String>,
@@ -73,7 +33,6 @@ mod tests {
     use std;
     use std::collections::HashMap;
 
-    static WRITE_TO_VECTOR: &'static str = "Writing to vector shouldn't fail";
     static FAILED_TO_ENCODE: &'static str = "Failed to encode";
     static FAILED_TO_DECODE: &'static str = "Failed to decode";
 
@@ -81,7 +40,7 @@ mod tests {
     fn writes_empty_map() {
         let mut cursor = std::io::Cursor::new(Vec::new());
         let data = HashMap::<String, String>::new();
-        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
+        encode(&mut cursor, &data).expect(FAILED_TO_ENCODE);
 
         assert_eq!(vec![0, 0, 0, 0], cursor.into_inner());
     }
@@ -91,7 +50,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(Vec::new());
         let mut data = HashMap::<String, String>::new();
         data.insert(String::from("abc"), String::from("123"));
-        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
+        encode(&mut cursor, &data).expect(FAILED_TO_ENCODE);
         assert_eq!(vec![11, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51],
                    cursor.into_inner());
     }
@@ -103,10 +62,10 @@ mod tests {
         let mut data = HashMap::<String, String>::new();
         data.insert(String::from("abc"), String::from("123"));
         data.insert(String::from("AAA"), String::from("B0"));
-        encode(data).expect(FAILED_TO_ENCODE).write_to(&mut cursor).expect(WRITE_TO_VECTOR);
+        encode(&mut cursor, &data).expect(FAILED_TO_ENCODE);
         let data = cursor.into_inner();
-        assert!(vec![21, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51, 6, 0, 0, 0, 65, 65,
-                     65, 61, 66, 48] == data ||
+        assert!(vec![21, 0, 0, 0, 7, 0, 0, 0, 97, 98, 99, 61, 49, 50, 51, 6, 0, 0, 0, 65,
+                     65, 65, 61, 66, 48] == data ||
                 vec![21, 0, 0, 0, 6, 0, 0, 0, 65, 65, 65, 61, 66, 48, 7, 0, 0, 0, 97, 98, 99,
                      61, 49, 50, 51] == data);
     }

@@ -1,4 +1,4 @@
-pub use ::rosxmlrpc::serde::error as serde;
+pub use rosxmlrpc::serde::error as serde;
 
 error_chain! {
     foreign_links {

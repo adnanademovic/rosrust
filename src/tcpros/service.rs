@@ -1,12 +1,10 @@
-use rustc_serialize::{Encodable, Decodable};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::collections::HashMap;
 use std;
-use super::decoder::DecoderSource;
-use super::encoder::Encoder;
+use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result};
 use super::header::{encode, decode, match_field};
 use super::{ServicePair, ServiceResult};
@@ -38,7 +36,7 @@ fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<()>
     fields.insert(String::from("callerid"), String::from(node_name));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields)?.write_to(&mut stream)?;
+    encode(&mut stream, &fields)?;
     Ok(())
 }
 
@@ -65,15 +63,18 @@ fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F
             continue;
         }
         let h = handler.clone();
-        thread::spawn(move || {
-            if let Err(err) = respond_to::<T, U, F>(stream, h) {
-                let info =
-                    err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
-                error!("{}", info);
-            }
-        });
+        thread::spawn(move || if let Err(err) = respond_to::<T, U, F>(stream, h) {
+                          let info = err.iter()
+                              .map(|v| format!("{}", v))
+                              .collect::<Vec<_>>()
+                              .join("\nCaused by:");
+                          error!("{}", info);
+                      });
     }
 }
+
+const TRUE_BUFFER: [u8; 1] = [1];
+const FALSE_BUFFER: [u8; 1] = [0];
 
 fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
     where T: ServicePair,
@@ -81,31 +82,23 @@ fn respond_to<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
           F: Fn(T::Request) -> ServiceResult<T::Response>
 {
     loop {
-        let mut encoder = Encoder::new();
-        let mut decoder = match DecoderSource::new(&mut stream).next() {
-            Some(decoder) => decoder,
-            None => break,
-        };
-        let req = match T::Request::decode(&mut decoder) {
+        let req = match from_reader(&mut stream) {
             Ok(req) => req,
             Err(_) => break,
         };
         match handler(req) {
             Ok(res) => {
-                true.encode(&mut encoder)?;
-                res.encode(&mut encoder)?;
+                stream.write_all(&TRUE_BUFFER)?;
+                to_writer(&mut stream, &res)?;
             }
             Err(message) => {
-                false.encode(&mut encoder)?;
-                message.encode(&mut encoder)?;
+                stream.write_all(&FALSE_BUFFER)?;
+                to_writer(&mut stream, &message)?;
             }
         }
-        encoder.write_to(&mut stream)?;
     }
-    let mut encoder = Encoder::new();
-    false.encode(&mut encoder)?;
-    "Failed to parse passed arguments".encode(&mut encoder)?;
-    encoder.write_to(&mut stream)?;
+    stream.write_all(&FALSE_BUFFER)?;
+    to_writer(&mut stream, &"Failed to parse passed arguments")?;
     Ok(())
 }
 
@@ -141,8 +134,11 @@ impl Service {
         let service_name = String::from(service);
         let node_name = String::from(node_name);
         thread::spawn(move || {
-            listen_for_clients::<T, _, _, _>(service_name, node_name, handler, listener)
-        });
+                          listen_for_clients::<T, _, _, _>(service_name,
+                                                           node_name,
+                                                           handler,
+                                                           listener)
+                      });
         Service {
             api: String::from(api),
             msg_type: T::msg_type(),
@@ -173,22 +169,20 @@ impl TcpIterator {
         let (tx, rx) = channel();
         let killer = TcpRaii { killer: tx.clone() };
         let service = String::from(service);
-        thread::spawn(move || {
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        if tx.send(Some(stream)).is_err() {
-                            break;
-                        }
-                    }
-                    Err(err) => {
-                        error!("TCP connection to subscriber failed on service '{}': {}",
-                               service,
-                               err);
-                    }
-                }
+        thread::spawn(move || for stream in listener.incoming() {
+                          match stream {
+                              Ok(stream) => {
+                                  if tx.send(Some(stream)).is_err() {
+                                      break;
+                                  }
+                              }
+                              Err(err) => {
+                error!("TCP connection to subscriber failed on service '{}': {}",
+                       service,
+                       err);
             }
-        });
+                          }
+                      });
         (killer, TcpIterator { listener: rx })
     }
 }

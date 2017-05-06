@@ -2,7 +2,7 @@ use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
 use std;
-use super::encoder::Encoder;
+use serde_rosmsg::to_vec;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode, match_field};
 use super::Message;
@@ -31,7 +31,7 @@ fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields)?.write_to(&mut stream)?;
+    encode(&mut stream, &fields)?;
     Ok(())
 }
 
@@ -53,8 +53,10 @@ fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: TargetList
         let result = exchange_headers::<T, _>(&mut stream, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info =
-                err.iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("\nCaused by:");
+            let info = err.iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<_>>()
+                .join("\nCaused by:");
             error!("{}", info);
             continue;
         }
@@ -116,17 +118,16 @@ impl<T: Message> PublisherStream<T> {
             bail!(ErrorKind::MessageTypeMismatch(publisher.msg_type.clone(), msg_type));
         }
         Ok(PublisherStream {
-            stream: publisher.subscriptions.clone(),
-            datatype: std::marker::PhantomData,
-        })
+               stream: publisher.subscriptions.clone(),
+               datatype: std::marker::PhantomData,
+           })
     }
 
-    pub fn send(&mut self, message: T) -> super::error::encoder::Result<()> {
-        let mut encoder = Encoder::new();
-        message.encode(&mut encoder)?;
+    pub fn send(&mut self, message: T) -> Result<()> {
+        let bytes = to_vec(&message)?;
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
-        self.stream.send(encoder).expect("Connected thread died");
+        self.stream.send(bytes).expect("Connected thread died");
         Ok(())
     }
 }

@@ -31,7 +31,11 @@ impl Mapper {
     pub fn translate(&self, keys: &[String]) -> Option<Slice> {
         match keys.split_first() {
             None => self.value.as_ref().map(|v| v.slice()),
-            Some((key, child_keys)) => self.children.get(key).and_then(|v| v.translate(child_keys)),
+            Some((key, child_keys)) => {
+                self.children
+                    .get(key)
+                    .and_then(|v| v.translate(child_keys))
+            }
         }
     }
 }

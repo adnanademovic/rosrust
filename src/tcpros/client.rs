@@ -1,13 +1,11 @@
-use rustc_serialize::{Encodable, Decodable};
 use std::net::TcpStream;
 use std::thread;
 use std::collections::HashMap;
 use std;
+use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode};
 use super::{ServicePair, ServiceResult};
-use super::decoder::DecoderSource;
-use super::encoder::Encoder;
 
 pub struct ClientResponse<T> {
     handle: thread::JoinHandle<Result<ServiceResult<T>>>,
@@ -15,7 +13,9 @@ pub struct ClientResponse<T> {
 
 impl<T> ClientResponse<T> {
     pub fn read(self) -> Result<ServiceResult<T>> {
-        self.handle.join().unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
+        self.handle
+            .join()
+            .unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
     }
 }
 
@@ -64,24 +64,26 @@ impl<T: ServicePair> Client<T> {
                     -> Result<ServiceResult<T::Response>> {
         let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
         let mut stream =
-            connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
+            connection
+                .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
-        let mut encoder = Encoder::new();
-        args.encode(&mut encoder)?;
-        encoder.write_to(&mut stream)?;
+        to_writer(&mut stream, &args)?;
 
-        let mut decoder = DecoderSource::new(&mut stream);
-        let success = decoder.pop_verification_byte()
-            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
-        let mut decoder = decoder.pop_decoder()
+        let success = read_verification_byte(&mut stream)
             .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
-            Ok(T::Response::decode(&mut decoder)?)
-        } else {
-            Err(String::decode(&mut decoder)?)
-        })
+               Ok(from_reader(&mut stream)?)
+           } else {
+               Err(from_reader(&mut stream)?)
+           })
     }
+}
+
+#[inline]
+fn read_verification_byte<R: std::io::Read>(reader: &mut R) -> std::io::Result<bool> {
+    let mut buffer = [0];
+    reader.read_exact(&mut buffer).map(|_| buffer[0] != 0)
 }
 
 fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
@@ -93,7 +95,7 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
     fields.insert(String::from("service"), String::from(service));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(fields)?.write_to(&mut stream)?;
+    encode(&mut stream, &fields)?;
     Ok(())
 }
 

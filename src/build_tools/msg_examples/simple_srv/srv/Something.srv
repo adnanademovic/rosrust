@@ -1,0 +1,4 @@
+geometry_msgs/Vector3 a
+---
+Header b
+geometry_msgs/Pose c
