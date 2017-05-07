@@ -13,6 +13,7 @@ mod subscriber;
 mod streamfork;
 mod service;
 mod client;
+mod util;
 
 pub type ServiceResult<T> = Result<T, String>;
 
