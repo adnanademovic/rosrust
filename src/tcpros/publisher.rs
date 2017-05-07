@@ -6,7 +6,7 @@ use serde_rosmsg::to_vec;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{encode, decode, match_field};
 use super::Message;
-use super::streamfork::{fork, TargetList, DataStream};
+use super::util::streamfork::{fork, TargetList, DataStream};
 
 pub struct Publisher {
     subscriptions: DataStream,

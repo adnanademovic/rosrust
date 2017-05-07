@@ -10,7 +10,6 @@ mod header;
 pub mod error;
 mod publisher;
 mod subscriber;
-mod streamfork;
 mod service;
 mod client;
 mod util;
