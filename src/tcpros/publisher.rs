@@ -1,26 +1,28 @@
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{TcpListener, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
 use std;
 use serde_rosmsg::to_vec;
 use super::error::{ErrorKind, Result, ResultExt};
-use super::header::{encode, decode, match_field};
+use super::header;
 use super::Message;
 use super::util::streamfork::{fork, TargetList, DataStream};
+use super::util::tcpconnection;
 
 pub struct Publisher {
     subscriptions: DataStream,
     pub port: u16,
     pub msg_type: String,
     pub topic: String,
+    _raii: tcpconnection::Raii,
 }
 
 fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<()> {
-    let fields = decode(&mut stream)?;
-    match_field(&fields, "md5sum", &T::md5sum())?;
-    match_field(&fields, "type", &T::msg_type())?;
-    match_field(&fields, "message_definition", &T::msg_definition())?;
-    match_field(&fields, "topic", topic)?;
+    let fields = header::decode(&mut stream)?;
+    header::match_field(&fields, "md5sum", &T::md5sum())?;
+    header::match_field(&fields, "type", &T::msg_type())?;
+    header::match_field(&fields, "message_definition", &T::msg_definition())?;
+    header::match_field(&fields, "topic", topic)?;
     if fields.get("callerid").is_none() {
         bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
@@ -31,7 +33,7 @@ fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    encode(&mut stream, &fields)?;
+    header::encode(&mut stream, &fields)?;
     Ok(())
 }
 
@@ -76,12 +78,15 @@ impl Publisher {
     {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
-        Ok(Publisher::wrap_stream::<T, _, _>(topic,
-                                             TcpIterator::new(listener, topic),
-                                             socket_address.port()))
+        let (raii, listener) = tcpconnection::iterate(listener, format!("topic '{}'", topic));
+        Ok(Publisher::wrap_stream::<T, _, _>(topic, raii, listener, socket_address.port()))
     }
 
-    fn wrap_stream<T, U, V>(topic: &str, listener: V, port: u16) -> Publisher
+    fn wrap_stream<T, U, V>(topic: &str,
+                            raii: tcpconnection::Raii,
+                            listener: V,
+                            port: u16)
+                            -> Publisher
         where T: Message,
               U: std::io::Read + std::io::Write + Send + 'static,
               V: Iterator<Item = U> + Send + 'static
@@ -94,6 +99,7 @@ impl Publisher {
             port: port,
             msg_type: T::msg_type(),
             topic: String::from(topic),
+            _raii: raii,
         }
     }
 
@@ -129,35 +135,5 @@ impl<T: Message> PublisherStream<T> {
         // There is no way for the streamfork thread to fail by itself
         self.stream.send(bytes).expect("Connected thread died");
         Ok(())
-    }
-}
-
-struct TcpIterator {
-    listener: TcpListener,
-    topic: String,
-}
-
-impl TcpIterator {
-    pub fn new(listener: TcpListener, topic: &str) -> TcpIterator {
-        TcpIterator {
-            listener: listener,
-            topic: String::from(topic),
-        }
-    }
-}
-
-impl Iterator for TcpIterator {
-    type Item = TcpStream;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.listener.accept() {
-            Ok((stream, _)) => Some(stream),
-            Err(err) => {
-                error!("TCP connection to subscriber failed on topic '{}': {}",
-                       self.topic,
-                       err);
-                self.next()
-            }
-        }
     }
 }
