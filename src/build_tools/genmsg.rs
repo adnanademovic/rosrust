@@ -91,7 +91,7 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
 
 fn create_function(name: &str, value: &str) -> String {
     format!(r#"
-            fn {}() -> String {{
+            fn {}() -> ::std::string::String {{
                 {:?}.into()
             }}"#,
             name,
