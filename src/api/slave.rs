@@ -87,10 +87,7 @@ impl Slave {
     }
 
     pub fn remove_service(&mut self, service: &str) {
-        self.services
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .remove(service);
+        self.services.lock().expect(FAILED_TO_LOCK).remove(service);
     }
 
     pub fn add_publication<T>(&mut self,

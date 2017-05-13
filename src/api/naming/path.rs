@@ -157,10 +157,7 @@ mod tests {
         assert_eq!(vec![String::from("foo")],
                    "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
         assert_eq!(vec![String::from("foo"), String::from("bar")],
-                   "/foo/bar"
-                       .parse::<Buffer>()
-                       .expect(FAILED_TO_HANDLE)
-                       .get());
+                   "/foo/bar".parse::<Buffer>().expect(FAILED_TO_HANDLE).get());
         assert_eq!(vec![String::from("f1_aA"),
                         String::from("Ba02"),
                         String::from("Xx")],
@@ -178,9 +175,7 @@ mod tests {
                    format!("{}", "/foo/bar".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
         assert_eq!("/f1_aA/Ba02/Xx",
                    format!("{}",
-                           "/f1_aA/Ba02/Xx"
-                               .parse::<Buffer>()
-                               .expect(FAILED_TO_HANDLE)));
+                           "/f1_aA/Ba02/Xx".parse::<Buffer>().expect(FAILED_TO_HANDLE)));
     }
 
     #[test]

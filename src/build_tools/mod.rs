@@ -50,8 +50,5 @@ pub fn depend_on_messages(messages: &[&str]) {
 }
 
 fn append_share_folder(path: &str) -> Option<String> {
-    Path::new(path)
-        .join("share")
-        .to_str()
-        .map(|v| v.to_owned())
+    Path::new(path).join("share").to_str().map(|v| v.to_owned())
 }

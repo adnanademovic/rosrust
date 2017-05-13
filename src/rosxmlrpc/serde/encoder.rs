@@ -261,9 +261,7 @@ mod tests {
         String::from("Hello")
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -312,9 +310,7 @@ mod tests {
         String::from("Friend")
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -339,9 +335,7 @@ mod tests {
         43i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         27i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         12i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -366,9 +360,7 @@ mod tests {
         33.5f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         11.25f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         77.125f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -392,9 +384,7 @@ mod tests {
         let mut encoder = Encoder::new();
         true.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         false.encode(&mut encoder).expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -416,9 +406,7 @@ mod tests {
         vec![1i32, 2, 3, 4, 5]
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -446,9 +434,7 @@ mod tests {
         ExampleTuple(5, 0.5, String::from("abc"), false)
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -492,9 +478,7 @@ mod tests {
             }
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,
@@ -534,9 +518,7 @@ mod tests {
             }
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_response(&mut data)
-            .expect(FAILED_TO_ENCODE);
+        encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
         assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
                            r#"<methodResponse>"#,
                            r#"<params>"#,

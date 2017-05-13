@@ -129,10 +129,7 @@ impl SlaveHandler {
             return Ok(Err("Empty strings given".into()));
         }
         info!("Server is shutting down because: {}", message);
-        if let Err(..) = self.shutdown_signal
-               .lock()
-               .expect(FAILED_TO_LOCK)
-               .send(()) {
+        if let Err(..) = self.shutdown_signal.lock().expect(FAILED_TO_LOCK).send(()) {
             bail!("Slave API is down already");
         }
         Ok(Ok(0))
@@ -203,10 +200,7 @@ impl SlaveHandler {
             Some(v) => v.value(),
             None => return Ok(Err("Missing parameter".into())),
         };
-        let (ip, port) = match self.publications
-                  .lock()
-                  .expect(FAILED_TO_LOCK)
-                  .get(&topic) {
+        let (ip, port) = match self.publications.lock().expect(FAILED_TO_LOCK).get(&topic) {
             Some(publisher) => (self.hostname.clone(), publisher.port as i32),
             None => {
                 return Ok(Err("Requested topic not published by node".into()));

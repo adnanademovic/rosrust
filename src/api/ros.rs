@@ -52,9 +52,7 @@ impl Ros {
     }
 
     fn map(&mut self, source: &str, destination: &str) -> Result<()> {
-        self.resolver
-            .map(source, destination)
-            .map_err(|v| v.into())
+        self.resolver.map(source, destination).map_err(|v| v.into())
     }
 
     pub fn uri(&self) -> &str {
@@ -173,9 +171,7 @@ impl<'a> Parameter<'a> {
     }
 
     pub fn set<T: Encodable>(&self, value: &T) -> MasterResult<()> {
-        self.master
-            .set_param::<T>(&self.name, value)
-            .and(Ok(()))
+        self.master.set_param::<T>(&self.name, value).and(Ok(()))
     }
 
     pub fn delete(&self) -> MasterResult<()> {

@@ -90,9 +90,7 @@ mod tests {
         assert_eq!(vec![String::from("f1_aA"),
                         String::from("Ba02"),
                         String::from("Xx")],
-                   r.resolve("/f1_aA/Ba02/Xx")
-                       .expect(FAILED_TO_RESOLVE)
-                       .get());
+                   r.resolve("/f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE).get());
     }
 
     #[test]
@@ -112,9 +110,7 @@ mod tests {
                         String::from("f1_aA"),
                         String::from("Ba02"),
                         String::from("Xx")],
-                   r.resolve("f1_aA/Ba02/Xx")
-                       .expect(FAILED_TO_RESOLVE)
-                       .get());
+                   r.resolve("f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE).get());
     }
 
     #[test]
@@ -137,9 +133,7 @@ mod tests {
                         String::from("f1_aA"),
                         String::from("Ba02"),
                         String::from("Xx")],
-                   r.resolve("~f1_aA/Ba02/Xx")
-                       .expect(FAILED_TO_RESOLVE)
-                       .get());
+                   r.resolve("~f1_aA/Ba02/Xx").expect(FAILED_TO_RESOLVE).get());
     }
 
     #[test]

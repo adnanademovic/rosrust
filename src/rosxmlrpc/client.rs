@@ -21,10 +21,7 @@ impl Client {
         request.encoder.write_request(&request.name, &mut body)?;
 
         let body = String::from_utf8(body)?;
-        let res = self.http_client
-            .post(&self.server_uri)
-            .body(&body)
-            .send()?;
+        let res = self.http_client.post(&self.server_uri).body(&body).send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
         match res.pop() {
@@ -40,10 +37,7 @@ impl Client {
         request.encoder.write_request(&request.name, &mut body)?;
 
         let body = String::from_utf8(body)?;
-        let res = self.http_client
-            .post(&self.server_uri)
-            .body(&body)
-            .send()?;
+        let res = self.http_client.post(&self.server_uri).body(&body).send()?;
 
         let mut res = serde::Decoder::new_response(res)?;
         let mut value = match res.pop() {

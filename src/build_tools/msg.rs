@@ -251,12 +251,12 @@ fn match_line(data: &str) -> Option<Result<FieldInfo>> {
 #[inline]
 fn strip_useless<'a>(data: &'a str) -> Result<&'a str> {
     Ok(data.splitn(2, '#')
-        .next()
-        .ok_or_else(|| {
-            format!("Somehow splitting a line resulted in 0 parts?! Happened here: {}",
-                    data)
-        })?
-        .trim())
+           .next()
+           .ok_or_else(|| {
+        format!("Somehow splitting a line resulted in 0 parts?! Happened here: {}",
+                data)
+    })?
+           .trim())
 }
 
 #[inline]
@@ -332,13 +332,13 @@ impl FieldInfo {
                  DataType::LocalStruct(..) => return None,
                  DataType::RemoteStruct(..) => return None,
                  _ => {
-            let datatype = self.datatype.rust_type();
-            format!("const {}: {} = {} as {};",
-                    self.name,
-                    datatype,
-                    value,
-                    datatype)
-        }
+                     let datatype = self.datatype.rust_type();
+                     format!("const {}: {} = {} as {};",
+                             self.name,
+                             datatype,
+                             value,
+                             datatype)
+                 }
              })
     }
 
@@ -437,10 +437,7 @@ impl DataType {
                            .as_str()
                    }
                    DataType::RemoteStruct(ref pkg, ref name) => {
-                       hashes
-                           .get(&(pkg.clone(), name.clone()))
-                           .ok_or(())?
-                           .as_str()
+                       hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
                    }
                }
                .into())

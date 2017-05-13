@@ -153,7 +153,7 @@ impl XmlRpcValue {
         let name =
             match name_node
                       .peel_layer("name")
-                      .chain_err(|| "First struct member field should be a node called 'name'")? {
+                      .chain_err(|| "First struct member field should be a node called 'name'",)? {
                 Tree::Leaf(name) => name,
                 Tree::Node(_, _) => {
                     bail!("Struct member's name node should just contain the member's name");
@@ -187,15 +187,16 @@ impl XmlRpcValue {
         }
         if key == "array" {
             return if let Some(Tree::Node(key, children)) = values.pop() {
-                       if key != "data" {
-                           bail!("Node 'array' must contain 'data' node, but '{}' detected",
-                                 key);
-                       }
-                       Ok(XmlRpcValue::Array(children.into_iter()
-                    .map(XmlRpcValue::from_tree)
-                    .collect::<Result<_>>()
-                    .chain_err(|| "Failed to parse array's children")?))
-                   } else {
+                if key != "data" {
+                    bail!("Node 'array' must contain 'data' node, but '{}' detected",
+                          key);
+                }
+                Ok(XmlRpcValue::Array(children
+                                          .into_iter()
+                                          .map(XmlRpcValue::from_tree)
+                                          .collect::<Result<_>>()
+                                          .chain_err(|| "Failed to parse array's children")?))
+            } else {
                        bail!("Node 'array' must contain 'data' node with child values");
                    };
         }
@@ -213,9 +214,11 @@ impl XmlRpcValue {
                                                    })?))
             }
             "boolean" => {
-                Ok(XmlRpcValue::Bool(value.parse::<i32>()
-                    .chain_err(|| format!("Expected 0 or 1 for boolean, got {}", value))? !=
-                                     0))
+                Ok(XmlRpcValue::Bool(value
+                                         .parse::<i32>()
+                                         .chain_err(|| {
+                    format!("Expected 0 or 1 for boolean, got {}", value)
+                })? != 0))
             }
             "string" => Ok(XmlRpcValue::String(value)),
             "double" => {

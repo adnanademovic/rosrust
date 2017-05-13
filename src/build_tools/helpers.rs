@@ -261,17 +261,13 @@ mod tests {
                         .get(&("geometry_msgs".into(), "Pose".into()))
                         .unwrap(),
                    "e45d45a5a1ce597b249e23fb30fc871f".to_owned());
-        assert_eq!(*hashes
-                        .get(&("std_msgs".into(), "Header".into()))
-                        .unwrap(),
+        assert_eq!(*hashes.get(&("std_msgs".into(), "Header".into())).unwrap(),
                    "2176decaecbce78abc3b96ef049fabed".to_owned());
         assert_eq!(*hashes
                         .get(&("geometry_msgs".into(), "PoseStamped".into()))
                         .unwrap(),
                    "d3812c3cbc69362b77dc0b19b345f8f5".to_owned());
-        assert_eq!(*hashes
-                        .get(&("sensor_msgs".into(), "Imu".into()))
-                        .unwrap(),
+        assert_eq!(*hashes.get(&("sensor_msgs".into(), "Imu".into())).unwrap(),
                    "6a62c6daae103f4ff57a132d6f95cec2".to_owned());
     }
 
