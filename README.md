@@ -31,69 +31,27 @@ Most of the examples are followed by an infinite loop. ROS shutdown signal check
 
 ### Messages
 
-Currently we don't have any support for message generation by ROS itself, because a 100% decision of how we'll integrate generated files hasn't been made. There is a prototype in the works, but in the meantime messages have to be manually generated. Looking from the bright side - at least you'll know what constitutes a ROS message.
-
-Let's demonstrate the [`std_msgs/UInt64.msg`](https://github.com/ros/std_msgs/blob/groovy-devel/msg/UInt64.msg) message.
+Message generation is done at build time. In the `build.rs` script, all you need to add is:
 
 ```rust
-#[derive(Debug,RustcEncodable,RustcDecodable)]
-struct UInt64 {
-    data: u64,
-}
-
-impl rosrust::Message for UInt64 {
-    fn msg_definition() -> String {
-        String::from("uint64 data\n")
-    }
-
-    fn md5sum() -> String {
-        String::from("1b2a79973e8bf53d7b53acb71299cb57")
-    }
-
-    fn msg_type() -> String {
-        String::from("std_msgs/UInt64")
-    }
-}
+#[macro_use]
+extern crate rosrust;
+// If you wanted std_msgs/String, sensor_msgs/Imu
+// and all the message types used by them, like geometry_msgs/Vector3
+rosmsg_main!("std_msgs/String", "sensor_msgs/Imu");
 ```
 
-Services are not too different, so let's show the [`rospy_tutorials/AddTwoInts.srv`](https://github.com/ros/ros_tutorials/blob/kinetic-devel/rospy_tutorials/srv/AddTwoInts.srv) service, from [the `rospy` Service/Client tutorial](http://wiki.ros.org/rospy_tutorials/Tutorials/WritingServiceClient).
+You need to depend on `rosrust`, `serde`, and `serde_derive`, and have `rosrust` as a build dependency. After that, add this to your main file:
 
 ```rust
-#[derive(Debug,RustcEncodable,RustcDecodable)]
-struct AddTwoIntsReq {
-    a: i64,
-    b: i64,
-}
-
-#[derive(Debug,RustcEncodable,RustcDecodable)]
-struct AddTwoIntsRes {
-    sum: i64,
-}
-
-#[derive(Debug,RustcEncodable,RustcDecodable)]
-struct AddTwoInts {}
-
-impl rosrust::Service for AddTwoInts {
-    type Request = AddTwoIntsReq;
-    type Response = AddTwoIntsRes;
-}
-
-impl rosrust::Message for AddTwoInts {
-    fn msg_definition() -> String {
-        String::from("")
-    }
-
-    fn md5sum() -> String {
-        String::from("6a2e34150c00229791cc89ff309fff21")
-    }
-
-    fn msg_type() -> String {
-        String::from("rospy_tutorials/AddTwoInts")
-    }
-}
+#[macro_use]
+extern crate rosrust;
+rosmsg_include!();
 ```
 
-This will all be unimportant information once message generation is done, but it's useful to know that ROS Messages and Services will just be normal structures. It's important to note that all of this depends on `rustc-serialize`.
+This will include all the generated structures, and at them to the `msg` namespace. Thus, to create a new `sensor_msgs/Imu`, you call `msg::sensor_msgs::Imu::new()`.
+
+All of the structures implement debug writing, so you can easily inspect their contents.
 
 ### Publishing to topic
 
