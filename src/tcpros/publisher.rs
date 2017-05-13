@@ -21,8 +21,10 @@ fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -
     let fields = header::decode(&mut stream)?;
     header::match_field(&fields, "md5sum", &T::md5sum())?;
     header::match_field(&fields, "type", &T::msg_type())?;
-    header::match_field(&fields, "message_definition", &T::msg_definition())?;
     header::match_field(&fields, "topic", topic)?;
+    if fields.get("message_definition").is_none() {
+        bail!(ErrorKind::HeaderMissingField("message_definition".into()));
+    }
     if fields.get("callerid").is_none() {
         bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
