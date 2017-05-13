@@ -55,19 +55,23 @@ All of the structures implement debug writing, so you can easily inspect their c
 
 ### Publishing to topic
 
-If we wanted to publish a defined message (let's use the previously described `UInt64`) to topic `some_topic` approximately every second, we can do it in the following way.
+If we wanted to publish a defined message (let's use `std_msgs/String`) to topic `some_topic` approximately every second, we can do it in the following way.
 
 ```rust
 extern crate rosrust;
 use rosrust::Ros;
 use std::{thread, time};
 
+rosmsg_include!();
+
 fn main() {
     let mut ros = Ros::new("node_name").unwrap();
-    let mut publisher = ros.publish::<Uint64>("some_topic").unwrap();
+    let mut publisher = ros.publish("some_topic").unwrap();
     loop {
         thread::sleep(time::Duration::from_secs(1));
-        publisher.send(UInt64 { data: 42 }).unwrap();
+        let msg = msg::std_msgs::String::new();
+        msg.data = String::from("test");
+        publisher.send(msg).unwrap();
     }
 }
 ```
@@ -81,9 +85,11 @@ extern crate rosrust;
 use rosrust::Ros;
 use std::{thread, time};
 
+rosmsg_include!();
+
 fn main() {
     let mut ros = Ros::new("node_name").unwrap();
-    ros.subscribe("some_topic", |v: UInt64| println!("{}", v.data)).unwrap();
+    ros.subscribe("some_topic", |v: msg::std_msgs::UInt64| println!("{}", v.data)).unwrap();
     loop {
         thread::sleep(time::Duration::from_secs(100));
     }
@@ -92,19 +98,21 @@ fn main() {
 
 ### Creating a service
 
-Creating a service is the easiest out of all the options. Just define a callback for each request. Let's make our own `AddTwoInts` service on the topic `/add_two_ints`.
+Creating a service is the easiest out of all the options. Just define a callback for each request. Let's use some `AddTwoInts` service on the topic `/add_two_ints`.
 
 ```rust
 extern crate rosrust;
 use rosrust::Ros;
 use std::{thread, time};
 
+rosmsg_include!();
+
 fn main() {
     let mut ros = Ros::new("node_name").unwrap();
-    ros.service::<AddTwoInts>("/add_two_ints",
-        |req| Ok(AddTwoIntsRes { sum: req.a + req.b }) ).unwrap();
+    ros.service::<msg::our_msgs::AddTwoInts>("/add_two_ints",
+        |req| Ok(msg::our_msgs::AddTwoIntsRes { sum: req.a + req.b })).unwrap();
     loop {
-        thread::sleep(time::Duration::from_secs(100);
+        thread::sleep(time::Duration::from_secs(100));
     }
 }
 ```
@@ -119,16 +127,16 @@ use rosrust::Ros;
 use std::{thread, time};
 
 fn main() {
-    let mut ros = Ros::new("node_name").unwrap();
-    let client = ros.client::<AddTwoInts>("/add_two_ints").unwrap();
+    let ros = Ros::new("node_name").unwrap();
+    let client = ros.client::<msg::our_msgs::AddTwoInts>("/add_two_ints").unwrap();
     loop {
         // Sync approach
         println!("5 + 7 = {}",
-            client.req(&AddTwoIntsReq { a: 5, b: 7 }).unwrap().unwrap().sum);
+            client.req(&msg::our_msgs::AddTwoIntsReq { a: 5, b: 7 }).unwrap().unwrap().sum);
         // Async approach
-        let retval = client.req_async(AddTwoIntsReq { a: 5, b: 7 }),
-        println!("12 + 4 = {}", retval.read().unwrap().unwrap().sum));
-        thread::sleep(time::Duration::from_secs(1);
+        let retval = client.req_async(msg::our_msgs::AddTwoIntsReq { a: 5, b: 7 });
+        println!("12 + 4 = {}", retval.read().unwrap().unwrap().sum);
+        thread::sleep(time::Duration::from_secs(1));
     }
 }
 ```
