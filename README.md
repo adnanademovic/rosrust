@@ -25,6 +25,8 @@ Integration with [catkin](http://www.ros.org/wiki/catkin) will be handled once a
 
 The API is far from being stable, but this is the current desired functionality.
 
+There is a demo project at [OTL/rosrust_tutorial](https://github.com/OTL/rosrust_tutorial), showing everything that needs to be done (including a tiny tiny `build.rs` script) to get `rosrust` running.
+
 Most of the examples are followed by an infinite loop. ROS shutdown signal checking is coming!
 
 ### Messages
