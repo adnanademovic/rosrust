@@ -27,7 +27,9 @@ impl Client {
         match res.pop() {
             Some(v) => Ok(v.value()),
             None => {
-                bail!(ErrorKind::Serde(error::serde::ErrorKind::Decoding("request tree".into())))
+                bail!(ErrorKind::Serde(
+                    error::serde::ErrorKind::Decoding("request tree".into()),
+                ))
             }
         }
     }
@@ -42,7 +44,11 @@ impl Client {
         let mut res = serde::Decoder::new_response(res)?;
         let mut value = match res.pop() {
             Some(v) => v,
-            None => bail!(ErrorKind::Serde(error::serde::ErrorKind::Decoding("request".into()))),
+            None => {
+                bail!(ErrorKind::Serde(
+                    error::serde::ErrorKind::Decoding("request".into()),
+                ))
+            }
         };
         T::decode(&mut value).map_err(|v| v.into())
     }

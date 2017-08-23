@@ -21,13 +21,20 @@ impl Decoder {
     pub fn new_request<T: std::io::Read>(body: T) -> Result<(String, Vec<Decoder>)> {
         value::XmlRpcRequest::new(body)
             .chain_err(|| ErrorKind::XmlRpcReading("request".into()))
-            .map(|value| (value.method, value.parameters.into_iter().map(Decoder::new).collect()))
+            .map(|value| {
+                (
+                    value.method,
+                    value.parameters.into_iter().map(Decoder::new).collect(),
+                )
+            })
     }
 
     pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>> {
         value::XmlRpcResponse::new(body)
             .chain_err(|| ErrorKind::XmlRpcReading("response".into()))
-            .map(|value| value.parameters.into_iter().map(Decoder::new).collect())
+            .map(|value| {
+                value.parameters.into_iter().map(Decoder::new).collect()
+            })
     }
 
     pub fn value(self) -> value::XmlRpcValue {
@@ -35,16 +42,21 @@ impl Decoder {
     }
 
     fn read_tuple_helper<T, F>(&mut self, l: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
             if l == len {
                 f(self)
             } else {
-                Err(ErrorKind::MismatchedDataFormat(format!("an array of length {}", len)).into())
+                Err(
+                    ErrorKind::MismatchedDataFormat(format!("an array of length {}", len)).into(),
+                )
             }
         } else {
-            Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
+            Err(
+                ErrorKind::MismatchedDataFormat("an array field".into()).into(),
+            )
         }
     }
 }
@@ -99,7 +111,9 @@ impl rustc_serialize::Decoder for Decoder {
         if let Some((value::XmlRpcValue::Int(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(ErrorKind::MismatchedDataFormat("an integer (i32) field".into()).into())
+            Err(
+                ErrorKind::MismatchedDataFormat("an integer (i32) field".into()).into(),
+            )
         }
     }
 
@@ -115,7 +129,9 @@ impl rustc_serialize::Decoder for Decoder {
         if let Some((value::XmlRpcValue::Bool(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(ErrorKind::MismatchedDataFormat("a boolean field".into()).into())
+            Err(
+                ErrorKind::MismatchedDataFormat("a boolean field".into()).into(),
+            )
         }
     }
 
@@ -123,7 +139,9 @@ impl rustc_serialize::Decoder for Decoder {
         if let Some((value::XmlRpcValue::Double(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(ErrorKind::MismatchedDataFormat("a double (f64) field".into()).into())
+            Err(
+                ErrorKind::MismatchedDataFormat("a double (f64) field".into()).into(),
+            )
         }
     }
 
@@ -139,115 +157,143 @@ impl rustc_serialize::Decoder for Decoder {
         if let Some((value::XmlRpcValue::String(v), _)) = self.chain.next() {
             Ok(v)
         } else {
-            Err(ErrorKind::MismatchedDataFormat("a string field".into()).into())
+            Err(
+                ErrorKind::MismatchedDataFormat("a string field".into()).into(),
+            )
         }
     }
 
     fn read_enum<T, F>(&mut self, _: &str, _: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("enum".into()))
     }
 
     fn read_enum_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T>
-        where F: FnMut(&mut Self, usize) -> Result<T>
+    where
+        F: FnMut(&mut Self, usize) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
     }
 
     fn read_enum_variant_arg<T, F>(&mut self, _: usize, _: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
-        bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
+        bail!(ErrorKind::UnsupportedDataType(
+            "enum variant argument".into(),
+        ))
     }
 
     fn read_enum_struct_variant<T, F>(&mut self, _: &[&str], _: F) -> Result<T>
-        where F: FnMut(&mut Self, usize) -> Result<T>
+    where
+        F: FnMut(&mut Self, usize) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
     }
 
     fn read_enum_struct_variant_field<T, F>(&mut self, _: &str, _: usize, _: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
-        bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
+        bail!(ErrorKind::UnsupportedDataType(
+            "enum struct variant field".into(),
+        ))
     }
 
     fn read_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
-        self.read_tuple_helper(size, f)
-            .chain_err(|| ErrorKind::Decoding(format!("struct {}", name)))
+        self.read_tuple_helper(size, f).chain_err(|| {
+            ErrorKind::Decoding(format!("struct {}", name))
+        })
     }
 
     fn read_struct_field<T, F>(&mut self, name: &str, _: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         f(self).chain_err(|| ErrorKind::Decoding(format!("field {}", name)))
     }
 
     fn read_tuple<T, F>(&mut self, size: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
-        self.read_tuple_helper(size, f)
-            .chain_err(|| ErrorKind::Decoding("tuple".into()))
+        self.read_tuple_helper(size, f).chain_err(|| {
+            ErrorKind::Decoding("tuple".into())
+        })
     }
 
     fn read_tuple_arg<T, F>(&mut self, n: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         f(self).chain_err(|| ErrorKind::Decoding(format!("field number {}", n)))
     }
 
     fn read_tuple_struct<T, F>(&mut self, name: &str, size: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
-        self.read_tuple_helper(size, f)
-            .chain_err(|| ErrorKind::Decoding(format!("tuple struct {}", name)))
+        self.read_tuple_helper(size, f).chain_err(|| {
+            ErrorKind::Decoding(format!("tuple struct {}", name))
+        })
     }
 
     fn read_tuple_struct_arg<T, F>(&mut self, n: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         f(self).chain_err(|| ErrorKind::Decoding(format!("field number {}", n)))
     }
 
     fn read_option<T, F>(&mut self, _: F) -> Result<T>
-        where F: FnMut(&mut Self, bool) -> Result<T>
+    where
+        F: FnMut(&mut Self, bool) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("option".into()))
     }
 
     fn read_seq<T, F>(&mut self, f: F) -> Result<T>
-        where F: FnOnce(&mut Self, usize) -> Result<T>
+    where
+        F: FnOnce(&mut Self, usize) -> Result<T>,
     {
         if let Some((value::XmlRpcValue::Array(_), len)) = self.chain.next() {
             f(self, len).chain_err(|| ErrorKind::Decoding("array".into()))
         } else {
-            Err(ErrorKind::MismatchedDataFormat("an array field".into()).into())
+            Err(
+                ErrorKind::MismatchedDataFormat("an array field".into()).into(),
+            )
         }
     }
 
     fn read_seq_elt<T, F>(&mut self, n: usize, f: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         f(self).chain_err(|| ErrorKind::Decoding(format!("element number {}", n)))
     }
 
     fn read_map<T, F>(&mut self, _: F) -> Result<T>
-        where F: FnOnce(&mut Self, usize) -> Result<T>
+    where
+        F: FnOnce(&mut Self, usize) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
     fn read_map_elt_key<T, F>(&mut self, _: usize, _: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
     fn read_map_elt_val<T, F>(&mut self, _: usize, _: F) -> Result<T>
-        where F: FnOnce(&mut Self) -> Result<T>
+    where
+        F: FnOnce(&mut Self) -> Result<T>,
     {
         bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }
@@ -268,63 +314,73 @@ mod tests {
 
     #[test]
     fn reads_string() {
-        assert_eq!("First test", String::decode(
-            &mut Decoder::new(XmlRpcValue::String(String::from("First test"))))
-                   .expect(FAILED_TO_DECODE));
+        assert_eq!(
+            "First test",
+            String::decode(&mut Decoder::new(
+                XmlRpcValue::String(String::from("First test")),
+            )).expect(FAILED_TO_DECODE)
+        );
     }
 
     #[test]
     fn reads_int() {
-        assert_eq!(41,
-                   i32::decode(&mut Decoder::new(XmlRpcValue::Int(41))).expect(FAILED_TO_DECODE));
+        assert_eq!(
+            41,
+            i32::decode(&mut Decoder::new(XmlRpcValue::Int(41))).expect(FAILED_TO_DECODE)
+        );
     }
 
     #[test]
     fn reads_float() {
-        assert_eq!(32.5,
-                   f64::decode(&mut Decoder::new(XmlRpcValue::Double(32.5)))
-                       .expect(FAILED_TO_DECODE));
+        assert_eq!(
+            32.5,
+            f64::decode(&mut Decoder::new(XmlRpcValue::Double(32.5))).expect(FAILED_TO_DECODE)
+        );
     }
 
     #[test]
     fn reads_bool() {
-        assert_eq!(true,
-                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(true)))
-                       .expect(FAILED_TO_DECODE));
-        assert_eq!(false,
-                   bool::decode(&mut Decoder::new(XmlRpcValue::Bool(false)))
-                       .expect(FAILED_TO_DECODE));
+        assert_eq!(
+            true,
+            bool::decode(&mut Decoder::new(XmlRpcValue::Bool(true))).expect(FAILED_TO_DECODE)
+        );
+        assert_eq!(
+            false,
+            bool::decode(&mut Decoder::new(XmlRpcValue::Bool(false))).expect(FAILED_TO_DECODE)
+        );
     }
 
     #[test]
     fn reads_array() {
-        assert_eq!(vec![1, 2, 3, 4, 5],
-                   Vec::<i32>::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
-                       XmlRpcValue::Int(1),
-                       XmlRpcValue::Int(2),
-                       XmlRpcValue::Int(3),
-                       XmlRpcValue::Int(4),
-                       XmlRpcValue::Int(5),
-                   ])))
-                           .expect(FAILED_TO_DECODE));
+        assert_eq!(
+            vec![1, 2, 3, 4, 5],
+            Vec::<i32>::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
+                XmlRpcValue::Int(1),
+                XmlRpcValue::Int(2),
+                XmlRpcValue::Int(3),
+                XmlRpcValue::Int(4),
+                XmlRpcValue::Int(5),
+            ]))).expect(FAILED_TO_DECODE)
+        );
     }
 
-    #[derive(Debug,PartialEq,RustcDecodable)]
+    #[derive(Debug, PartialEq, RustcDecodable)]
     struct ExampleTuple(i32, f64, String, bool);
 
     #[test]
     fn reads_tuple() {
-        assert_eq!(ExampleTuple(5, 0.5, String::from("abc"), false),
-                   ExampleTuple::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
-                       XmlRpcValue::Int(5),
-                       XmlRpcValue::Double(0.5),
-                       XmlRpcValue::String(String::from("abc")),
-                       XmlRpcValue::Bool(false),
-                   ])))
-                           .expect(FAILED_TO_DECODE));
+        assert_eq!(
+            ExampleTuple(5, 0.5, String::from("abc"), false),
+            ExampleTuple::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
+                XmlRpcValue::Int(5),
+                XmlRpcValue::Double(0.5),
+                XmlRpcValue::String(String::from("abc")),
+                XmlRpcValue::Bool(false),
+            ]))).expect(FAILED_TO_DECODE)
+        );
     }
 
-    #[derive(Debug,PartialEq,RustcDecodable)]
+    #[derive(Debug, PartialEq, RustcDecodable)]
     struct ExampleStruct {
         a: i32,
         b: ExampleTuple,
@@ -332,30 +388,31 @@ mod tests {
 
     #[test]
     fn reads_struct() {
-        assert_eq!(ExampleStruct {
-                       a: 11,
-                       b: ExampleTuple(5, 0.5, String::from("abc"), false),
-                   },
-                   ExampleStruct::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
-                       XmlRpcValue::Int(11),
-                       XmlRpcValue::Array(vec![
-                           XmlRpcValue::Int(5),
-                           XmlRpcValue::Double(0.5),
-                           XmlRpcValue::String(String::from("abc")),
-                           XmlRpcValue::Bool(false),
-                       ]),
-                   ])))
-                           .expect(FAILED_TO_DECODE));
+        assert_eq!(
+            ExampleStruct {
+                a: 11,
+                b: ExampleTuple(5, 0.5, String::from("abc"), false),
+            },
+            ExampleStruct::decode(&mut Decoder::new(XmlRpcValue::Array(vec![
+                XmlRpcValue::Int(11),
+                XmlRpcValue::Array(vec![
+                    XmlRpcValue::Int(5),
+                    XmlRpcValue::Double(0.5),
+                    XmlRpcValue::String(String::from("abc")),
+                    XmlRpcValue::Bool(false),
+                ]),
+            ]))).expect(FAILED_TO_DECODE)
+        );
     }
 
-    #[derive(Debug,PartialEq,RustcDecodable)]
+    #[derive(Debug, PartialEq, RustcDecodable)]
     struct ExampleRequestStruct {
         a: i32,
         b: bool,
         c: ExampleRequestStructChild,
     }
 
-    #[derive(Debug,PartialEq,RustcDecodable)]
+    #[derive(Debug, PartialEq, RustcDecodable)]
     struct ExampleRequestStructChild {
         a: String,
         b: f64,
@@ -387,15 +444,17 @@ mod tests {
         assert_eq!("mytype.mymethod", method);
         assert_eq!(2, parameters.len());
         assert_eq!(33, i32::decode(&mut parameters[0]).expect(FAILED_TO_DECODE));
-        assert_eq!(ExampleRequestStruct {
-                       a: 41,
-                       b: true,
-                       c: ExampleRequestStructChild {
-                           a: String::from("Hello"),
-                           b: 0.5,
-                       },
-                   },
-                   ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE));
+        assert_eq!(
+            ExampleRequestStruct {
+                a: 41,
+                b: true,
+                c: ExampleRequestStructChild {
+                    a: String::from("Hello"),
+                    b: 0.5,
+                },
+            },
+            ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE)
+        );
     }
 
     #[test]
@@ -422,15 +481,17 @@ mod tests {
         let mut parameters = Decoder::new_response(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!(2, parameters.len());
         assert_eq!(33, i32::decode(&mut parameters[0]).expect(FAILED_TO_DECODE));
-        assert_eq!(ExampleRequestStruct {
-                       a: 41,
-                       b: true,
-                       c: ExampleRequestStructChild {
-                           a: String::from("Hello"),
-                           b: 0.5,
-                       },
-                   },
-                   ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE));
+        assert_eq!(
+            ExampleRequestStruct {
+                a: 41,
+                b: true,
+                c: ExampleRequestStructChild {
+                    a: String::from("Hello"),
+                    b: 0.5,
+                },
+            },
+            ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE)
+        );
     }
 
     #[test]
@@ -458,14 +519,20 @@ mod tests {
         let (method, mut parameters) = Decoder::new_request(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!("mytype.mymethod", method);
         assert_eq!(2, parameters.len());
-        assert_eq!(XmlRpcValue::Array(vec![XmlRpcValue::Int(41),
-                                           XmlRpcValue::Bool(true),
-                                           XmlRpcValue::Array(vec![
-                XmlRpcValue::String(String::from("Hello")),
-                XmlRpcValue::Double(0.5),
-            ])]),
-                   parameters.pop().expect(FAILED_TO_DECODE).value());
-        assert_eq!(XmlRpcValue::Int(33),
-                   parameters.pop().expect(FAILED_TO_DECODE).value());
+        assert_eq!(
+            XmlRpcValue::Array(vec![
+                XmlRpcValue::Int(41),
+                XmlRpcValue::Bool(true),
+                XmlRpcValue::Array(vec![
+                    XmlRpcValue::String(String::from("Hello")),
+                    XmlRpcValue::Double(0.5),
+                ]),
+            ]),
+            parameters.pop().expect(FAILED_TO_DECODE).value()
+        );
+        assert_eq!(
+            XmlRpcValue::Int(33),
+            parameters.pop().expect(FAILED_TO_DECODE).value()
+        );
     }
 }

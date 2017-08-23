@@ -40,22 +40,25 @@ fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<()>
-    where T: Message,
-          U: std::io::Write + std::io::Read
+where
+    T: Message,
+    U: std::io::Write + std::io::Read,
 {
     read_request::<T, U>(&mut stream, &topic)?;
     write_response::<T, U>(&mut stream)
 }
 
 fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: TargetList<U>)
-    where T: Message,
-          U: std::io::Read + std::io::Write + Send,
-          V: Iterator<Item = U>
+where
+    T: Message,
+    U: std::io::Read + std::io::Write + Send,
+    V: Iterator<Item = U>,
 {
     // This listener stream never breaks by itself since it's a TcpListener
     for mut stream in listener {
-        let result = exchange_headers::<T, _>(&mut stream, topic)
-            .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
+        let result = exchange_headers::<T, _>(&mut stream, topic).chain_err(|| {
+            ErrorKind::TopicConnectionFail(topic.into())
+        });
         if let Err(err) = result {
             let info = err.iter()
                 .map(|v| format!("{}", v))
@@ -75,27 +78,37 @@ fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: TargetList
 
 impl Publisher {
     pub fn new<T, U>(address: U, topic: &str) -> Result<Publisher>
-        where T: Message,
-              U: ToSocketAddrs
+    where
+        T: Message,
+        U: ToSocketAddrs,
     {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
         let (raii, listener) = tcpconnection::iterate(listener, format!("topic '{}'", topic));
-        Ok(Publisher::wrap_stream::<T, _, _>(topic, raii, listener, socket_address.port()))
+        Ok(Publisher::wrap_stream::<T, _, _>(
+            topic,
+            raii,
+            listener,
+            socket_address.port(),
+        ))
     }
 
-    fn wrap_stream<T, U, V>(topic: &str,
-                            raii: tcpconnection::Raii,
-                            listener: V,
-                            port: u16)
-                            -> Publisher
-        where T: Message,
-              U: std::io::Read + std::io::Write + Send + 'static,
-              V: Iterator<Item = U> + Send + 'static
+    fn wrap_stream<T, U, V>(
+        topic: &str,
+        raii: tcpconnection::Raii,
+        listener: V,
+        port: u16,
+    ) -> Publisher
+    where
+        T: Message,
+        U: std::io::Read + std::io::Write + Send + 'static,
+        V: Iterator<Item = U> + Send + 'static,
     {
         let (targets, data) = fork();
         let topic_name = String::from(topic);
-        thread::spawn(move || listen_for_subscribers::<T, _, _>(&topic_name, listener, targets));
+        thread::spawn(move || {
+            listen_for_subscribers::<T, _, _>(&topic_name, listener, targets)
+        });
         Publisher {
             subscriptions: data,
             port: port,
@@ -123,12 +136,15 @@ impl<T: Message> PublisherStream<T> {
     fn new(publisher: &Publisher) -> Result<PublisherStream<T>> {
         let msg_type = T::msg_type();
         if publisher.msg_type != msg_type {
-            bail!(ErrorKind::MessageTypeMismatch(publisher.msg_type.clone(), msg_type));
+            bail!(ErrorKind::MessageTypeMismatch(
+                publisher.msg_type.clone(),
+                msg_type,
+            ));
         }
         Ok(PublisherStream {
-               stream: publisher.subscriptions.clone(),
-               datatype: std::marker::PhantomData,
-           })
+            stream: publisher.subscriptions.clone(),
+            datatype: std::marker::PhantomData,
+        })
     }
 
     pub fn send(&mut self, message: T) -> Result<()> {

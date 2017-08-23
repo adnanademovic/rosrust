@@ -49,40 +49,58 @@ impl Master {
         let values = match data {
             rosxmlrpc::XmlRpcValue::Array(values) => values,
             _ => {
-                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into()))))
+                bail!(ErrorKind::XmlRpc(
+                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                        "while handling request".into(),
+                    )),
+                ))
             }
         };
         if values.len() != 3 {
-            bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat("while \
+            bail!(ErrorKind::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                    "while \
                                                                                           handling \
                                                                                           request"
-                .into()))))
+                        .into(),
+                )),
+            ))
         }
         let mut values = values.into_iter();
         let code = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::Int(v)) => v,
             _ => {
-                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into()))))
+                bail!(ErrorKind::XmlRpc(
+                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                        "while handling request".into(),
+                    )),
+                ))
             }
         };
         let message = match values.next() {
             Some(rosxmlrpc::XmlRpcValue::String(v)) => v,
             _ => {
-                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into()))))
+                bail!(ErrorKind::XmlRpc(
+                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                        "while handling request".into(),
+                    )),
+                ))
             }
         };
         let value = match values.next() {
             Some(v) => v,
             _ => {
-                bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while handling request".into()))))
+                bail!(ErrorKind::XmlRpc(
+                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
+                        "while handling request".into(),
+                    )),
+                ))
             }
         };
         if code != 1 {
-            bail!(ErrorKind::XmlRpc(ReErrorKind::Serde(SeErrorKind::Msg(message))));
+            bail!(ErrorKind::XmlRpc(
+                ReErrorKind::Serde(SeErrorKind::Msg(message)),
+            ));
         }
         Ok(value)
     }
@@ -185,10 +203,9 @@ impl Master {
 fn to_api_error(v: (bool, String)) -> Error {
     use super::error::api::ErrorKind as ApiErrorKind;
     match v.0 {
-            false => ErrorKind::Api(ApiErrorKind::SystemFail(v.1)),
-            true => ErrorKind::Api(ApiErrorKind::BadData(v.1)),
-        }
-        .into()
+        false => ErrorKind::Api(ApiErrorKind::SystemFail(v.1)),
+        true => ErrorKind::Api(ApiErrorKind::BadData(v.1)),
+    }.into()
 }
 
 #[derive(Debug)]
@@ -201,20 +218,22 @@ impl<T: Decodable> Decodable for ResponseData<T> {
             let message = d.read_struct_field("status_message", 1, |d| d.read_str())?;
             match code {
                 0 | -1 => Ok(ResponseData(Err((code != 0, message)))),
-                1 => Ok(ResponseData(Ok(d.read_struct_field("data", 2, |d| T::decode(d))?))),
+                1 => Ok(ResponseData(
+                    Ok(d.read_struct_field("data", 2, |d| T::decode(d))?),
+                )),
                 _ => Err(d.error("Invalid response code returned by ROS")),
             }
         })
     }
 }
 
-#[derive(Debug,RustcDecodable)]
+#[derive(Debug, RustcDecodable)]
 pub struct TopicData {
     pub name: String,
     pub connections: Vec<String>,
 }
 
-#[derive(Debug,RustcDecodable)]
+#[derive(Debug, RustcDecodable)]
 pub struct SystemState {
     pub publishers: Vec<TopicData>,
     pub subscribers: Vec<TopicData>,

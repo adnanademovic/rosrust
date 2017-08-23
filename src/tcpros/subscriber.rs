@@ -18,15 +18,18 @@ pub struct Subscriber {
 
 impl Subscriber {
     pub fn new<T, F>(caller_id: &str, topic: &str, callback: F) -> Subscriber
-        where T: Message,
-              F: Fn(T) -> () + Send + 'static
+    where
+        T: Message,
+        F: Fn(T) -> () + Send + 'static,
     {
         let (data_tx, data_rx) = channel();
         let (pub_tx, pub_rx) = channel();
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
         let data_stream = data_tx.clone();
-        thread::spawn(move || join_connections::<T>(data_tx, pub_rx, &caller_id, &topic_name));
+        thread::spawn(move || {
+            join_connections::<T>(data_tx, pub_rx, &caller_id, &topic_name)
+        });
         thread::spawn(move || handle_data::<T, F>(data_rx, callback));
         Subscriber {
             data_stream: data_stream,
@@ -42,9 +45,9 @@ impl Subscriber {
             // Failure could only be caused by the join_connections
             // thread not running, which only happens after
             // Subscriber has been deconstructed
-            self.publishers_stream
-                .send(address)
-                .expect("Connected thread died");
+            self.publishers_stream.send(address).expect(
+                "Connected thread died",
+            );
         }
         Ok(())
     }
@@ -53,15 +56,18 @@ impl Subscriber {
 impl Drop for Subscriber {
     fn drop(&mut self) {
         if self.data_stream.send(None).is_err() {
-            error!("Subscriber data stream to topic '{}' has already been killed",
-                   self.topic);
+            error!(
+                "Subscriber data stream to topic '{}' has already been killed",
+                self.topic
+            );
         }
     }
 }
 
 fn handle_data<T, F>(data: Receiver<Option<Vec<u8>>>, callback: F)
-    where T: Message,
-          F: Fn(T) -> ()
+where
+    T: Message,
+    F: Fn(T) -> (),
 {
     for buffer_option in data {
         let buffer = match buffer_option {
@@ -75,11 +81,13 @@ fn handle_data<T, F>(data: Receiver<Option<Vec<u8>>>, callback: F)
     }
 }
 
-fn join_connections<T>(data_stream: Sender<Option<Vec<u8>>>,
-                       publishers: Receiver<SocketAddr>,
-                       caller_id: &str,
-                       topic: &str)
-    where T: Message
+fn join_connections<T>(
+    data_stream: Sender<Option<Vec<u8>>>,
+    publishers: Receiver<SocketAddr>,
+    caller_id: &str,
+    topic: &str,
+) where
+    T: Message,
 {
     // Ends when publisher sender is destroyed, which happens at Subscriber destruction
     for publisher in publishers {
@@ -95,12 +103,14 @@ fn join_connections<T>(data_stream: Sender<Option<Vec<u8>>>,
     }
 }
 
-fn join_connection<T>(data_stream: &Sender<Option<Vec<u8>>>,
-                      publisher: &SocketAddr,
-                      caller_id: &str,
-                      topic: &str)
-                      -> Result<()>
-    where T: Message
+fn join_connection<T>(
+    data_stream: &Sender<Option<Vec<u8>>>,
+    publisher: &SocketAddr,
+    caller_id: &str,
+    topic: &str,
+) -> Result<()>
+where
+    T: Message,
 {
     let mut stream = TcpStream::connect(publisher)?;
     exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
@@ -117,10 +127,11 @@ fn join_connection<T>(data_stream: &Sender<Option<Vec<u8>>>,
     Ok(())
 }
 
-fn write_request<T: Message, U: std::io::Write>(mut stream: &mut U,
-                                                caller_id: &str,
-                                                topic: &str)
-                                                -> Result<()> {
+fn write_request<T: Message, U: std::io::Write>(
+    mut stream: &mut U,
+    caller_id: &str,
+    topic: &str,
+) -> Result<()> {
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("message_definition"), T::msg_definition());
     fields.insert(String::from("callerid"), String::from(caller_id));
@@ -138,8 +149,9 @@ fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<()>
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, topic: &str) -> Result<()>
-    where T: Message,
-          U: std::io::Write + std::io::Read
+where
+    T: Message,
+    U: std::io::Write + std::io::Read,
 {
     write_request::<T, U>(stream, caller_id, topic)?;
     read_response::<T, U>(stream)
@@ -177,16 +189,16 @@ mod tests {
     #[test]
     fn package_to_vector_creates_right_buffer_from_reader() {
         let input = [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7];
-        let data = package_to_vector(&mut std::io::Cursor::new(input))
-            .expect(FAILED_TO_READ_WRITE_VECTOR);
+        let data =
+            package_to_vector(&mut std::io::Cursor::new(input)).expect(FAILED_TO_READ_WRITE_VECTOR);
         assert_eq!(data, [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7]);
     }
 
     #[test]
     fn package_to_vector_respects_provided_length() {
         let input = [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-        let data = package_to_vector(&mut std::io::Cursor::new(input))
-            .expect(FAILED_TO_READ_WRITE_VECTOR);
+        let data =
+            package_to_vector(&mut std::io::Cursor::new(input)).expect(FAILED_TO_READ_WRITE_VECTOR);
         assert_eq!(data, [7, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7]);
     }
 

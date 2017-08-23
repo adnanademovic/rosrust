@@ -12,15 +12,19 @@ pub struct Server {
 
 impl Server {
     pub fn new<T>(hostname: &str, port: u16, responder: T) -> Result<Server>
-        where T: 'static + XmlRpcServer + Send + Sync
+    where
+        T: 'static + XmlRpcServer + Send + Sync,
     {
-        let listener = hyper::Server::http((hostname, port))?
-            .handle(XmlRpcHandler::new(responder))?;
+        let listener = hyper::Server::http((hostname, port))?.handle(
+            XmlRpcHandler::new(
+                responder,
+            ),
+        )?;
         let uri = format!("http://{}:{}/", hostname, listener.socket.port());
         Ok(Server {
-               listener: listener,
-               uri: uri,
-           })
+            listener: listener,
+            uri: uri,
+        })
     }
 
     pub fn shutdown(&mut self) -> hyper::Result<()> {
@@ -28,8 +32,10 @@ impl Server {
     }
 }
 
-pub type ParameterIterator = std::iter::Map<std::vec::IntoIter<serde::decoder::Decoder>,
-                                            fn(serde::decoder::Decoder) -> Parameter>;
+pub type ParameterIterator = std::iter::Map<
+    std::vec::IntoIter<serde::decoder::Decoder>,
+    fn(serde::decoder::Decoder) -> Parameter,
+>;
 
 pub trait XmlRpcServer {
     fn handle(&self, method_name: &str, params: ParameterIterator) -> error::serde::Result<Answer>;
@@ -47,8 +53,8 @@ impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
     fn process(&self, req: Request, res: Response) -> Result<()> {
         let (method_name, parameters) = serde::Decoder::new_request(req)?;
         res.send(&self.handler
-                       .handle(&method_name, parameters.into_iter().map(Parameter::new))?
-                       .write_response()?)?;
+            .handle(&method_name, parameters.into_iter().map(Parameter::new))?
+            .write_response()?)?;
         Ok(())
     }
 }

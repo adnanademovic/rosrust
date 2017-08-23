@@ -52,10 +52,14 @@ mod tests {
         let src2 = "/foo/ter".parse::<Buffer>().expect(FAILED_TO_MAP);
         let dst = "/d/e/f".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src2.get(), dst);
-        assert_eq!("/a/b/c",
-                   format!("{}", mapper.translate(src1.get()).expect(FAILED_TO_MAP)));
-        assert_eq!("/d/e/f",
-                   format!("{}", mapper.translate(src2.get()).expect(FAILED_TO_MAP)));
+        assert_eq!(
+            "/a/b/c",
+            format!("{}", mapper.translate(src1.get()).expect(FAILED_TO_MAP))
+        );
+        assert_eq!(
+            "/d/e/f",
+            format!("{}", mapper.translate(src2.get()).expect(FAILED_TO_MAP))
+        );
     }
 
     #[test]
@@ -67,10 +71,14 @@ mod tests {
         let src2 = "/foo/ter".parse::<Buffer>().expect(FAILED_TO_MAP);
         let dst = "/".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src2.get(), dst);
-        assert_eq!("/a/b/c",
-                   format!("{}", mapper.translate(src1.get()).expect(FAILED_TO_MAP)));
-        assert_eq!("",
-                   format!("{}", mapper.translate(src2.get()).expect(FAILED_TO_MAP)));
+        assert_eq!(
+            "/a/b/c",
+            format!("{}", mapper.translate(src1.get()).expect(FAILED_TO_MAP))
+        );
+        assert_eq!(
+            "",
+            format!("{}", mapper.translate(src2.get()).expect(FAILED_TO_MAP))
+        );
     }
 
     #[test]
@@ -92,11 +100,15 @@ mod tests {
         let src = "/foo/bar".parse::<Buffer>().expect(FAILED_TO_MAP);
         let dst1 = "/a/b/c".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src.get(), dst1);
-        assert_eq!("/a/b/c",
-                   format!("{}", mapper.translate(src.get()).expect(FAILED_TO_MAP)));
+        assert_eq!(
+            "/a/b/c",
+            format!("{}", mapper.translate(src.get()).expect(FAILED_TO_MAP))
+        );
         let dst2 = "/d/e/f".parse::<Buffer>().expect(FAILED_TO_MAP);
         mapper.add(src.get(), dst2);
-        assert_eq!("/d/e/f",
-                   format!("{}", mapper.translate(src.get()).expect(FAILED_TO_MAP)));
+        assert_eq!(
+            "/d/e/f",
+            format!("{}", mapper.translate(src.get()).expect(FAILED_TO_MAP))
+        );
     }
 }

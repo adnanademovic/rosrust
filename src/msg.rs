@@ -2,7 +2,7 @@ use std::ops;
 
 const BILLION: i64 = 1000000000;
 
-#[derive(Serialize,Deserialize,Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Time {
     pub sec: i32,
     pub nsec: i32,
@@ -25,7 +25,7 @@ impl Time {
     }
 }
 
-#[derive(Serialize,Deserialize,Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Duration {
     pub sec: i32,
     pub nsec: i32,

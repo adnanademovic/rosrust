@@ -14,15 +14,16 @@ pub struct ClientResponse<T> {
 
 impl<T> ClientResponse<T> {
     pub fn read(self) -> Result<ServiceResult<T>> {
-        self.handle
-            .join()
-            .unwrap_or(Err(ErrorKind::ServiceResponseUnknown.into()))
+        self.handle.join().unwrap_or(Err(
+            ErrorKind::ServiceResponseUnknown.into(),
+        ))
     }
 }
 
 impl<T: Send + 'static> ClientResponse<T> {
     pub fn callback<F>(self, callback: F)
-        where F: FnOnce(Result<ServiceResult<T>>) + Send + 'static
+    where
+        F: FnOnce(Result<ServiceResult<T>>) + Send + 'static,
     {
         thread::spawn(move || callback(self.read()));
     }
@@ -43,42 +44,42 @@ impl<T: ServicePair> Client<T> {
     pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
         Client {
             info: std::sync::Arc::new(ClientInfo {
-                                          caller_id: String::from(caller_id),
-                                          uri: String::from(uri),
-                                          service: String::from(service),
-                                      }),
+                caller_id: String::from(caller_id),
+                uri: String::from(uri),
+                service: String::from(service),
+            }),
             phantom: std::marker::PhantomData,
         }
     }
 
     pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
-        Self::request_body(args,
-                           &self.info.uri,
-                           &self.info.caller_id,
-                           &self.info.service)
+        Self::request_body(
+            args,
+            &self.info.uri,
+            &self.info.caller_id,
+            &self.info.service,
+        )
     }
 
     pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
         let info = self.info.clone();
         ClientResponse {
             handle: thread::spawn(move || {
-                                      Self::request_body(&args,
-                                                         &info.uri,
-                                                         &info.caller_id,
-                                                         &info.service)
-                                  }),
+                Self::request_body(&args, &info.uri, &info.caller_id, &info.service)
+            }),
         }
     }
 
-    fn request_body(args: &T::Request,
-                    uri: &str,
-                    caller_id: &str,
-                    service: &str)
-                    -> Result<ServiceResult<T::Response>> {
+    fn request_body(
+        args: &T::Request,
+        uri: &str,
+        caller_id: &str,
+        service: &str,
+    ) -> Result<ServiceResult<T::Response>> {
         let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
-        let mut stream =
-            connection
-                .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
+        let mut stream = connection.chain_err(|| {
+            ErrorKind::ServiceConnectionFail(service.into(), uri.into())
+        })?;
 
         // Service request starts by exchanging connection headers
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
@@ -87,15 +88,16 @@ impl<T: ServicePair> Client<T> {
         to_writer(&mut stream, &args)?;
 
         // Service responds with a boolean byte, signalling success
-        let success = read_verification_byte(&mut stream)
-            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
+        let success = read_verification_byte(&mut stream).chain_err(|| {
+            ErrorKind::ServiceResponseInterruption
+        })?;
         Ok(if success {
-               // Decode response as response type upon success
-               Ok(from_reader(&mut stream)?)
-           } else {
-               // Decode response as string upon failure
-               Err(from_reader(&mut stream)?)
-           })
+            // Decode response as response type upon success
+            Ok(from_reader(&mut stream)?)
+        } else {
+            // Decode response as string upon failure
+            Err(from_reader(&mut stream)?)
+        })
     }
 }
 
@@ -105,8 +107,9 @@ fn read_verification_byte<R: std::io::Read>(reader: &mut R) -> std::io::Result<b
 }
 
 fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
-    where T: ServicePair,
-          U: std::io::Write
+where
+    T: ServicePair,
+    U: std::io::Write,
 {
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("callerid"), String::from(caller_id));
@@ -118,8 +121,9 @@ fn write_request<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Re
 }
 
 fn read_response<T, U>(mut stream: &mut U) -> Result<()>
-    where T: ServicePair,
-          U: std::io::Read
+where
+    T: ServicePair,
+    U: std::io::Read,
 {
     let fields = decode(&mut stream)?;
     if fields.get("callerid").is_none() {
@@ -129,8 +133,9 @@ fn read_response<T, U>(mut stream: &mut U) -> Result<()>
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
-    where T: ServicePair,
-          U: std::io::Write + std::io::Read
+where
+    T: ServicePair,
+    U: std::io::Write + std::io::Read,
 {
     write_request::<T, U>(stream, caller_id, service)?;
     read_response::<T, U>(stream)

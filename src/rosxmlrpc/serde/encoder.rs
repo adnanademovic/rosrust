@@ -21,42 +21,48 @@ impl Encoder {
         retval
     }
 
-    fn form_subtree(mut data: &mut std::vec::IntoIter<(XmlRpcValue, usize)>)
-                    -> Option<XmlRpcValue> {
+    fn form_subtree(
+        mut data: &mut std::vec::IntoIter<(XmlRpcValue, usize)>,
+    ) -> Option<XmlRpcValue> {
         match data.next() {
             Some((node, count)) => {
                 Some(match node {
-                         XmlRpcValue::Array(_) => {
-                             XmlRpcValue::Array((0..count)
-                                                    .into_iter()
-                                                    .filter_map(|_| {
-                                                                    Encoder::form_subtree(&mut data)
-                                                                })
-                                                    .collect())
-                         }
-                         _ => node,
-                     })
+                    XmlRpcValue::Array(_) => {
+                        XmlRpcValue::Array(
+                            (0..count)
+                                .into_iter()
+                                .filter_map(|_| Encoder::form_subtree(&mut data))
+                                .collect(),
+                        )
+                    }
+                    _ => node,
+                })
             }
             None => None,
         }
     }
 
-    pub fn write_request<T: std::io::Write>(self,
-                                            method: &str,
-                                            mut body: &mut T)
-                                            -> std::io::Result<()> {
-        write!(&mut body,
-               "{}",
-               value::XmlRpcRequest {
-                   method: String::from(method),
-                   parameters: self.form_tree(),
-               })
+    pub fn write_request<T: std::io::Write>(
+        self,
+        method: &str,
+        mut body: &mut T,
+    ) -> std::io::Result<()> {
+        write!(
+            &mut body,
+            "{}",
+            value::XmlRpcRequest {
+                method: String::from(method),
+                parameters: self.form_tree(),
+            }
+        )
     }
 
     pub fn write_response<T: std::io::Write>(self, mut body: &mut T) -> std::io::Result<()> {
-        write!(&mut body,
-               "{}",
-               value::XmlRpcResponse { parameters: self.form_tree() })
+        write!(
+            &mut body,
+            "{}",
+            value::XmlRpcResponse { parameters: self.form_tree() }
+        )
     }
 }
 
@@ -130,76 +136,100 @@ impl rustc_serialize::Encoder for Encoder {
     }
 
     fn emit_enum<F>(&mut self, _: &str, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("enum".into()))
     }
 
     fn emit_enum_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("enum variant".into()))
     }
 
     fn emit_enum_variant_arg<F>(&mut self, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
-        bail!(ErrorKind::UnsupportedDataType("enum variant argument".into()))
+        bail!(ErrorKind::UnsupportedDataType(
+            "enum variant argument".into(),
+        ))
     }
 
     fn emit_enum_struct_variant<F>(&mut self, _: &str, _: usize, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("enum struct variant".into()))
     }
 
     fn emit_enum_struct_variant_field<F>(&mut self, _: &str, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
-        bail!(ErrorKind::UnsupportedDataType("enum struct variant field".into()))
+        bail!(ErrorKind::UnsupportedDataType(
+            "enum struct variant field".into(),
+        ))
     }
 
     fn emit_struct<F>(&mut self, name: &str, l: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         self.data.push((XmlRpcValue::Array(vec![]), l));
-        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("struct {}", name)))
+        f(self).chain_err(|| {
+            ErrorKind::UnsupportedDataType(format!("struct {}", name))
+        })
     }
 
     fn emit_struct_field<F>(&mut self, name: &str, _: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field {}", name)))
     }
 
     fn emit_tuple<F>(&mut self, l: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         self.data.push((XmlRpcValue::Array(vec![]), l));
         f(self).chain_err(|| ErrorKind::UnsupportedDataType("tuple".into()))
     }
 
     fn emit_tuple_arg<F>(&mut self, n: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
-        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field number {}", n)))
+        f(self).chain_err(|| {
+            ErrorKind::UnsupportedDataType(format!("field number {}", n))
+        })
     }
 
     fn emit_tuple_struct<F>(&mut self, name: &str, l: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         self.data.push((XmlRpcValue::Array(vec![]), l));
-        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("tuple struct {}", name)))
+        f(self).chain_err(|| {
+            ErrorKind::UnsupportedDataType(format!("tuple struct {}", name))
+        })
     }
 
     fn emit_tuple_struct_arg<F>(&mut self, n: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
-        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("field number {}", n)))
+        f(self).chain_err(|| {
+            ErrorKind::UnsupportedDataType(format!("field number {}", n))
+        })
     }
 
     fn emit_option<F>(&mut self, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("option".into()))
     }
@@ -209,38 +239,46 @@ impl rustc_serialize::Encoder for Encoder {
     }
 
     fn emit_option_some<F>(&mut self, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("some".into()))
     }
 
     fn emit_seq<F>(&mut self, l: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         self.data.push((XmlRpcValue::Array(vec![]), l));
         f(self).chain_err(|| ErrorKind::UnsupportedDataType("array".into()))
     }
 
     fn emit_seq_elt<F>(&mut self, n: usize, f: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
-        f(self).chain_err(|| ErrorKind::UnsupportedDataType(format!("element number {}", n)))
+        f(self).chain_err(|| {
+            ErrorKind::UnsupportedDataType(format!("element number {}", n))
+        })
     }
 
     fn emit_map<F>(&mut self, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("map".into()))
     }
 
     fn emit_map_elt_key<F>(&mut self, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("map element key".into()))
     }
 
     fn emit_map_elt_val<F>(&mut self, _: usize, _: F) -> EncoderResult
-        where F: FnOnce(&mut Self) -> EncoderResult
+    where
+        F: FnOnce(&mut Self) -> EncoderResult,
     {
         bail!(ErrorKind::UnsupportedDataType("map element value".into()))
     }
@@ -258,74 +296,86 @@ mod tests {
     fn writes_response() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        String::from("Hello")
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
+        String::from("Hello").encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><string>Hello</string></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><string>Hello</string></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
     fn writes_request() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        String::from("Hello")
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
-        encoder
-            .write_request("something", &mut data)
-            .expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodCall>"#,
-                           r#"<methodName>"#,
-                           r#"something"#,
-                           r#"</methodName>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><string>Hello</string></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodCall>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        String::from("Hello").encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
+        encoder.write_request("something", &mut data).expect(
+            FAILED_TO_ENCODE,
+        );
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodCall>"#,
+                r#"<methodName>"#,
+                r#"something"#,
+                r#"</methodName>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><string>Hello</string></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodCall>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
     fn writes_string() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        String::from("Hello")
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
-        String::from("There")
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
-        String::from("Friend")
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
+        String::from("Hello").encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
+        String::from("There").encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
+        String::from("Friend").encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><string>Hello</string></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><string>There</string></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><string>Friend</string></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><string>Hello</string></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><string>There</string></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><string>Friend</string></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
@@ -336,21 +386,25 @@ mod tests {
         27i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         12i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><i4>43</i4></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><i4>27</i4></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><i4>12</i4></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><i4>43</i4></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><i4>27</i4></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><i4>12</i4></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
@@ -361,21 +415,25 @@ mod tests {
         11.25f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         77.125f64.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><double>33.5</double></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><double>11.25</double></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><double>77.125</double></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><double>33.5</double></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><double>11.25</double></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><double>77.125</double></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
@@ -385,46 +443,54 @@ mod tests {
         true.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         false.encode(&mut encoder).expect(FAILED_TO_ENCODE);
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><boolean>1</boolean></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><boolean>0</boolean></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><boolean>1</boolean></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><boolean>0</boolean></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
     fn writes_array() {
         let mut data = vec![];
         let mut encoder = Encoder::new();
-        vec![1i32, 2, 3, 4, 5]
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
+        vec![1i32, 2, 3, 4, 5].encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><i4>1</i4></value>"#,
-                           r#"<value><i4>2</i4></value>"#,
-                           r#"<value><i4>3</i4></value>"#,
-                           r#"<value><i4>4</i4></value>"#,
-                           r#"<value><i4>5</i4></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><array><data>"#,
+                r#"<value><i4>1</i4></value>"#,
+                r#"<value><i4>2</i4></value>"#,
+                r#"<value><i4>3</i4></value>"#,
+                r#"<value><i4>4</i4></value>"#,
+                r#"<value><i4>5</i4></value>"#,
+                r#"</data></array></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
-    #[derive(Debug,PartialEq,RustcEncodable)]
+    #[derive(Debug, PartialEq, RustcEncodable)]
     struct ExampleTuple(i32, f64, String, bool);
 
     #[test]
@@ -435,30 +501,34 @@ mod tests {
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><i4>5</i4></value>"#,
-                           r#"<value><double>0.5</double></value>"#,
-                           r#"<value><string>abc</string></value>"#,
-                           r#"<value><boolean>0</boolean></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><array><data>"#,
+                r#"<value><i4>5</i4></value>"#,
+                r#"<value><double>0.5</double></value>"#,
+                r#"<value><string>abc</string></value>"#,
+                r#"<value><boolean>0</boolean></value>"#,
+                r#"</data></array></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
-    #[derive(Debug,PartialEq,RustcEncodable)]
+    #[derive(Debug, PartialEq, RustcEncodable)]
     struct ExampleRequestStruct {
         a: i32,
         b: bool,
         c: ExampleRequestStructChild,
     }
 
-    #[derive(Debug,PartialEq,RustcEncodable)]
+    #[derive(Debug, PartialEq, RustcEncodable)]
     struct ExampleRequestStructChild {
         a: String,
         b: f64,
@@ -469,32 +539,35 @@ mod tests {
         let mut data = vec![];
         let mut encoder = Encoder::new();
         ExampleRequestStruct {
-                a: 41,
-                b: true,
-                c: ExampleRequestStructChild {
-                    a: String::from("Hello"),
-                    b: 0.5,
-                },
-            }
-            .encode(&mut encoder)
+            a: 41,
+            b: true,
+            c: ExampleRequestStructChild {
+                a: String::from("Hello"),
+                b: 0.5,
+            },
+        }.encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><i4>41</i4></value>"#,
-                           r#"<value><boolean>1</boolean></value>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><string>Hello</string></value>"#,
-                           r#"<value><double>0.5</double></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><array><data>"#,
+                r#"<value><i4>41</i4></value>"#,
+                r#"<value><boolean>1</boolean></value>"#,
+                r#"<value><array><data>"#,
+                r#"<value><string>Hello</string></value>"#,
+                r#"<value><double>0.5</double></value>"#,
+                r#"</data></array></value>"#,
+                r#"</data></array></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 
     #[test]
@@ -505,49 +578,52 @@ mod tests {
             .encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
         27i32.encode(&mut encoder).expect(FAILED_TO_ENCODE);
-        String::from("Hello")
-            .encode(&mut encoder)
-            .expect(FAILED_TO_ENCODE);
+        String::from("Hello").encode(&mut encoder).expect(
+            FAILED_TO_ENCODE,
+        );
         ExampleRequestStruct {
-                a: 41,
-                b: true,
-                c: ExampleRequestStructChild {
-                    a: String::from("Hello"),
-                    b: 0.5,
-                },
-            }
-            .encode(&mut encoder)
+            a: 41,
+            b: true,
+            c: ExampleRequestStructChild {
+                a: String::from("Hello"),
+                b: 0.5,
+            },
+        }.encode(&mut encoder)
             .expect(FAILED_TO_ENCODE);
         encoder.write_response(&mut data).expect(FAILED_TO_ENCODE);
-        assert_eq!(concat!(r#"<?xml version="1.0"?>"#,
-                           r#"<methodResponse>"#,
-                           r#"<params>"#,
-                           r#"<param>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><i4>5</i4></value>"#,
-                           r#"<value><double>0.5</double></value>"#,
-                           r#"<value><string>abc</string></value>"#,
-                           r#"<value><boolean>0</boolean></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><i4>27</i4></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><string>Hello</string></value>"#,
-                           r#"</param>"#,
-                           r#"<param>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><i4>41</i4></value>"#,
-                           r#"<value><boolean>1</boolean></value>"#,
-                           r#"<value><array><data>"#,
-                           r#"<value><string>Hello</string></value>"#,
-                           r#"<value><double>0.5</double></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</data></array></value>"#,
-                           r#"</param>"#,
-                           r#"</params>"#,
-                           r#"</methodResponse>"#),
-                   std::str::from_utf8(&data).expect(FAILED_TO_ENCODE));
+        assert_eq!(
+            concat!(
+                r#"<?xml version="1.0"?>"#,
+                r#"<methodResponse>"#,
+                r#"<params>"#,
+                r#"<param>"#,
+                r#"<value><array><data>"#,
+                r#"<value><i4>5</i4></value>"#,
+                r#"<value><double>0.5</double></value>"#,
+                r#"<value><string>abc</string></value>"#,
+                r#"<value><boolean>0</boolean></value>"#,
+                r#"</data></array></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><i4>27</i4></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><string>Hello</string></value>"#,
+                r#"</param>"#,
+                r#"<param>"#,
+                r#"<value><array><data>"#,
+                r#"<value><i4>41</i4></value>"#,
+                r#"<value><boolean>1</boolean></value>"#,
+                r#"<value><array><data>"#,
+                r#"<value><string>Hello</string></value>"#,
+                r#"<value><double>0.5</double></value>"#,
+                r#"</data></array></value>"#,
+                r#"</data></array></value>"#,
+                r#"</param>"#,
+                r#"</params>"#,
+                r#"</methodResponse>"#
+            ),
+            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
+        );
     }
 }

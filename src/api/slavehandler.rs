@@ -20,10 +20,11 @@ pub struct SlaveHandler {
 }
 
 impl XmlRpcServer for SlaveHandler {
-    fn handle(&self,
-              method_name: &str,
-              mut req: ParameterIterator)
-              -> error::rosxmlrpc::serde::Result<Answer> {
+    fn handle(
+        &self,
+        method_name: &str,
+        mut req: ParameterIterator,
+    ) -> error::rosxmlrpc::serde::Result<Answer> {
         info!("Slave API method called: {}", method_name);
         self.handle_call(method_name, &mut req)
     }
@@ -41,11 +42,12 @@ macro_rules! pop{
 }
 
 impl SlaveHandler {
-    pub fn new(master_uri: &str,
-               hostname: &str,
-               name: &str,
-               shutdown_signal: Sender<()>)
-               -> SlaveHandler {
+    pub fn new(
+        master_uri: &str,
+        hostname: &str,
+        name: &str,
+        shutdown_signal: Sender<()>,
+    ) -> SlaveHandler {
         SlaveHandler {
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
             publications: Arc::new(Mutex::new(HashMap::new())),
@@ -57,10 +59,11 @@ impl SlaveHandler {
         }
     }
 
-    fn handle_call(&self,
-                   method_name: &str,
-                   req: &mut ParameterIterator)
-                   -> error::rosxmlrpc::serde::Result<Answer> {
+    fn handle_call(
+        &self,
+        method_name: &str,
+        req: &mut ParameterIterator,
+    ) -> error::rosxmlrpc::serde::Result<Answer> {
         match method_name {
             "getBusStats" => encode_response(self.get_bus_stats(req), "Bus stats"),
             "getBusInfo" => encode_response(self.get_bus_info(req), "Bus stats"),
@@ -122,9 +125,9 @@ impl SlaveHandler {
 
     fn shutdown(&self, req: &mut ParameterIterator) -> HandleResult<i32> {
         let caller_id = pop!(req; String);
-        let message = pop::<String>(req)
-            .unwrap_or(Err("".into()))
-            .unwrap_or("".into());
+        let message = pop::<String>(req).unwrap_or(Err("".into())).unwrap_or(
+            "".into(),
+        );
         if caller_id == "" {
             return Ok(Err("Empty strings given".into()));
         }
@@ -140,17 +143,19 @@ impl SlaveHandler {
         if caller_id == "" {
             return Ok(Err("Empty strings given".into()));
         }
-        Ok(Ok(self.publications
-                  .lock()
-                  .expect(FAILED_TO_LOCK)
-                  .values()
-                  .map(|ref v| {
-                           return Topic {
-                                      name: v.topic.clone(),
-                                      datatype: v.msg_type.clone(),
-                                  };
-                       })
-                  .collect()))
+        Ok(Ok(
+            self.publications
+                .lock()
+                .expect(FAILED_TO_LOCK)
+                .values()
+                .map(|ref v| {
+                    return Topic {
+                        name: v.topic.clone(),
+                        datatype: v.msg_type.clone(),
+                    };
+                })
+                .collect(),
+        ))
     }
 
     fn get_subscriptions(&self, req: &mut ParameterIterator) -> HandleResult<Vec<Topic>> {
@@ -158,17 +163,19 @@ impl SlaveHandler {
         if caller_id == "" {
             return Ok(Err("Empty strings given".into()));
         }
-        Ok(Ok(self.subscriptions
-                  .lock()
-                  .expect(FAILED_TO_LOCK)
-                  .values()
-                  .map(|ref v| {
-                           return Topic {
-                                      name: v.topic.clone(),
-                                      datatype: v.msg_type.clone(),
-                                  };
-                       })
-                  .collect()))
+        Ok(Ok(
+            self.subscriptions
+                .lock()
+                .expect(FAILED_TO_LOCK)
+                .values()
+                .map(|ref v| {
+                    return Topic {
+                        name: v.topic.clone(),
+                        datatype: v.msg_type.clone(),
+                    };
+                })
+                .collect(),
+        ))
     }
 
     fn publisher_update(&self, req: &mut ParameterIterator) -> HandleResult<i32> {
@@ -178,11 +185,12 @@ impl SlaveHandler {
         if caller_id == "" || topic == "" || publishers.iter().any(|ref x| x.as_str() == "") {
             return Ok(Err("Empty strings given".into()));
         }
-        add_publishers_to_subscription(&mut self.subscriptions.lock().expect(FAILED_TO_LOCK),
-                                       &self.name,
-                                       &topic,
-                                       publishers.into_iter())
-                .and(Ok(Ok(0)))
+        add_publishers_to_subscription(
+            &mut self.subscriptions.lock().expect(FAILED_TO_LOCK),
+            &self.name,
+            &topic,
+            publishers.into_iter(),
+        ).and(Ok(Ok(0)))
     }
 
     fn get_master_uri(&self, req: &mut ParameterIterator) -> HandleResult<&str> {
@@ -212,9 +220,11 @@ impl SlaveHandler {
         let protocols = match protocols {
             XmlRpcValue::Array(protocols) => protocols,
             _ => {
-                return Ok(Err("Protocols need to be provided as [ [String, \
+                return Ok(Err(
+                    "Protocols need to be provided as [ [String, \
                                            XmlRpcLegalValue] ]"
-                                      .into()));
+                        .into(),
+                ));
             }
         };
         let mut has_tcpros = false;
@@ -233,12 +243,14 @@ impl SlaveHandler {
     }
 }
 
-pub fn add_publishers_to_subscription<T>(subscriptions: &mut HashMap<String, Subscriber>,
-                                         name: &str,
-                                         topic: &str,
-                                         publishers: T)
-                                         -> Result<()>
-    where T: Iterator<Item = String>
+pub fn add_publishers_to_subscription<T>(
+    subscriptions: &mut HashMap<String, Subscriber>,
+    name: &str,
+    topic: &str,
+    publishers: T,
+) -> Result<()>
+where
+    T: Iterator<Item = String>,
 {
     if let Some(mut subscription) = subscriptions.get_mut(topic) {
         for publisher in publishers {
@@ -255,62 +267,66 @@ pub fn add_publishers_to_subscription<T>(subscriptions: &mut HashMap<String, Sub
     Ok(())
 }
 
-fn encode_response<T: Encodable>(response: HandleResult<T>,
-                                 message: &str)
-                                 -> error::rosxmlrpc::serde::Result<Answer> {
+fn encode_response<T: Encodable>(
+    response: HandleResult<T>,
+    message: &str,
+) -> error::rosxmlrpc::serde::Result<Answer> {
     use std::error::Error;
     let mut res = Answer::new();
     match response {
-            Ok(value) => {
-                match value {
-                    // Success
-                    Ok(value) => res.add(&(1i32, message, value)),
-                    // Bad request provided
-                    Err(err) => res.add(&(-1i32, err, 0)),
-                }
+        Ok(value) => {
+            match value {
+                // Success
+                Ok(value) => res.add(&(1i32, message, value)),
+                // Bad request provided
+                Err(err) => res.add(&(-1i32, err, 0)),
             }
-            // System failure while handling request
-            Err(err) => res.add(&(0i32, err.description(), 0)),
         }
-        .map(|_| res)
+        // System failure while handling request
+        Err(err) => res.add(&(0i32, err.description(), 0)),
+    }.map(|_| res)
 }
 
 
 fn pop<T: Decodable>(req: &mut ParameterIterator) -> HandleResult<T> {
     Ok(Ok(match req.next() {
-                  Some(v) => v,
-                  None => return Ok(Err("Missing parameter".into())),
-              }
-              .read::<T>()
-              .map_err(|v| error::rosxmlrpc::Error::from(v))?))
+        Some(v) => v,
+        None => return Ok(Err("Missing parameter".into())),
+    }.read::<T>()
+        .map_err(|v| error::rosxmlrpc::Error::from(v))?))
 }
 
-fn connect_to_publisher(subscriber: &mut Subscriber,
-                        caller_id: &str,
-                        publisher: &str,
-                        topic: &str)
-                        -> Result<()> {
+fn connect_to_publisher(
+    subscriber: &mut Subscriber,
+    caller_id: &str,
+    publisher: &str,
+    topic: &str,
+) -> Result<()> {
     let (protocol, hostname, port) = request_topic(publisher, caller_id, topic)?;
     if protocol != "TCPROS" {
-        bail!("Publisher responded with a non-TCPROS protocol: {}",
-              protocol)
+        bail!(
+            "Publisher responded with a non-TCPROS protocol: {}",
+            protocol
+        )
     }
     subscriber
         .connect_to((hostname.as_str(), port as u16))
         .map_err(|err| ErrorKind::Io(err).into())
 }
 
-fn request_topic(publisher_uri: &str,
-                 caller_id: &str,
-                 topic: &str)
-                 -> error::rosxmlrpc::Result<(String, String, i32)> {
+fn request_topic(
+    publisher_uri: &str,
+    caller_id: &str,
+    topic: &str,
+) -> error::rosxmlrpc::Result<(String, String, i32)> {
     let mut request = rosxmlrpc::client::Request::new("requestTopic");
     request.add(&caller_id)?;
     request.add(&topic)?;
     request.add(&[["TCPROS"]])?;
     let client = rosxmlrpc::Client::new(publisher_uri);
-    let protocols = client
-        .request::<(i32, String, (String, String, i32))>(request)?;
+    let protocols = client.request::<(i32, String, (String, String, i32))>(
+        request,
+    )?;
     Ok(protocols.2)
 }
 

@@ -18,9 +18,9 @@ fn fork_thread<T: Write + Send + 'static>(streams: Receiver<T>, data: Receiver<V
         targets = targets
             .into_iter()
             .filter_map(|mut target| match target.write_all(&buffer) {
-                            Ok(()) => Some(target),
-                            Err(_) => None,
-                        })
+                Ok(()) => Some(target),
+                Err(_) => None,
+            })
             .collect()
     }
 }

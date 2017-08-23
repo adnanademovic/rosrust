@@ -18,42 +18,50 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn new<T, F>(hostname: &str,
-                     port: u16,
-                     service: &str,
-                     node_name: &str,
-                     handler: F)
-                     -> Result<Service>
-        where T: ServicePair,
-              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
+    pub fn new<T, F>(
+        hostname: &str,
+        port: u16,
+        service: &str,
+        node_name: &str,
+        handler: F,
+    ) -> Result<Service>
+    where
+        T: ServicePair,
+        F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
         let listener = TcpListener::bind((hostname, port))?;
         let socket_address = listener.local_addr()?;
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
         let (raii, listener) = tcpconnection::iterate(listener, format!("service '{}'", service));
-        Ok(Service::wrap_stream::<T, _, _, _>(service, node_name, handler, raii, listener, &api))
+        Ok(Service::wrap_stream::<T, _, _, _>(
+            service,
+            node_name,
+            handler,
+            raii,
+            listener,
+            &api,
+        ))
     }
 
-    fn wrap_stream<T, U, V, F>(service: &str,
-                               node_name: &str,
-                               handler: F,
-                               raii: tcpconnection::Raii,
-                               listener: V,
-                               api: &str)
-                               -> Service
-        where T: ServicePair,
-              U: std::io::Read + std::io::Write + Send + 'static,
-              V: Iterator<Item = U> + Send + 'static,
-              F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
+    fn wrap_stream<T, U, V, F>(
+        service: &str,
+        node_name: &str,
+        handler: F,
+        raii: tcpconnection::Raii,
+        listener: V,
+        api: &str,
+    ) -> Service
+    where
+        T: ServicePair,
+        U: std::io::Read + std::io::Write + Send + 'static,
+        V: Iterator<Item = U> + Send + 'static,
+        F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
         let service_name = String::from(service);
         let node_name = String::from(node_name);
         thread::spawn(move || {
-                          listen_for_clients::<T, _, _, _>(service_name,
-                                                           node_name,
-                                                           handler,
-                                                           listener)
-                      });
+            listen_for_clients::<T, _, _, _>(service_name, node_name, handler, listener)
+        });
         Service {
             api: String::from(api),
             msg_type: T::msg_type(),
@@ -64,18 +72,21 @@ impl Service {
 }
 
 fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F, connections: V)
-    where T: ServicePair,
-          U: std::io::Read + std::io::Write + Send + 'static,
-          V: Iterator<Item = U>,
-          F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
+where
+    T: ServicePair,
+    U: std::io::Read + std::io::Write + Send + 'static,
+    V: Iterator<Item = U>,
+    F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
 {
     let handler = Arc::new(handler);
     for mut stream in connections {
         // Service request starts by exchanging connection headers
         if let Err(err) = exchange_headers::<T, _>(&mut stream, &service, &node_name) {
-            error!("Failed to exchange headers for service '{}': {}",
-                   service,
-                   err);
+            error!(
+                "Failed to exchange headers for service '{}': {}",
+                service,
+                err
+            );
             continue;
         }
 
@@ -85,8 +96,9 @@ fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F
 }
 
 fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) -> Result<()>
-    where T: ServicePair,
-          U: std::io::Write + std::io::Read
+where
+    T: ServicePair,
+    U: std::io::Write + std::io::Read,
 {
     read_request::<T, U>(stream, service)?;
     write_response::<T, U>(stream, node_name)
@@ -105,8 +117,9 @@ fn read_request<T: ServicePair, U: std::io::Read>(mut stream: &mut U, service: &
 }
 
 fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<()>
-    where T: ServicePair,
-          U: std::io::Write
+where
+    T: ServicePair,
+    U: std::io::Write,
 {
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("callerid"), String::from(node_name));
@@ -117,23 +130,29 @@ fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<()>
 }
 
 fn spawn_request_handler<T, U, F>(stream: U, handler: Arc<F>)
-    where T: ServicePair,
-          U: std::io::Read + std::io::Write + Send + 'static,
-          F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
+where
+    T: ServicePair,
+    U: std::io::Read + std::io::Write + Send + 'static,
+    F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
 {
-    thread::spawn(move || if let Err(err) = handle_request_loop::<T, U, F>(stream, handler) {
-                      let info = err.iter()
-                          .map(|v| format!("{}", v))
-                          .collect::<Vec<_>>()
-                          .join("\nCaused by:");
-                      error!("{}", info);
-                  });
+    thread::spawn(move || if let Err(err) = handle_request_loop::<T, U, F>(
+        stream,
+        handler,
+    )
+    {
+        let info = err.iter()
+            .map(|v| format!("{}", v))
+            .collect::<Vec<_>>()
+            .join("\nCaused by:");
+        error!("{}", info);
+    });
 }
 
 fn handle_request_loop<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
-    where T: ServicePair,
-          U: std::io::Read + std::io::Write,
-          F: Fn(T::Request) -> ServiceResult<T::Response>
+where
+    T: ServicePair,
+    U: std::io::Read + std::io::Write,
+    F: Fn(T::Request) -> ServiceResult<T::Response>,
 {
     loop {
         // Receive request from client

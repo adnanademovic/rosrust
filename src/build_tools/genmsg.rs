@@ -16,10 +16,9 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
         .messages
         .iter()
         .map(|(&(ref pack, ref _name), ref _value)| pack.clone())
-        .chain(message_map
-                   .services
-                   .iter()
-                   .map(|&(ref pack, ref _name)| pack.clone()))
+        .chain(message_map.services.iter().map(|&(ref pack, ref _name)| {
+            pack.clone()
+        }))
         .collect::<HashSet<String>>();
     for package in packages {
         output.push(format!("    pub mod {} {{", package));
@@ -31,16 +30,18 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             .collect::<HashSet<String>>();
         for name in &names {
             let key = (package.clone(), name.clone());
-            let message = message_map
-                .messages
-                .get(&key)
-                .expect("Internal implementation contains mismatch in map keys");
-            let hash = hashes
-                .get(&key)
-                .expect("Internal implementation contains mismatch in map keys");
+            let message = message_map.messages.get(&key).expect(
+                "Internal implementation contains mismatch in map keys",
+            );
+            let hash = hashes.get(&key).expect(
+                "Internal implementation contains mismatch in map keys",
+            );
             let definition = helpers::generate_message_definition(&message_map.messages, &message)?;
             output.push(message.struct_string());
-            output.push(format!("        impl ::rosrust::Message for {} {{", message.name));
+            output.push(format!(
+                "        impl ::rosrust::Message for {} {{",
+                message.name
+            ));
             output.push(create_function("msg_definition", &definition));
             output.push(create_function("md5sum", &hash));
             output.push(create_function("msg_type", &message.get_type()));
@@ -66,16 +67,21 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             .map(|&(ref _pack, ref name)| name.clone())
             .collect::<HashSet<String>>();
         for name in &names {
-            let hash = hashes
-                .get(&(package.clone(), name.clone()))
-                .expect("Internal implementation contains mismatch in map keys");
-            output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
+            let hash = hashes.get(&(package.clone(), name.clone())).expect(
+                "Internal implementation contains mismatch in map keys",
+            );
+            output.push(
+                "        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into(),
+            );
             output.push("        #[derive(Serialize,Deserialize,Debug)]".into());
             output.push(format!("        pub struct {} {{}}", name));
             output.push(format!("        impl ::rosrust::Message for {} {{", name));
             output.push(create_function("msg_definition", ""));
             output.push(create_function("md5sum", &hash));
-            output.push(create_function("msg_type", &format!("{}/{}", package, name)));
+            output.push(create_function(
+                "msg_type",
+                &format!("{}/{}", package, name),
+            ));
             output.push("        }".into());
 
             output.push(format!("        impl ::rosrust::Service for {} {{", name));
@@ -90,12 +96,14 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
 }
 
 fn create_function(name: &str, value: &str) -> String {
-    format!(r#"
+    format!(
+        r#"
             fn {}() -> ::std::string::String {{
                 {:?}.into()
             }}"#,
-            name,
-            value)
+        name,
+        value
+    )
 }
 
 fn string_into_pair<'a>(input: &'a str) -> Result<(&'a str, &'a str)> {
@@ -107,8 +115,10 @@ fn string_into_pair<'a>(input: &'a str) -> Result<(&'a str, &'a str)> {
     let name = match parts.next() {
         Some(v) => v,
         None => {
-            bail!("Package string needs to be in package/name format: {}",
-                  input)
+            bail!(
+                "Package string needs to be in package/name format: {}",
+                input
+            )
         }
     };
     Ok((package, name))
@@ -129,9 +139,10 @@ mod tests {
 
     #[test]
     fn depend_on_messages_printout() {
-        let data = depend_on_messages(&[&FILEPATH],
-                                      &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"])
-                .unwrap();
+        let data = depend_on_messages(
+            &[&FILEPATH],
+            &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"],
+        ).unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
