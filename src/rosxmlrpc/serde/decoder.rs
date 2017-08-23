@@ -29,14 +29,6 @@ impl Decoder {
             })
     }
 
-    pub fn new_response<T: std::io::Read>(body: T) -> Result<Vec<Decoder>> {
-        value::XmlRpcResponse::new(body)
-            .chain_err(|| ErrorKind::XmlRpcReading("response".into()))
-            .map(|value| {
-                value.parameters.into_iter().map(Decoder::new).collect()
-            })
-    }
-
     pub fn value(self) -> value::XmlRpcValue {
         self.value
     }
@@ -442,43 +434,6 @@ mod tests {
         let mut cursor = std::io::Cursor::new(data.as_bytes());
         let (method, mut parameters) = Decoder::new_request(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!("mytype.mymethod", method);
-        assert_eq!(2, parameters.len());
-        assert_eq!(33, i32::decode(&mut parameters[0]).expect(FAILED_TO_DECODE));
-        assert_eq!(
-            ExampleRequestStruct {
-                a: 41,
-                b: true,
-                c: ExampleRequestStructChild {
-                    a: String::from("Hello"),
-                    b: 0.5,
-                },
-            },
-            ExampleRequestStruct::decode(&mut parameters[1]).expect(FAILED_TO_DECODE)
-        );
-    }
-
-    #[test]
-    fn handles_responses() {
-        let data = r#"<?xml version="1.0"?>
-<methodResponse>
-  <params>
-    <param>
-      <value><i4>33</i4></value>
-    </param>
-    <param>
-      <value><array><data>
-        <value><i4>41</i4></value>
-        <value><boolean>1</boolean></value>
-        <value><array><data>
-          <value><string>Hello</string></value>
-          <value><double>0.5</double></value>
-        </data></array></value>
-      </data></array></value>
-    </param>
-  </params>
-</methodResponse>"#;
-        let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let mut parameters = Decoder::new_response(&mut cursor).expect(FAILED_TO_DECODE);
         assert_eq!(2, parameters.len());
         assert_eq!(33, i32::decode(&mut parameters[0]).expect(FAILED_TO_DECODE));
         assert_eq!(

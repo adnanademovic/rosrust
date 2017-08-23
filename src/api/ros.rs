@@ -1,4 +1,4 @@
-use rustc_serialize::{Encodable, Decodable};
+use serde::{Serialize, Deserialize};
 use super::master::{self, Master};
 use super::slave::Slave;
 use super::error::{ErrorKind, Result};
@@ -7,7 +7,7 @@ use super::value::Topic;
 use super::naming::{self, Resolver};
 use super::resolve;
 use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
-use rosxmlrpc::serde::XmlRpcValue;
+use xml_rpc;
 
 pub struct Ros {
     master: Master,
@@ -75,11 +75,13 @@ impl Ros {
     }
 
     pub fn state(&self) -> MasterResult<master::SystemState> {
-        self.master.get_system_state()
+        self.master.get_system_state().map(Into::into)
     }
 
     pub fn topics(&self) -> MasterResult<Vec<Topic>> {
-        self.master.get_topic_types()
+        self.master.get_topic_types().map(|v| {
+            v.into_iter().map(Into::into).collect()
+        })
     }
 
     pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>> {
@@ -173,15 +175,15 @@ impl<'a> Parameter<'a> {
         &self.name
     }
 
-    pub fn get<T: Decodable>(&self) -> MasterResult<T> {
+    pub fn get<'b, T: Deserialize<'b>>(&self) -> MasterResult<T> {
         self.master.get_param::<T>(&self.name)
     }
 
-    pub fn get_raw(&self) -> MasterResult<XmlRpcValue> {
+    pub fn get_raw(&self) -> MasterResult<xml_rpc::Value> {
         self.master.get_param_any(&self.name)
     }
 
-    pub fn set<T: Encodable>(&self, value: &T) -> MasterResult<()> {
+    pub fn set<T: Serialize>(&self, value: &T) -> MasterResult<()> {
         self.master.set_param::<T>(&self.name, value).and(Ok(()))
     }
 

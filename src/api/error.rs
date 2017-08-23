@@ -38,10 +38,19 @@ pub mod api {
 }
 
 pub mod master {
+    use xml_rpc;
+
     error_chain! {
         links {
+            XmlRpcErr(xml_rpc::error::Error, xml_rpc::error::ErrorKind);
             XmlRpc(super::rosxmlrpc::Error, super::rosxmlrpc::ErrorKind);
             Api(::error::api::Error, ::error::api::ErrorKind);
+        }
+        errors {
+            Fault(fault: xml_rpc::Fault) {
+                description("Queried XML-RPC server returned a fault")
+                display("Fault #{}: {}", fault.code, fault.message)
+            }
         }
     }
 }

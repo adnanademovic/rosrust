@@ -113,15 +113,6 @@ impl XmlRpcRequest {
     }
 }
 
-impl XmlRpcResponse {
-    pub fn new<T: std::io::Read>(body: T) -> Result<XmlRpcResponse> {
-        extract_parameters(Tree::new(body)
-            .chain_err(|| "Failed to transform XML data into tree")?
-            .peel_layer("methodResponse")?)
-            .map(|parameters| XmlRpcResponse { parameters: parameters })
-    }
-}
-
 fn extract_parameters(parameters: Tree) -> Result<Vec<XmlRpcValue>> {
     if let Tree::Node(key, parameters) = parameters {
         if key == "params" {
@@ -460,44 +451,6 @@ mod tests {
         let mut cursor = std::io::Cursor::new(data.as_bytes());
         let value = XmlRpcRequest::new(&mut cursor).expect(BAD_DATA);
         assert_eq!("mytype.mymethod", value.method);
-        assert_eq!(
-            vec![
-                XmlRpcValue::Int(33),
-                XmlRpcValue::Array(vec![
-                    XmlRpcValue::Int(41),
-                    XmlRpcValue::Bool(true),
-                    XmlRpcValue::Array(vec![
-                        XmlRpcValue::String(String::from("Hello")),
-                        XmlRpcValue::Double(0.5),
-                    ]),
-                ]),
-            ],
-            value.parameters
-        );
-    }
-
-    #[test]
-    fn reads_response() {
-        let data = r#"<?xml version="1.0"?>
-<methodResponse>
-  <params>
-    <param>
-      <value><i4>33</i4></value>
-    </param>
-    <param>
-      <value><array><data>
-        <value><i4>41</i4></value>
-        <value><boolean>1</boolean></value>
-        <value><array><data>
-          <value><string>Hello</string></value>
-          <value><double>0.5</double></value>
-        </data></array></value>
-      </data></array></value>
-    </param>
-  </params>
-</methodResponse>"#;
-        let mut cursor = std::io::Cursor::new(data.as_bytes());
-        let value = XmlRpcResponse::new(&mut cursor).expect(BAD_DATA);
         assert_eq!(
             vec![
                 XmlRpcValue::Int(33),

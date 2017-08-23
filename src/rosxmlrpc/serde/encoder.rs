@@ -42,21 +42,6 @@ impl Encoder {
         }
     }
 
-    pub fn write_request<T: std::io::Write>(
-        self,
-        method: &str,
-        mut body: &mut T,
-    ) -> std::io::Result<()> {
-        write!(
-            &mut body,
-            "{}",
-            value::XmlRpcRequest {
-                method: String::from(method),
-                parameters: self.form_tree(),
-            }
-        )
-    }
-
     pub fn write_response<T: std::io::Write>(self, mut body: &mut T) -> std::io::Result<()> {
         write!(
             &mut body,
@@ -310,34 +295,6 @@ mod tests {
                 r#"</param>"#,
                 r#"</params>"#,
                 r#"</methodResponse>"#
-            ),
-            std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
-        );
-    }
-
-    #[test]
-    fn writes_request() {
-        let mut data = vec![];
-        let mut encoder = Encoder::new();
-        String::from("Hello").encode(&mut encoder).expect(
-            FAILED_TO_ENCODE,
-        );
-        encoder.write_request("something", &mut data).expect(
-            FAILED_TO_ENCODE,
-        );
-        assert_eq!(
-            concat!(
-                r#"<?xml version="1.0"?>"#,
-                r#"<methodCall>"#,
-                r#"<methodName>"#,
-                r#"something"#,
-                r#"</methodName>"#,
-                r#"<params>"#,
-                r#"<param>"#,
-                r#"<value><string>Hello</string></value>"#,
-                r#"</param>"#,
-                r#"</params>"#,
-                r#"</methodCall>"#
             ),
             std::str::from_utf8(&data).expect(FAILED_TO_ENCODE)
         );

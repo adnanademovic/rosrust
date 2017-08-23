@@ -1,112 +1,103 @@
-use rosxmlrpc;
-use error::rosxmlrpc::{Error as ReError, ErrorKind as ReErrorKind};
-use error::rosxmlrpc::serde::ErrorKind as SeErrorKind;
+use std;
+use std::sync::Mutex;
 use super::error::master::{Result, Error, ErrorKind};
-use rustc_serialize::{Decodable, Decoder, Encodable};
+use serde::{Deserialize, Serialize};
 use super::value::Topic;
+use xml_rpc;
 
 pub struct Master {
-    client: rosxmlrpc::Client,
+    client: Mutex<xml_rpc::Client>,
     client_id: String,
     caller_api: String,
+    master_uri: String,
+}
+
+const ERROR_CODE: i32 = -1;
+const FAILURE_CODE: i32 = 0;
+const SUCCESS_CODE: i32 = 1;
+
+fn parse_response(params: xml_rpc::Params) -> std::result::Result<xml_rpc::Value, xml_rpc::Fault> {
+    let mut param_iter = params.into_iter();
+    let code = param_iter.next().ok_or_else(|| {
+        xml_rpc::Fault::new(FAILURE_CODE, "Server response missing arguments.")
+    })?;
+    let message = param_iter.next().ok_or_else(|| {
+        xml_rpc::Fault::new(FAILURE_CODE, "Server response missing arguments.")
+    })?;
+    let value = param_iter.next().ok_or_else(|| {
+        xml_rpc::Fault::new(FAILURE_CODE, "Server response missing arguments.")
+    })?;
+    let code = match code {
+        xml_rpc::Value::Int(v) => v,
+        _ => {
+            return Err(xml_rpc::Fault::new(
+                FAILURE_CODE,
+                "First response argument is expected to be int.",
+            ))
+        }
+    };
+    let message = match message {
+        xml_rpc::Value::String(v) => v,
+        _ => {
+            return Err(xml_rpc::Fault::new(
+                FAILURE_CODE,
+                "Second response argument is expected to be string.",
+            ))
+        }
+    };
+    if code != SUCCESS_CODE {
+        return Err(xml_rpc::Fault::new(code, message));
+    }
+    Ok(value)
 }
 
 macro_rules! request {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
-        let mut request = rosxmlrpc::client::Request::new(stringify!($name));
-        request.add(&$s.client_id).map_err(|v| ReError::from(v))?;
-        $(
-            request.add(&$item).map_err(|v| ReError::from(v))?;
-        )*
-        let data : ResponseData<_> = $s.client.request(request)?;
-        data.0.map_err(to_api_error)
+        let params = xml_rpc::into_params(&(&$s.client_id,
+            $(
+                $item,
+            )*
+            ))
+            .map_err(xml_rpc::error::Error::from)?;
+        let response = $s.client.lock().unwrap()
+            .call_value(&$s.master_uri.parse().unwrap(), stringify!($name), params)?
+            .map_err(to_api_error)?;
+        let data = parse_response(response).map_err(to_api_error)?;
+        Deserialize::deserialize(data).map_err(|v| {
+        to_api_error(xml_rpc::Fault::new(
+            FAILURE_CODE,
+            format!("Third response argument has unexpected structure: {}", v),
+        ))})
     })
 }
 
 macro_rules! request_tree {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
-        let mut request = rosxmlrpc::client::Request::new(stringify!($name));
-        request.add(&$s.client_id).map_err(|v| ReError::from(v))?;
-        $(
-            request.add(&$item).map_err(|v| ReError::from(v))?;
-        )*
-        $s.client.request_tree(request)
-            .map_err(|v|v.into())
-            .and_then(Master::remove_tree_wrap)
+        let params = xml_rpc::into_params(&(&$s.client_id,
+            $(
+                $item,
+            )*
+            ))
+            .map_err(xml_rpc::error::Error::from)?;
+        let response = $s.client.lock().unwrap()
+            .call_value(&$s.master_uri.parse().unwrap(), stringify!($name), params)?
+            .map_err(ErrorKind::Fault)?;
+        parse_response(response).map_err(to_api_error)
     })
 }
 
 impl Master {
     pub fn new(master_uri: &str, client_id: &str, caller_api: &str) -> Master {
         Master {
-            client: rosxmlrpc::Client::new(&master_uri),
+            client: Mutex::new(xml_rpc::Client::new().unwrap()),
             client_id: client_id.to_owned(),
             caller_api: caller_api.to_owned(),
+            master_uri: master_uri.to_owned(),
         }
-    }
-
-    fn remove_tree_wrap(data: rosxmlrpc::XmlRpcValue) -> Result<rosxmlrpc::XmlRpcValue> {
-        let values = match data {
-            rosxmlrpc::XmlRpcValue::Array(values) => values,
-            _ => {
-                bail!(ErrorKind::XmlRpc(
-                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                        "while handling request".into(),
-                    )),
-                ))
-            }
-        };
-        if values.len() != 3 {
-            bail!(ErrorKind::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                    "while \
-                                                                                          handling \
-                                                                                          request"
-                        .into(),
-                )),
-            ))
-        }
-        let mut values = values.into_iter();
-        let code = match values.next() {
-            Some(rosxmlrpc::XmlRpcValue::Int(v)) => v,
-            _ => {
-                bail!(ErrorKind::XmlRpc(
-                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                        "while handling request".into(),
-                    )),
-                ))
-            }
-        };
-        let message = match values.next() {
-            Some(rosxmlrpc::XmlRpcValue::String(v)) => v,
-            _ => {
-                bail!(ErrorKind::XmlRpc(
-                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                        "while handling request".into(),
-                    )),
-                ))
-            }
-        };
-        let value = match values.next() {
-            Some(v) => v,
-            _ => {
-                bail!(ErrorKind::XmlRpc(
-                    ReErrorKind::Serde(SeErrorKind::MismatchedDataFormat(
-                        "while handling request".into(),
-                    )),
-                ))
-            }
-        };
-        if code != 1 {
-            bail!(ErrorKind::XmlRpc(
-                ReErrorKind::Serde(SeErrorKind::Msg(message)),
-            ));
-        }
-        Ok(value)
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> Result<i32> {
-        request!(self; registerService; service, service_api, self.caller_api)
+        request!(self; registerService; service, service_api, &self.caller_api)
     }
 
     pub fn unregister_service(&self, service: &str, service_api: &str) -> Result<i32> {
@@ -114,19 +105,19 @@ impl Master {
     }
 
     pub fn register_subscriber(&self, topic: &str, topic_type: &str) -> Result<Vec<String>> {
-        request!(self; registerSubscriber; topic, topic_type, self.caller_api)
+        request!(self; registerSubscriber; topic, topic_type, &self.caller_api)
     }
 
     pub fn unregister_subscriber(&self, topic: &str) -> Result<i32> {
-        request!(self; registerSubscriber; topic, self.caller_api)
+        request!(self; registerSubscriber; topic, &self.caller_api)
     }
 
     pub fn register_publisher(&self, topic: &str, topic_type: &str) -> Result<Vec<String>> {
-        request!(self; registerPublisher; topic, topic_type, self.caller_api)
+        request!(self; registerPublisher; topic, topic_type, &self.caller_api)
     }
 
     pub fn unregister_publisher(&self, topic: &str) -> Result<i32> {
-        request!(self; unregisterPublisher; topic, self.caller_api)
+        request!(self; unregisterPublisher; topic, &self.caller_api)
     }
 
     #[allow(dead_code)]
@@ -139,11 +130,11 @@ impl Master {
         request!(self; getPublishedTopics; subgraph)
     }
 
-    pub fn get_topic_types(&self) -> Result<Vec<Topic>> {
+    pub fn get_topic_types(&self) -> Result<Vec<TopicTuple>> {
         request!(self; getTopicTypes;)
     }
 
-    pub fn get_system_state(&self) -> Result<SystemState> {
+    pub fn get_system_state(&self) -> Result<SystemStateTuple> {
         request!(self; getSystemState;)
     }
 
@@ -160,15 +151,15 @@ impl Master {
         request!(self; deleteParam; key)
     }
 
-    pub fn set_param<T: Encodable>(&self, key: &str, value: &T) -> Result<i32> {
+    pub fn set_param<T: Serialize>(&self, key: &str, value: &T) -> Result<i32> {
         request!(self; setParam; key, value)
     }
 
-    pub fn get_param<T: Decodable>(&self, key: &str) -> Result<T> {
+    pub fn get_param<'a, T: Deserialize<'a>>(&self, key: &str) -> Result<T> {
         request!(self; getParam; key)
     }
 
-    pub fn get_param_any(&self, key: &str) -> Result<rosxmlrpc::XmlRpcValue> {
+    pub fn get_param_any(&self, key: &str) -> Result<xml_rpc::Value> {
         request_tree!(self; getParam; key)
     }
 
@@ -177,18 +168,18 @@ impl Master {
     }
 
     #[allow(dead_code)]
-    pub fn subscribe_param<T: Decodable>(&self, key: &str) -> Result<T> {
-        request!(self; subscribeParam; self.caller_api, key)
+    pub fn subscribe_param<'a, T: Deserialize<'a>>(&self, key: &str) -> Result<T> {
+        request!(self; subscribeParam; &self.caller_api, key)
     }
 
     #[allow(dead_code)]
-    pub fn subscribe_param_any(&self, key: &str) -> Result<rosxmlrpc::XmlRpcValue> {
-        request_tree!(self; subscribeParam; self.caller_api, key)
+    pub fn subscribe_param_any(&self, key: &str) -> Result<xml_rpc::Value> {
+        request_tree!(self; subscribeParam; &self.caller_api, key)
     }
 
     #[allow(dead_code)]
     pub fn unsubscribe_param(&self, key: &str) -> Result<i32> {
-        request!(self; unsubscribeParam; self.caller_api, key)
+        request!(self; unsubscribeParam; &self.caller_api, key)
     }
 
     pub fn has_param(&self, key: &str) -> Result<bool> {
@@ -200,42 +191,64 @@ impl Master {
     }
 }
 
-fn to_api_error(v: (bool, String)) -> Error {
+fn to_api_error(v: xml_rpc::Fault) -> Error {
     use super::error::api::ErrorKind as ApiErrorKind;
-    match v.0 {
-        false => ErrorKind::Api(ApiErrorKind::SystemFail(v.1)),
-        true => ErrorKind::Api(ApiErrorKind::BadData(v.1)),
+    match v.code {
+        FAILURE_CODE => ErrorKind::Api(ApiErrorKind::SystemFail(v.message)),
+        ERROR_CODE => ErrorKind::Api(ApiErrorKind::BadData(v.message)),
+        x => ErrorKind::Api(ApiErrorKind::SystemFail(format!(
+            "Bad error code #{} returned with message: {}",
+            x,
+            v.message
+        ))),
     }.into()
 }
 
 #[derive(Debug)]
-struct ResponseData<T>(::std::result::Result<T, (bool, String)>);
-
-impl<T: Decodable> Decodable for ResponseData<T> {
-    fn decode<D: Decoder>(d: &mut D) -> ::std::result::Result<ResponseData<T>, D::Error> {
-        d.read_struct("ResponseData", 3, |d| {
-            let code = d.read_struct_field("status_code", 0, |d| d.read_i32())?;
-            let message = d.read_struct_field("status_message", 1, |d| d.read_str())?;
-            match code {
-                0 | -1 => Ok(ResponseData(Err((code != 0, message)))),
-                1 => Ok(ResponseData(
-                    Ok(d.read_struct_field("data", 2, |d| T::decode(d))?),
-                )),
-                _ => Err(d.error("Invalid response code returned by ROS")),
-            }
-        })
-    }
-}
-
-#[derive(Debug, RustcDecodable)]
 pub struct TopicData {
     pub name: String,
     pub connections: Vec<String>,
 }
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug)]
 pub struct SystemState {
     pub publishers: Vec<TopicData>,
     pub subscribers: Vec<TopicData>,
     pub services: Vec<TopicData>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TopicDataTuple(String, Vec<String>);
+#[derive(Debug, Deserialize)]
+pub struct SystemStateTuple(Vec<TopicDataTuple>, Vec<TopicDataTuple>, Vec<TopicDataTuple>);
+
+impl Into<SystemState> for SystemStateTuple {
+    fn into(self) -> SystemState {
+        SystemState {
+            publishers: self.0.into_iter().map(Into::into).collect(),
+            subscribers: self.1.into_iter().map(Into::into).collect(),
+            services: self.2.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl Into<TopicData> for TopicDataTuple {
+    fn into(self) -> TopicData {
+        TopicData {
+            name: self.0,
+            connections: self.1,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TopicTuple(String, String);
+
+impl Into<Topic> for TopicTuple {
+    fn into(self) -> Topic {
+        Topic {
+            name: self.0,
+            datatype: self.1,
+        }
+    }
 }

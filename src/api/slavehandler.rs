@@ -1,5 +1,5 @@
 use nix::unistd::getpid;
-use rosxmlrpc::{self, XmlRpcValue};
+use rosxmlrpc::XmlRpcValue;
 use rosxmlrpc::server::{Answer, ParameterIterator, XmlRpcServer};
 use rustc_serialize::{Decodable, Encodable};
 use std::collections::HashMap;
@@ -8,6 +8,7 @@ use std::sync::mpsc::Sender;
 use super::error::{self, ErrorKind, Result};
 use super::value::Topic;
 use tcpros::{Publisher, Subscriber, Service};
+use xml_rpc;
 
 pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
@@ -319,15 +320,16 @@ fn request_topic(
     caller_id: &str,
     topic: &str,
 ) -> error::rosxmlrpc::Result<(String, String, i32)> {
-    let mut request = rosxmlrpc::client::Request::new("requestTopic");
-    request.add(&caller_id)?;
-    request.add(&topic)?;
-    request.add(&[["TCPROS"]])?;
-    let client = rosxmlrpc::Client::new(publisher_uri);
-    let protocols = client.request::<(i32, String, (String, String, i32))>(
-        request,
-    )?;
-    Ok(protocols.2)
+    let (_code, _message, protocols): (i32, String, (String, String, i32)) = xml_rpc::Client::new()
+        .unwrap()
+        .call(&publisher_uri.parse().unwrap(), "requestTopic", &(
+            caller_id,
+            topic,
+            [["TCPROS"]],
+        ))
+        .unwrap()
+        .unwrap();
+    Ok(protocols)
 }
 
 #[derive(RustcEncodable)]
