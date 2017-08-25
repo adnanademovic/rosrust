@@ -1,0 +1,74 @@
+use std::sync::Mutex;
+use serde::{Deserialize, Serialize};
+use xml_rpc::{self, Value, Params};
+use super::{Response, ResponseError, ERROR_CODE, FAILURE_CODE, SUCCESS_CODE};
+
+pub struct Client {
+    client: Mutex<xml_rpc::Client>,
+    master_uri: String,
+}
+
+impl Client {
+    pub fn new(master_uri: &str) -> Result<Client, xml_rpc::error::Error> {
+        Ok(Client {
+            client: Mutex::new(xml_rpc::Client::new()?),
+            master_uri: master_uri.to_owned(),
+        })
+    }
+
+    pub fn request_tree_with_tree(&self, name: &str, params: Params) -> Response<Value> {
+        let mut client = self.client.lock().map_err(|err| {
+            ResponseError::Client(format!("Failed to acquire lock on socket: {}", err))
+        })?;
+        let mut response = client
+            .call_value(&self.master_uri.parse().unwrap(), name, params)
+            .map_err(|err| {
+                ResponseError::Client(format!("Failed to perform call to server: {}", err))
+            })?
+            .map_err(|fault| {
+                ResponseError::Client(format!(
+                    "Unexpected fault #{} received from server: {}",
+                    fault.code,
+                    fault.message
+                ))
+            })?
+            .into_iter();
+        if let (Some(Value::Int(code)), Some(Value::String(message)), Some(data)) =
+            (response.next(), response.next(), response.next())
+        {
+            match code {
+                ERROR_CODE => Err(ResponseError::Client(message)),
+                FAILURE_CODE => Err(ResponseError::Server(message)),
+                SUCCESS_CODE => Ok(data),
+                _ => Err(ResponseError::Server(
+                    format!("Bad response code returned from server"),
+                )),
+            }
+        } else {
+            Err(ResponseError::Server(format!(
+                "Response with three parameters (int code, str msg, value) expected from server"
+            )))
+        }
+    }
+
+    pub fn request_tree<S>(&self, name: &str, params: &S) -> Response<Value>
+    where
+        S: Serialize,
+    {
+        let params = xml_rpc::into_params(params).map_err(|err| {
+            ResponseError::Client(format!("Failed to serialize parameters: {}", err))
+        })?;
+        self.request_tree_with_tree(name, params)
+    }
+
+    pub fn request<'a, S, D>(&self, name: &str, params: &S) -> Response<D>
+    where
+        S: Serialize,
+        D: Deserialize<'a>,
+    {
+        let data = self.request_tree(name, params)?;
+        Deserialize::deserialize(data).map_err(|err| {
+            ResponseError::Server(format!("Response data has unexpected structure: {}", err))
+        })
+    }
+}

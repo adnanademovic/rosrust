@@ -1,98 +1,40 @@
-use std;
-use std::sync::Mutex;
-use super::error::master::{Result, Error, ErrorKind};
 use serde::{Deserialize, Serialize};
 use super::value::Topic;
+use super::super::rosxmlrpc::{self, Response as Result};
 use xml_rpc;
 
 pub struct Master {
-    client: Mutex<xml_rpc::Client>,
+    client: rosxmlrpc::Client,
     client_id: String,
     caller_api: String,
-    master_uri: String,
-}
-
-const ERROR_CODE: i32 = -1;
-const FAILURE_CODE: i32 = 0;
-const SUCCESS_CODE: i32 = 1;
-
-fn parse_response(params: xml_rpc::Params) -> std::result::Result<xml_rpc::Value, xml_rpc::Fault> {
-    let mut param_iter = params.into_iter();
-    let code = param_iter.next().ok_or_else(|| {
-        xml_rpc::Fault::new(FAILURE_CODE, "Server response missing arguments.")
-    })?;
-    let message = param_iter.next().ok_or_else(|| {
-        xml_rpc::Fault::new(FAILURE_CODE, "Server response missing arguments.")
-    })?;
-    let value = param_iter.next().ok_or_else(|| {
-        xml_rpc::Fault::new(FAILURE_CODE, "Server response missing arguments.")
-    })?;
-    let code = match code {
-        xml_rpc::Value::Int(v) => v,
-        _ => {
-            return Err(xml_rpc::Fault::new(
-                FAILURE_CODE,
-                "First response argument is expected to be int.",
-            ))
-        }
-    };
-    let message = match message {
-        xml_rpc::Value::String(v) => v,
-        _ => {
-            return Err(xml_rpc::Fault::new(
-                FAILURE_CODE,
-                "Second response argument is expected to be string.",
-            ))
-        }
-    };
-    if code != SUCCESS_CODE {
-        return Err(xml_rpc::Fault::new(code, message));
-    }
-    Ok(value)
 }
 
 macro_rules! request {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
-        let params = xml_rpc::into_params(&(&$s.client_id,
+        $s.client.request(stringify!($name),&(&$s.client_id,
             $(
                 $item,
             )*
             ))
-            .map_err(xml_rpc::error::Error::from)?;
-        let response = $s.client.lock().unwrap()
-            .call_value(&$s.master_uri.parse().unwrap(), stringify!($name), params)?
-            .map_err(to_api_error)?;
-        let data = parse_response(response).map_err(to_api_error)?;
-        Deserialize::deserialize(data).map_err(|v| {
-        to_api_error(xml_rpc::Fault::new(
-            FAILURE_CODE,
-            format!("Third response argument has unexpected structure: {}", v),
-        ))})
     })
 }
 
 macro_rules! request_tree {
     ($s:expr; $name:ident; $($item:expr),*)=> ({
-        let params = xml_rpc::into_params(&(&$s.client_id,
+        $s.client.request_tree(stringify!($name),&(&$s.client_id,
             $(
                 $item,
             )*
             ))
-            .map_err(xml_rpc::error::Error::from)?;
-        let response = $s.client.lock().unwrap()
-            .call_value(&$s.master_uri.parse().unwrap(), stringify!($name), params)?
-            .map_err(ErrorKind::Fault)?;
-        parse_response(response).map_err(to_api_error)
     })
 }
 
 impl Master {
     pub fn new(master_uri: &str, client_id: &str, caller_api: &str) -> Master {
         Master {
-            client: Mutex::new(xml_rpc::Client::new().unwrap()),
+            client: rosxmlrpc::Client::new(master_uri).unwrap(),
             client_id: client_id.to_owned(),
             caller_api: caller_api.to_owned(),
-            master_uri: master_uri.to_owned(),
         }
     }
 
@@ -189,19 +131,6 @@ impl Master {
     pub fn get_param_names(&self) -> Result<Vec<String>> {
         request!(self; getParamNames;)
     }
-}
-
-fn to_api_error(v: xml_rpc::Fault) -> Error {
-    use super::error::api::ErrorKind as ApiErrorKind;
-    match v.code {
-        FAILURE_CODE => ErrorKind::Api(ApiErrorKind::SystemFail(v.message)),
-        ERROR_CODE => ErrorKind::Api(ApiErrorKind::BadData(v.message)),
-        x => ErrorKind::Api(ApiErrorKind::SystemFail(format!(
-            "Bad error code #{} returned with message: {}",
-            x,
-            v.message
-        ))),
-    }.into()
 }
 
 #[derive(Debug)]

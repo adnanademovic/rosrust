@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use super::master::{self, Master};
 use super::slave::Slave;
 use super::error::{ErrorKind, Result};
-use super::error::master::Result as MasterResult;
+use super::super::rosxmlrpc::Response;
 use super::value::Topic;
 use super::naming::{self, Resolver};
 use super::resolve;
@@ -70,15 +70,15 @@ impl Ros {
         })
     }
 
-    pub fn parameters(&self) -> MasterResult<Vec<String>> {
+    pub fn parameters(&self) -> Response<Vec<String>> {
         self.master.get_param_names()
     }
 
-    pub fn state(&self) -> MasterResult<master::SystemState> {
+    pub fn state(&self) -> Response<master::SystemState> {
         self.master.get_system_state().map(Into::into)
     }
 
-    pub fn topics(&self) -> MasterResult<Vec<Topic>> {
+    pub fn topics(&self) -> Response<Vec<Topic>> {
         self.master.get_topic_types().map(|v| {
             v.into_iter().map(Into::into).collect()
         })
@@ -175,27 +175,27 @@ impl<'a> Parameter<'a> {
         &self.name
     }
 
-    pub fn get<'b, T: Deserialize<'b>>(&self) -> MasterResult<T> {
+    pub fn get<'b, T: Deserialize<'b>>(&self) -> Response<T> {
         self.master.get_param::<T>(&self.name)
     }
 
-    pub fn get_raw(&self) -> MasterResult<xml_rpc::Value> {
+    pub fn get_raw(&self) -> Response<xml_rpc::Value> {
         self.master.get_param_any(&self.name)
     }
 
-    pub fn set<T: Serialize>(&self, value: &T) -> MasterResult<()> {
+    pub fn set<T: Serialize>(&self, value: &T) -> Response<()> {
         self.master.set_param::<T>(&self.name, value).and(Ok(()))
     }
 
-    pub fn delete(&self) -> MasterResult<()> {
+    pub fn delete(&self) -> Response<()> {
         self.master.delete_param(&self.name).and(Ok(()))
     }
 
-    pub fn exists(&self) -> MasterResult<bool> {
+    pub fn exists(&self) -> Response<bool> {
         self.master.has_param(&self.name)
     }
 
-    pub fn search(&self) -> MasterResult<String> {
+    pub fn search(&self) -> Response<String> {
         self.master.search_param(&self.name)
     }
 }
