@@ -1,4 +1,3 @@
-use rosxmlrpc;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
@@ -19,21 +18,21 @@ type SerdeResult<T> = Result<T>;
 
 impl Slave {
     pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave> {
-        let (shutdown_tx, shutdown_rx) = channel();
+        use std::net::ToSocketAddrs;
+
+        let (shutdown_tx, _shutdown_rx) = channel();
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
         let services = handler.services.clone();
-        let mut server = rosxmlrpc::Server::new(hostname, port, handler)?;
-        let uri = server.uri.clone();
-        thread::spawn(move || {
-            match shutdown_rx.recv() {
-                Ok(..) => info!("ROS Slave API shutdown by remote request"),
-                Err(..) => info!("ROS Slave API shutdown by ROS client destruction"),
-            };
-            if let Err(err) = server.shutdown() {
-                info!("Error during ROS Slave API shutdown: {}", err);
-            }
+        // TODO: allow OS assigned port numbers
+        let uri = format!("http://{}:{}/", hostname, port);
+        let socket_addr = match (hostname, port).to_socket_addrs()?.next() {
+            Some(socket_addr) => socket_addr,
+            None => bail!("Bad address provided: {}:{}", hostname, port),
+        };
+        thread::spawn(move || if let Err(err) = handler.run(&socket_addr) {
+            info!("Error during ROS Slave API initiation: {}", err);
         });
         Ok(Slave {
             name: String::from(name),

@@ -1,109 +1,69 @@
-use hyper;
-use hyper::server::{Request, Response, Handler};
-use rustc_serialize::{Decodable, Encodable};
-use std;
-use super::serde;
-use super::error::{self, Result};
+use std::net::SocketAddr;
+use xml_rpc;
+
+use super::{ERROR_CODE, FAILURE_CODE, SUCCESS_CODE, Response, ResponseError};
 
 pub struct Server {
-    listener: hyper::server::Listening,
-    pub uri: String,
+    server: xml_rpc::Server,
+}
+
+impl Default for Server {
+    fn default() -> Self {
+        let mut server = xml_rpc::Server::default();
+        server.set_on_missing(on_missing);
+        Server { server: server }
+    }
 }
 
 impl Server {
-    pub fn new<T>(hostname: &str, port: u16, responder: T) -> Result<Server>
+    pub fn register_value<K, T>(&mut self, name: K, msg: &'static str, handler: T)
     where
-        T: 'static + XmlRpcServer + Send + Sync,
+        K: Into<String>,
+        T: Fn(xml_rpc::Params) -> Response<xml_rpc::Value> + Send + Sync + 'static,
     {
-        let listener = hyper::Server::http((hostname, port))?.handle(
-            XmlRpcHandler::new(
-                responder,
-            ),
-        )?;
-        let uri = format!("http://{}:{}/", hostname, listener.socket.port());
-        Ok(Server {
-            listener: listener,
-            uri: uri,
+        self.server.register_value(name, move |args| {
+            Ok(response_to_params(msg, handler(args)))
         })
     }
 
-    pub fn shutdown(&mut self) -> hyper::Result<()> {
-        self.listener.close()
+    pub fn run(self, uri: &SocketAddr) -> xml_rpc::error::Result<()> {
+        self.server.run(uri)
     }
 }
 
-pub type ParameterIterator = std::iter::Map<
-    std::vec::IntoIter<serde::decoder::Decoder>,
-    fn(serde::decoder::Decoder) -> Parameter,
->;
-
-pub trait XmlRpcServer {
-    fn handle(&self, method_name: &str, params: ParameterIterator) -> error::serde::Result<Answer>;
-}
-
-struct XmlRpcHandler<T: XmlRpcServer + Sync + Send> {
-    handler: T,
-}
-
-impl<T: XmlRpcServer + Sync + Send> XmlRpcHandler<T> {
-    fn new(handler: T) -> XmlRpcHandler<T> {
-        XmlRpcHandler { handler: handler }
-    }
-
-    fn process(&self, req: Request, res: Response) -> Result<()> {
-        let (method_name, parameters) = serde::Decoder::new_request(req)?;
-        res.send(&self.handler
-            .handle(&method_name, parameters.into_iter().map(Parameter::new))?
-            .write_response()?)?;
-        Ok(())
-    }
-}
-
-impl<T: XmlRpcServer + Sync + Send> Handler for XmlRpcHandler<T> {
-    fn handle(&self, req: Request, res: Response) {
-        if let Err(err) = self.process(req, res) {
-            let info = err.iter()
-                .map(|v| format!("{}", v))
-                .collect::<Vec<_>>()
-                .join("\nCaused by:");
-            error!("Server handler error: {}", info);
+fn response_to_params(msg: &str, response: Response<xml_rpc::Value>) -> xml_rpc::Params {
+    use xml_rpc::Value;
+    match response {
+        Ok(v) => vec![Value::Int(SUCCESS_CODE), Value::String(msg.into()), v],
+        Err(ResponseError::Client(err)) => {
+            vec![
+                Value::Int(ERROR_CODE),
+                Value::String(err.into()),
+                Value::Int(0),
+            ]
+        }
+        Err(ResponseError::Server(err)) => {
+            vec![
+                Value::Int(FAILURE_CODE),
+                Value::String(err.into()),
+                Value::Int(0),
+            ]
         }
     }
 }
 
-pub struct Answer {
-    encoder: serde::Encoder,
+fn error_response<T>(message: T) -> xml_rpc::Params
+where
+    T: Into<String>,
+{
+    use xml_rpc::Value;
+    vec![
+        Value::Int(ERROR_CODE),
+        Value::String(message.into()),
+        Value::Int(0),
+    ]
 }
 
-impl Answer {
-    pub fn new() -> Answer {
-        Answer { encoder: serde::Encoder::new() }
-    }
-
-    pub fn add<T: Encodable>(&mut self, data: &T) -> error::serde::Result<()> {
-        data.encode(&mut self.encoder)
-    }
-
-    fn write_response(self) -> std::io::Result<Vec<u8>> {
-        let mut data = vec![];
-        self.encoder.write_response(&mut data).and(Ok(data))
-    }
-}
-
-pub struct Parameter {
-    decoder: serde::Decoder,
-}
-
-impl Parameter {
-    fn new(decoder: serde::Decoder) -> Parameter {
-        Parameter { decoder: decoder }
-    }
-
-    pub fn read<T: Decodable>(mut self) -> error::serde::Result<T> {
-        T::decode(&mut self.decoder)
-    }
-
-    pub fn value(self) -> serde::XmlRpcValue {
-        self.decoder.value()
-    }
+fn on_missing(_params: xml_rpc::Params) -> xml_rpc::Response {
+    Ok(error_response("Bad method requested"))
 }
