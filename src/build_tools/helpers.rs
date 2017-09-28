@@ -362,4 +362,12 @@ float64 w\n\
                         .unwrap(),
                    "63715c08716373d8624430cde1434192".to_owned());
     }
+
+    #[test]
+    fn parse_tricky_srv_files() {
+        get_message_map(&[&FILEPATH],
+                        &[("empty_req_srv", "EmptyRequest"),
+                        ("tricky_comment_srv", "TrickyComment")])
+            .unwrap();
+    }
 }
