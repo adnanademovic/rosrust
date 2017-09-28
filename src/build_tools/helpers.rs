@@ -3,6 +3,7 @@ use super::msg::Msg;
 use super::error::{Result, ResultExt};
 use std::fs::File;
 use std::path::Path;
+use regex::RegexBuilder;
 
 pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String), String>> {
     let mut representations = HashMap::<(String, String), String>::new();
@@ -153,7 +154,8 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            let mut parts = contents.split("\n---");
+            let re = RegexBuilder::new("^---$").multi_line(true).build()?;
+            let mut parts = re.split(&contents);
             let req = match parts.next() {
                 Some(v) => v,
                 None => bail!("Service needs to have content"),
