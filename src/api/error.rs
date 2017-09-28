@@ -19,6 +19,7 @@ error_chain! {
             description("Could not add duplicate")
             display("Could not add duplicate {}", t)
         }
+	TimeoutError
     }
 }
 
