@@ -98,26 +98,25 @@ impl Ros {
         let name = self.resolver.translate(service)?;
         let now = ::std::time::Instant::now();
         loop {
-            match self.master.lookup_service(&name) {
-                Err(e) => {
-                    match e.kind() {
-                        &Api(BadData(ref m)) if m == "no provider" => {
-                            if let Some(ref timeout) = timeout {
-                                if &now.elapsed() > timeout {
-                                    return Err(ErrorKind::TimeoutError.into());
-                                }
-                            }
-                            sleep(Duration::from_millis(100));
-                            continue;
+            let e = match self.master.lookup_service(&name) {
+                Ok(_) => return Ok(()),
+                Err(e) => e,
+            };
+            match e.kind() {
+                &Api(BadData(ref m)) if m == "no provider" => {
+                    if let Some(ref timeout) = timeout {
+                        if &now.elapsed() > timeout {
+                            return Err(ErrorKind::TimeoutError.into());
                         }
-                        _ => {}
                     }
-                    return Err(e.into());
+                    sleep(Duration::from_millis(100));
+                    continue;
                 }
-                Ok(_) => break,
+                _ => {}
             }
+            return Err(e.into());
         }
-        Ok(())
+        unreachable!();
     }
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>
