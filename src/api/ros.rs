@@ -89,6 +89,31 @@ impl Ros {
         Ok(Client::new(&self.name, &uri, &name))
     }
 
+    pub fn wait_for_service(&self, service: &str) -> Result<()> {
+        use super::error::master::ErrorKind::Api;
+        use super::error::api::ErrorKind::BadData;
+        use ::std::thread::sleep;
+        use ::std::time::Duration;
+
+        let name = self.resolver.translate(service)?;
+        loop {
+            match self.master.lookup_service(&name) {
+                Err(e) => {
+                    match e.kind() {
+                        &Api(BadData(ref m)) if m == "no provider" => {
+                            sleep(Duration::from_millis(100));
+                            continue;
+                        },
+                        _ => {},
+                    }
+                    return Err(e.into());
+                }
+                Ok(_) => {break}
+            }
+        }
+        Ok(())
+    }
+
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>
         where T: ServicePair,
               F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static
