@@ -8,7 +8,7 @@ use super::naming::{self, Resolver};
 use super::resolve;
 use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
 use rosxmlrpc::serde::XmlRpcValue;
-use ::std::time::Duration;
+use std::time::Duration;
 
 pub struct Ros {
     master: Master,
@@ -93,7 +93,7 @@ impl Ros {
     pub fn wait_for_service(&self, service: &str, timeout: Option<Duration>) -> Result<()> {
         use super::error::master::ErrorKind::Api;
         use super::error::api::ErrorKind::BadData;
-        use ::std::thread::sleep;
+        use std::thread::sleep;
 
         let name = self.resolver.translate(service)?;
         let now = ::std::time::Instant::now();
@@ -102,19 +102,19 @@ impl Ros {
                 Err(e) => {
                     match e.kind() {
                         &Api(BadData(ref m)) if m == "no provider" => {
-			                if let Some(ref timeout) = timeout {
-			                    if &now.elapsed() > timeout {
-				                    return Err(ErrorKind::TimeoutError.into());
-				                }
-			                }
+                            if let Some(ref timeout) = timeout {
+                                if &now.elapsed() > timeout {
+                                    return Err(ErrorKind::TimeoutError.into());
+                                }
+                            }
                             sleep(Duration::from_millis(100));
                             continue;
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     }
                     return Err(e.into());
                 }
-                Ok(_) => {break}
+                Ok(_) => break,
             }
         }
         Ok(())
