@@ -60,6 +60,14 @@ impl Ros {
         return self.slave.uri();
     }
 
+    pub fn name(&self) -> &str {
+        return &self.name;
+    }
+
+    pub fn hostname(&self) -> &str {
+        return &self.hostname;
+    }
+
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
         self.resolver
             .translate(name)
