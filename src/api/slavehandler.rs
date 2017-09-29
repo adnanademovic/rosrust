@@ -3,7 +3,7 @@ use rosxmlrpc::{Response, ResponseError, Server};
 use std::net::SocketAddr;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::Sender;
+use futures::sync::mpsc::Sender;
 use super::error::{self, ErrorKind, Result};
 use tcpros::{Publisher, Subscriber, Service};
 use xml_rpc::{self, Value};
@@ -20,8 +20,10 @@ impl SlaveHandler {
         master_uri: &str,
         hostname: &str,
         name: &str,
-        _shutdown_signal: Sender<()>,
+        shutdown_signal: Sender<()>,
     ) -> SlaveHandler {
+        use futures::Sink;
+
         let mut server = Server::default();
 
 
@@ -41,9 +43,23 @@ impl SlaveHandler {
             Ok(Value::String(master_uri_string.clone()))
         });
 
-        server.register_value("shutdown", "Shutdown", |_args| {
-            // TODO: implement shutdown
-            Err(ResponseError::Server("Method not implemented".into()))
+        server.register_value("shutdown", "Shutdown", move |args| {
+            let mut args = args.into_iter();
+            let _caller_id = args.next().ok_or(ResponseError::Client(
+                "Missing argument 'caller_id'".into(),
+            ))?;
+            let message = match args.next() {
+                Some(Value::String(message)) => message,
+                _ => return Err(ResponseError::Client("Missing argument 'message'".into())),
+            };
+            info!("Server is shutting down because: {}", message);
+            match shutdown_signal.clone().wait().send(()) {
+                Ok(()) => Ok(Value::Int(0)),
+                Err(err) => {
+                    error!("Shutdown error: {:?}", err);
+                    Err(ResponseError::Server("Failed to shut down".into()))
+                }
+            }
         });
 
         server.register_value("getPid", "PID", |_args| Ok(Value::Int(getpid())));

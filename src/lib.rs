@@ -4,6 +4,7 @@ extern crate byteorder;
 extern crate crypto;
 #[macro_use]
 extern crate error_chain;
+extern crate futures;
 extern crate hyper;
 extern crate itertools;
 #[macro_use]

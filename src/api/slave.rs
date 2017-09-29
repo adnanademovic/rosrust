@@ -1,3 +1,4 @@
+use futures::sync::mpsc::channel as futures_channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
@@ -19,8 +20,9 @@ type SerdeResult<T> = Result<T>;
 impl Slave {
     pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave> {
         use std::net::ToSocketAddrs;
+        use futures::{Future, Stream};
 
-        let (shutdown_tx, _shutdown_rx) = channel();
+        let (shutdown_tx, shutdown_rx) = futures_channel(1);
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
@@ -41,7 +43,8 @@ impl Slave {
             };
             let port = bound_handler.local_addr().map(|v| v.port());
             port_tx.send(port).expect(FAILED_TO_LOCK);
-            if let Err(err) = bound_handler.run() {
+            let shutdown_future = shutdown_rx.into_future().map(|_| ()).map_err(|_| ());
+            if let Err(err) = bound_handler.run_until(shutdown_future) {
                 info!("Error during ROS Slave API initiation: {}", err);
             }
         });

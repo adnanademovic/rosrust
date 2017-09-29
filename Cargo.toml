@@ -6,9 +6,11 @@ name = "rosrust"
 readme = "README.md"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.5.0"
+
 [dependencies]
 byteorder = "1.0.0"
 error-chain = "0.10.0"
+futures = "0.1.16"
 itertools = "0.6.0"
 lazy_static = "0.2"
 log = "0.3"
