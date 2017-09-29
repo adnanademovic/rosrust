@@ -269,21 +269,21 @@ fn request_topic(
     Ok(protocols)
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct BusStats {
     pub publish: Vec<PublishStats>,
     pub subscribe: Vec<SubscribeStats>,
     pub service: ServiceStats,
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct PublishStats {
     pub name: String,
     pub data_sent: String,
     pub connection_data: PublishConnectionData,
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct PublishConnectionData {
     pub connection_id: String,
     pub bytes_sent: i32,
@@ -291,13 +291,13 @@ pub struct PublishConnectionData {
     pub connected: bool,
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct SubscribeStats {
     pub name: String,
     pub connection_data: SubscribeConnectionData,
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct SubscribeConnectionData {
     pub connection_id: String,
     pub bytes_received: i32,
@@ -305,14 +305,14 @@ pub struct SubscribeConnectionData {
     pub connected: bool,
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct ServiceStats {
     pub number_of_requests: i32,
     pub bytes_received: i32,
     pub bytes_sent: i32,
 }
 
-#[derive(RustcEncodable)]
+#[allow(dead_code)]
 pub struct BusInfo {
     pub connection_id: String,
     pub destination_id: String,

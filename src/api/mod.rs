@@ -1,6 +1,5 @@
 pub use self::ros::Ros;
 
-mod value;
 pub mod error;
 mod master;
 mod slave;

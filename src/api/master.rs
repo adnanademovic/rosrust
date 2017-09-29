@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use super::value::Topic;
 use super::super::rosxmlrpc::{self, Response as Result};
 use xml_rpc;
 
@@ -180,4 +179,9 @@ impl Into<Topic> for TopicTuple {
             datatype: self.1,
         }
     }
+}
+
+pub struct Topic {
+    pub name: String,
+    pub datatype: String,
 }

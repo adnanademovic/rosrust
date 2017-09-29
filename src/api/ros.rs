@@ -1,9 +1,8 @@
 use serde::{Serialize, Deserialize};
-use super::master::{self, Master};
+use super::master::{self, Master, Topic};
 use super::slave::Slave;
 use super::error::{ErrorKind, Result};
 use super::super::rosxmlrpc::Response;
-use super::value::Topic;
 use super::naming::{self, Resolver};
 use super::resolve;
 use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
