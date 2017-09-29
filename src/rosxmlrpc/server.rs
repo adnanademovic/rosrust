@@ -26,8 +26,8 @@ impl Server {
         })
     }
 
-    pub fn run(self, uri: &SocketAddr) -> xml_rpc::error::Result<()> {
-        self.server.run(uri)
+    pub fn bind(self, uri: &SocketAddr) -> xml_rpc::error::Result<xml_rpc::server::BoundServer> {
+        self.server.bind(uri)
     }
 }
 

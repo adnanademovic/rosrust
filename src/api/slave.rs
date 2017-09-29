@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::thread;
-use super::error::{self, ErrorKind, Result};
+use super::error::{self, ErrorKind, Result, ResultExt};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
 use tcpros::{Message, Publisher, PublisherStream, Subscriber, Service, ServicePair, ServiceResult};
 
@@ -25,15 +25,32 @@ impl Slave {
         let pubs = handler.publications.clone();
         let subs = handler.subscriptions.clone();
         let services = handler.services.clone();
-        // TODO: allow OS assigned port numbers
-        let uri = format!("http://{}:{}/", hostname, port);
+        let (port_tx, port_rx) = channel();
         let socket_addr = match (hostname, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
             None => bail!("Bad address provided: {}:{}", hostname, port),
         };
-        thread::spawn(move || if let Err(err) = handler.run(&socket_addr) {
-            info!("Error during ROS Slave API initiation: {}", err);
+
+        thread::spawn(move || {
+            let bound_handler = match handler.bind(&socket_addr) {
+                Ok(v) => v,
+                Err(err) => {
+                    port_tx.send(Err(err)).expect(FAILED_TO_LOCK);
+                    return;
+                }
+            };
+            let port = bound_handler.local_addr().map(|v| v.port());
+            port_tx.send(port).expect(FAILED_TO_LOCK);
+            if let Err(err) = bound_handler.run() {
+                info!("Error during ROS Slave API initiation: {}", err);
+            }
         });
+
+        let port = port_rx.recv().expect(FAILED_TO_LOCK).chain_err(
+            || "Failed to get port",
+        )?;
+        let uri = format!("http://{}:{}/", hostname, port);
+
         Ok(Slave {
             name: String::from(name),
             uri: uri,

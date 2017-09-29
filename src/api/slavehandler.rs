@@ -189,8 +189,8 @@ impl SlaveHandler {
         }
     }
 
-    pub fn run(self, addr: &SocketAddr) -> xml_rpc::error::Result<()> {
-        self.server.run(addr)
+    pub fn bind(self, addr: &SocketAddr) -> xml_rpc::error::Result<xml_rpc::server::BoundServer> {
+        self.server.bind(addr)
     }
 }
 
