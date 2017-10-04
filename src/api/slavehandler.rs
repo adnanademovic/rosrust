@@ -6,13 +6,20 @@ use std::sync::{Arc, Mutex};
 use futures::sync::mpsc::Sender;
 use super::error::{self, ErrorKind, Result};
 use tcpros::{Publisher, Subscriber, Service};
-use xml_rpc::{self, Value};
+use xml_rpc::{self, Value, Params};
 
 pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
     pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
     pub services: Arc<Mutex<HashMap<String, Service>>>,
     server: Server,
+}
+
+fn unwrap_array_case(params: Params) -> Params {
+    if let Some(&Value::Array(ref items)) = params.get(0) {
+        return items.clone();
+    }
+    params
 }
 
 impl SlaveHandler {
@@ -44,7 +51,7 @@ impl SlaveHandler {
         });
 
         server.register_value("shutdown", "Shutdown", move |args| {
-            let mut args = args.into_iter();
+            let mut args = unwrap_array_case(args).into_iter();
             let _caller_id = args.next().ok_or(ResponseError::Client(
                 "Missing argument 'caller_id'".into(),
             ))?;
@@ -109,7 +116,7 @@ impl SlaveHandler {
         let subs = subscriptions.clone();
 
         server.register_value("publisherUpdate", "Publishers updated", move |args| {
-            let mut args = args.into_iter();
+            let mut args = unwrap_array_case(args).into_iter();
             let _caller_id = args.next().ok_or(ResponseError::Client(
                 "Missing argument 'caller_id'".into(),
             ))?;
@@ -150,7 +157,7 @@ impl SlaveHandler {
         let pubs = publications.clone();
 
         server.register_value("requestTopic", "Chosen protocol", move |args| {
-            let mut args = args.into_iter();
+            let mut args = unwrap_array_case(args).into_iter();
             let _caller_id = args.next().ok_or(ResponseError::Client(
                 "Missing argument 'caller_id'".into(),
             ))?;
