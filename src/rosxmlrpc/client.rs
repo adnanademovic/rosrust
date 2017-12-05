@@ -33,21 +33,31 @@ impl Client {
                 ))
             })?
             .into_iter();
-        if let (Some(Value::Int(code)), Some(Value::String(message)), Some(data)) =
-            (response.next(), response.next(), response.next())
-        {
-            match code {
-                ERROR_CODE => Err(ResponseError::Client(message)),
-                FAILURE_CODE => Err(ResponseError::Server(message)),
-                SUCCESS_CODE => Ok(data),
-                _ => Err(ResponseError::Server(
-                    format!("Bad response code returned from server"),
-                )),
+        let mut first_item = response.next();
+        while let Some(Value::Array(v)) = first_item {
+            response = v.into_iter();
+            first_item = response.next();
+        }
+        match (first_item, response.next(), response.next()) {
+            (Some(Value::Int(code)), Some(Value::String(message)), Some(data)) => {
+                match code {
+                    ERROR_CODE => Err(ResponseError::Client(message)),
+                    FAILURE_CODE => Err(ResponseError::Server(message)),
+                    SUCCESS_CODE => Ok(data),
+                    _ => Err(ResponseError::Server(
+                        format!("Bad response code returned from server"),
+                    )),
+                }
             }
-        } else {
-            Err(ResponseError::Server(format!(
-                "Response with three parameters (int code, str msg, value) expected from server"
-            )))
+            (code, message, data) => {
+                Err(ResponseError::Server(format!(
+                    "Response with three parameters (int code, str msg, value) \
+                    expected from server, received: ({:?}, {:?}, {:?})",
+                    code,
+                    message,
+                    data
+                )))
+            }
         }
     }
 
