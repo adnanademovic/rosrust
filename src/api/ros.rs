@@ -7,6 +7,7 @@ use super::naming::{self, Resolver};
 use super::resolve;
 use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
 use xml_rpc;
+use std::time::Duration;
 
 pub struct Ros {
     master: Master,
@@ -60,6 +61,14 @@ impl Ros {
         return self.slave.uri();
     }
 
+    pub fn name(&self) -> &str {
+        return &self.name;
+    }
+
+    pub fn hostname(&self) -> &str {
+        return &self.hostname;
+    }
+
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
         self.resolver.translate(name).ok().map(|v| {
             Parameter {
@@ -87,6 +96,35 @@ impl Ros {
         let name = self.resolver.translate(service)?;
         let uri = self.master.lookup_service(&name)?;
         Ok(Client::new(&self.name, &uri, &name))
+    }
+
+    pub fn wait_for_service(&self, service: &str, timeout: Option<Duration>) -> Result<()> {
+        use rosxmlrpc::ResponseError;
+        use std::thread::sleep;
+
+        let name = self.resolver.translate(service)?;
+        let now = ::std::time::Instant::now();
+        loop {
+            let e = match self.master.lookup_service(&name) {
+                Ok(_) => return Ok(()),
+                Err(e) => e,
+            };
+            println!("{:?}", e);
+            match e {
+                ResponseError::Client(ref m) if m == "no provider" => {
+                    if let Some(ref timeout) = timeout {
+                        if &now.elapsed() > timeout {
+                            return Err(ErrorKind::TimeoutError.into());
+                        }
+                    }
+                    sleep(Duration::from_millis(100));
+                    continue;
+                }
+                _ => {}
+            }
+            return Err(e.into());
+        }
+        unreachable!();
     }
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>
