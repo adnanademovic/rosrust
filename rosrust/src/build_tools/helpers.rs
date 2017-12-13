@@ -35,7 +35,6 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String
             Some(v) => v,
             None => bail!("Message map does not contain all needed elements"),
         };
-        println!("|{}|{}|", req, res);
         hashes.insert(
             (pack.clone(), name.clone()),
             calculate_md5_from_representation(&format!("{}{}", req, res)),

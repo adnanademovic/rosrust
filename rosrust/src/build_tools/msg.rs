@@ -338,11 +338,12 @@ impl FieldInfo {
         hashes: &HashMap<(String, String), String>,
     ) -> ::std::result::Result<String, ()> {
         let datatype = self.datatype.md5_string(package, hashes)?;
-        Ok(match self.case {
-            FieldCase::Unit => format!("{} {}", datatype, self.name),
-            FieldCase::Vector => format!("{}[] {}", datatype, self.name),
-            FieldCase::Array(l) => format!("{}[{}] {}", datatype, l, self.name),
-            FieldCase::Const(ref v) => format!("{} {}={}", datatype, self.name, v),
+        Ok(match (self.datatype.is_builtin(), &self.case) {
+            (_, &FieldCase::Const(ref v)) => format!("{} {}={}", datatype, self.name, v),
+            (false, _) |
+            (_, &FieldCase::Unit) => format!("{} {}", datatype, self.name),
+            (true, &FieldCase::Vector) => format!("{}[] {}", datatype, self.name),
+            (true, &FieldCase::Array(l)) => format!("{}[{}] {}", datatype, l, self.name),
         })
     }
 
@@ -431,6 +432,16 @@ impl DataType {
             DataType::Duration => "::rosrust::msg::Duration".into(),
             DataType::LocalStruct(ref name) => name.clone(),
             DataType::RemoteStruct(ref pkg, ref name) => format!("super::{}::{}", pkg, name),
+        }
+    }
+
+    fn is_builtin(&self) -> bool {
+        match *self {
+            DataType::Bool | DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64 |
+            DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64 | DataType::F32 |
+            DataType::F64 | DataType::String | DataType::Time | DataType::Duration => true,
+            DataType::LocalStruct(_) |
+            DataType::RemoteStruct(_, _) => false,
         }
     }
 
