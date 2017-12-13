@@ -593,6 +593,13 @@ mod tests {
             "float32[3] abc".to_owned()
         );
         assert_eq!(
+            FieldInfo::new("int32", "abc", FieldCase::Vector)
+                .unwrap()
+                .md5_string("", &hashes)
+                .unwrap(),
+            "int32[] abc".to_owned()
+        );
+        assert_eq!(
             FieldInfo::new("string", "abc", FieldCase::Const("something".into()))
                 .unwrap()
                 .md5_string("", &hashes)
@@ -604,7 +611,14 @@ mod tests {
                 .unwrap()
                 .md5_string("p1", &hashes)
                 .unwrap(),
-            "ABCD[] abc".to_owned()
+            "ABCD abc".to_owned()
+        );
+        assert_eq!(
+            FieldInfo::new("xx", "abc", FieldCase::Array(3))
+                .unwrap()
+                .md5_string("p1", &hashes)
+                .unwrap(),
+            "ABCD abc".to_owned()
         );
         assert_eq!(
             FieldInfo::new("p2/xx", "abc", FieldCase::Unit)
