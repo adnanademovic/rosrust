@@ -69,7 +69,7 @@ impl SlaveHandler {
             }
         });
 
-        server.register_value("getPid", "PID", |_args| Ok(Value::Int(getpid())));
+        server.register_value("getPid", "PID", |_args| Ok(Value::Int(getpid().into())));
 
         let subscriptions = Arc::new(Mutex::new(HashMap::<String, Subscriber>::new()));
         let subs = subscriptions.clone();

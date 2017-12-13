@@ -1,9 +1,7 @@
 error_chain! {
     foreign_links {
         Io(::std::io::Error);
-    }
-    links {
-        SerdeRosmsg(::serde_rosmsg::error::Error, ::serde_rosmsg::error::ErrorKind);
+        SerdeRosmsg(::serde_rosmsg::error::Error);
     }
     errors {
         ServiceConnectionFail(service: String, uri: String) {
