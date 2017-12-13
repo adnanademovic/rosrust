@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "examples/pubsub",
+    "examples/serviceclient",
     "rosrust",
 ]
 
