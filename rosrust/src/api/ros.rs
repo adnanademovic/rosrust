@@ -109,7 +109,6 @@ impl Ros {
                 Ok(_) => return Ok(()),
                 Err(e) => e,
             };
-            println!("{:?}", e);
             match e {
                 ResponseError::Client(ref m) if m == "no provider" => {
                     if let Some(ref timeout) = timeout {
@@ -124,7 +123,6 @@ impl Ros {
             }
             return Err(e.into());
         }
-        unreachable!();
     }
 
     pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>

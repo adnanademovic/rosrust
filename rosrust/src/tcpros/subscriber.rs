@@ -148,7 +148,7 @@ fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<()>
     match_field(&fields, "type", &T::msg_type())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, topic: &str) -> Result<()>
+fn exchange_headers<T, U>(stream: &mut U, caller_id: &str, topic: &str) -> Result<()>
 where
     T: Message,
     U: std::io::Write + std::io::Read,
@@ -158,7 +158,7 @@ where
 }
 
 #[inline]
-fn package_to_vector<R: std::io::Read>(mut stream: &mut R) -> std::io::Result<Vec<u8>> {
+fn package_to_vector<R: std::io::Read>(stream: &mut R) -> std::io::Result<Vec<u8>> {
     let length = stream.read_u32::<LittleEndian>()?;
     let mut buffer = length_vector(length)?;
     buffer.resize(length as usize + 4, 0);

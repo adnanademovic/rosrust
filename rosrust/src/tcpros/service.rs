@@ -95,7 +95,7 @@ where
     }
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, service: &str, node_name: &str) -> Result<()>
+fn exchange_headers<T, U>(stream: &mut U, service: &str, node_name: &str) -> Result<()>
 where
     T: ServicePair,
     U: std::io::Write + std::io::Read,
@@ -104,7 +104,7 @@ where
     write_response::<T, U>(stream, node_name)
 }
 
-fn read_request<T: ServicePair, U: std::io::Read>(mut stream: &mut U, service: &str) -> Result<()> {
+fn read_request<T: ServicePair, U: std::io::Read>(stream: &mut U, service: &str) -> Result<()> {
     let fields = header::decode(stream)?;
     header::match_field(&fields, "service", service)?;
     if fields.get("callerid").is_none() {
@@ -116,7 +116,7 @@ fn read_request<T: ServicePair, U: std::io::Read>(mut stream: &mut U, service: &
     header::match_field(&fields, "md5sum", &T::md5sum())
 }
 
-fn write_response<T, U>(mut stream: &mut U, node_name: &str) -> Result<()>
+fn write_response<T, U>(stream: &mut U, node_name: &str) -> Result<()>
 where
     T: ServicePair,
     U: std::io::Write,
@@ -125,7 +125,7 @@ where
     fields.insert(String::from("callerid"), String::from(node_name));
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
-    header::encode(&mut stream, &fields)?;
+    header::encode(stream, &fields)?;
     Ok(())
 }
 

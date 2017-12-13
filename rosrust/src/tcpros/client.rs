@@ -132,7 +132,7 @@ where
     Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
+fn exchange_headers<T, U>(stream: &mut U, caller_id: &str, service: &str) -> Result<()>
 where
     T: ServicePair,
     U: std::io::Write + std::io::Read,
