@@ -187,17 +187,11 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
 mod tests {
     use super::*;
 
-    lazy_static! {
-        static ref FILEPATH: String = Path::new(file!())
-            .parent().unwrap()
-            .join("msg_examples")
-            .to_str().unwrap()
-            .into();
-    }
+    static FILEPATH: &'static str = "src/build_tools/msg_examples";
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Point")])
+        let message_map = get_message_map(&[FILEPATH], &[("geometry_msgs", "Point")])
             .unwrap()
             .messages;
         assert_eq!(message_map.len(), 1);
@@ -208,7 +202,7 @@ mod tests {
 
     #[test]
     fn get_message_map_fetches_message_and_dependencies() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Pose")])
+        let message_map = get_message_map(&[FILEPATH], &[("geometry_msgs", "Pose")])
             .unwrap()
             .messages;
         assert_eq!(message_map.len(), 3);
@@ -225,7 +219,7 @@ mod tests {
 
     #[test]
     fn get_message_map_traverses_whole_dependency_tree() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "PoseStamped")])
+        let message_map = get_message_map(&[FILEPATH], &[("geometry_msgs", "PoseStamped")])
             .unwrap()
             .messages;
         assert_eq!(message_map.len(), 5);
@@ -249,7 +243,7 @@ mod tests {
     #[test]
     fn get_message_map_traverses_all_passed_messages_dependency_tree() {
         let message_map = get_message_map(
-            &[&FILEPATH],
+            &[FILEPATH],
             &[("geometry_msgs", "PoseStamped"), ("sensor_msgs", "Imu")],
         ).unwrap()
             .messages;
@@ -280,7 +274,7 @@ mod tests {
     #[test]
     fn calculate_md5_works() {
         let message_map = get_message_map(
-            &[&FILEPATH],
+            &[FILEPATH],
             &[("geometry_msgs", "PoseStamped"), ("sensor_msgs", "Imu")],
         ).unwrap();
         let hashes = calculate_md5(&message_map).unwrap();
@@ -327,7 +321,7 @@ mod tests {
 
     #[test]
     fn generate_message_definition_works() {
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "Vector3")])
+        let message_map = get_message_map(&[FILEPATH], &[("geometry_msgs", "Vector3")])
             .unwrap()
             .messages;
         let definition = generate_message_definition(
@@ -345,7 +339,7 @@ mod tests {
                     too, use the\n# geometry_msgs/Point message instead.\n\nfloat64 x\nfloat64 \
                     y\nfloat64 z\n"
         );
-        let message_map = get_message_map(&[&FILEPATH], &[("geometry_msgs", "PoseStamped")])
+        let message_map = get_message_map(&[FILEPATH], &[("geometry_msgs", "PoseStamped")])
             .unwrap()
             .messages;
         let definition = generate_message_definition(
@@ -406,7 +400,7 @@ float64 w\n\
     #[test]
     fn calculate_md5_works_for_services() {
         let message_map = get_message_map(
-            &[&FILEPATH],
+            &[FILEPATH],
             &[
                 ("diagnostic_msgs", "AddDiagnostics"),
                 ("simple_srv", "Something"),
@@ -431,7 +425,7 @@ float64 w\n\
     #[test]
     fn parse_tricky_srv_files() {
         get_message_map(
-            &[&FILEPATH],
+            &[FILEPATH],
             &[
                 ("empty_req_srv", "EmptyRequest"),
                 ("tricky_comment_srv", "TrickyComment"),

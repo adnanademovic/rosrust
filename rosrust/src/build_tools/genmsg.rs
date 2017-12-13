@@ -127,20 +127,13 @@ fn string_into_pair<'a>(input: &'a str) -> Result<(&'a str, &'a str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
-    lazy_static! {
-        static ref FILEPATH: String = Path::new(file!())
-            .parent().unwrap()
-            .join("msg_examples")
-            .to_str().unwrap()
-            .into();
-    }
+    static FILEPATH: &'static str = "src/build_tools/msg_examples";
 
     #[test]
     fn depend_on_messages_printout() {
         let data = depend_on_messages(
-            &[&FILEPATH],
+            &[FILEPATH],
             &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"],
         ).unwrap();
         println!("{}", data);
@@ -149,14 +142,14 @@ mod tests {
 
     #[test]
     fn benchmark_genmsg() {
-        let data = depend_on_messages(&[&FILEPATH], &["benchmark_msgs/Overall"]).unwrap();
+        let data = depend_on_messages(&[FILEPATH], &["benchmark_msgs/Overall"]).unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
 
     #[test]
     fn benchmark_genmsg_service() {
-        let data = depend_on_messages(&[&FILEPATH], &["simple_srv/Something"]).unwrap();
+        let data = depend_on_messages(&[FILEPATH], &["simple_srv/Something"]).unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
