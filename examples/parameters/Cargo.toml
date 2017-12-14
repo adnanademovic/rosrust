@@ -1,0 +1,20 @@
+[package]
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+license = "MIT"
+name = "parameters"
+repository = "https://github.com/adnanademovic/rosrust"
+version = "0.0.1"
+
+[dependencies]
+env_logger = "0.4.3"
+rosrust = "*"
+serde = "1.0.24"
+serde_derive = "1.0.24"
+
+[[bin]]
+name = "parameters"
+path = "src/parameters.rs"
+
+[build-dependencies]
+env_logger = "0.4.3"
+rosrust = "*"
