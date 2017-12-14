@@ -3,7 +3,7 @@ extern crate env_logger;
 extern crate rosrust;
 
 use rosrust::Ros;
-use std::{env, thread, time};
+use std::{env, time};
 
 rosmsg_include!();
 
@@ -21,6 +21,10 @@ fn main() {
     let b = args[2].parse::<i64>().unwrap();
 
     let ros = Ros::new("add_two_ints_client").unwrap();
+
+    ros.wait_for_service("add_two_ints", Some(time::Duration::from_secs(10)))
+        .unwrap();
+
     let client = ros.client::<msg::roscpp_tutorials::TwoInts>("add_two_ints")
         .unwrap();
 
@@ -39,6 +43,4 @@ fn main() {
     // Async approach
     let retval = client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b });
     println!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
-
-    thread::sleep(time::Duration::from_secs(1));
 }
