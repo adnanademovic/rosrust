@@ -4,8 +4,9 @@ use super::slave::Slave;
 use super::error::{ErrorKind, Result};
 use super::super::rosxmlrpc::Response;
 use super::naming::{self, Resolver};
+use super::raii::{Publisher, Subscriber, Service};
 use super::resolve;
-use tcpros::{Client, Message, PublisherStream, ServicePair, ServiceResult};
+use tcpros::{Client, Message, ServicePair, ServiceResult};
 use xml_rpc;
 use std::time::Duration;
 
@@ -125,78 +126,36 @@ impl Ros {
         }
     }
 
-    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<()>
+    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<Service>
     where
         T: ServicePair,
         F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
         let name = self.resolver.translate(service)?;
-        let api = self.slave.add_service::<T, F>(
+        Service::new::<T, F>(
+            &self.master,
+            &mut self.slave,
             &self.hostname,
             &name,
             handler,
-        )?;
-
-        if let Err(err) = self.master.register_service(&name, &api) {
-            self.slave.remove_service(&name);
-            self.master.unregister_service(&name, &api)?;
-            Err(err.into())
-        } else {
-            Ok(())
-        }
-
+        )
     }
 
-    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<()>
+    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<Subscriber>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
         let name = self.resolver.translate(topic)?;
-        self.slave.add_subscription::<T, F>(&name, callback)?;
-
-        match self.master.register_subscriber(&name, &T::msg_type()) {
-            Ok(publishers) => {
-                if let Err(err) = self.slave.add_publishers_to_subscription(
-                    &name,
-                    publishers.into_iter(),
-                )
-                {
-                    error!(
-                        "Failed to subscribe to all publishers of topic '{}': {}",
-                        name,
-                        err
-                    );
-                }
-                Ok(())
-            }
-            Err(err) => {
-                self.slave.remove_subscription(&name);
-                self.master.unregister_subscriber(&name)?;
-                Err(err.into())
-            }
-        }
+        Subscriber::new::<T, F>(&self.master, &mut self.slave, &name, callback)
     }
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<PublisherStream<T>>
+    pub fn publish<T>(&mut self, topic: &str) -> Result<Publisher<T>>
     where
         T: Message,
     {
         let name = self.resolver.translate(topic)?;
-        let stream = self.slave.add_publication::<T>(&self.hostname, &name)?;
-        match self.master.register_publisher(&name, &T::msg_type()) {
-            Ok(_) => Ok(stream),
-            Err(error) => {
-                error!(
-                    "Failed to register publisher for topic '{}': {}",
-                    name,
-                    error
-                );
-                self.slave.remove_publication(&name);
-                self.master.unregister_publisher(&name)?;
-                Err(error.into())
-            }
-        }
+        Publisher::new(&self.master, &mut self.slave, &self.hostname, &name)
     }
 }
 

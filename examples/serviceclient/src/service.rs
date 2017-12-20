@@ -12,7 +12,8 @@ fn main() {
 
     let mut ros = Ros::new("add_two_ints_server").unwrap();
 
-    ros.service::<msg::roscpp_tutorials::TwoInts, _>("add_two_ints", |req| {
+    // The service is stopped when the returned object is destroyed
+    let _service_raii = ros.service::<msg::roscpp_tutorials::TwoInts, _>("add_two_ints", |req| {
         Ok(msg::roscpp_tutorials::TwoIntsRes { sum: req.a + req.b })
     }).unwrap();
 

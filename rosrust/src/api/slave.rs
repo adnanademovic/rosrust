@@ -112,7 +112,7 @@ impl Slave {
         }
     }
 
-    pub fn remove_service(&mut self, service: &str) {
+    pub fn remove_service(&self, service: &str) {
         self.services.lock().expect(FAILED_TO_LOCK).remove(service);
     }
 
@@ -136,7 +136,7 @@ impl Slave {
         }
     }
 
-    pub fn remove_publication(&mut self, topic: &str) {
+    pub fn remove_publication(&self, topic: &str) {
         self.publications.lock().expect(FAILED_TO_LOCK).remove(
             topic,
         );
@@ -163,7 +163,7 @@ impl Slave {
         }
     }
 
-    pub fn remove_subscription(&mut self, topic: &str) {
+    pub fn remove_subscription(&self, topic: &str) {
         self.subscriptions.lock().expect(FAILED_TO_LOCK).remove(
             topic,
         );

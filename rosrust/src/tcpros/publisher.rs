@@ -127,6 +127,7 @@ impl Publisher {
 // publisher streams are gone. This should be done with a RAII Arc, residing next todo
 // the datastream. So maybe replace DataStream with a wrapper that holds that Arc too
 
+#[derive(Clone)]
 pub struct PublisherStream<T: Message> {
     stream: DataStream,
     datatype: std::marker::PhantomData<T>,

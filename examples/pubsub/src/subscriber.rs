@@ -12,8 +12,10 @@ fn main() {
 
     let mut ros = Ros::new("listener").unwrap();
 
-    ros.subscribe("chatter", |v: msg::std_msgs::String| println!("{}", v.data))
-        .unwrap();
+    // The subscriber is stopped when the returned object is destroyed
+    let _subscriber_raii =
+        ros.subscribe("chatter", |v: msg::std_msgs::String| println!("{}", v.data))
+            .unwrap();
 
     loop {
         thread::sleep(time::Duration::from_secs(100));
