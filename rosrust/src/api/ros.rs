@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use super::master::{self, Master, Topic};
 use super::slave::Slave;
-use super::error::{ErrorKind, Result};
+use super::error::{ErrorKind, Result, ResultExt};
 use super::super::rosxmlrpc::Response;
 use super::naming::{self, Resolver};
 use super::raii::{Publisher, Subscriber, Service};
@@ -9,6 +9,7 @@ use super::resolve;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
 use xml_rpc;
 use std::time::Duration;
+use yaml_rust::{Yaml, YamlLoader};
 
 pub struct Ros {
     master: Master,
@@ -27,6 +28,17 @@ impl Ros {
         let mut ros = Ros::new_raw(&master_uri, &hostname, &namespace, &name)?;
         for (src, dest) in resolve::mappings() {
             ros.map(&src, &dest)?;
+        }
+        for (src, dest) in resolve::params() {
+            let data = YamlLoader::load_from_str(&dest)
+                .chain_err(|| format!("Failed to load YAML: {}", dest))?
+                .into_iter()
+                .next()
+                .ok_or_else(|| format!("Failed to load YAML: {}", dest))?;
+            let param = ros.param(&src).ok_or_else(
+                || format!("Failed to resolve name: {}", src),
+            )?;
+            param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
         Ok(ros)
     }
@@ -181,6 +193,10 @@ impl<'a> Parameter<'a> {
         self.master.set_param::<T>(&self.name, value).and(Ok(()))
     }
 
+    pub fn set_raw(&self, value: xml_rpc::Value) -> Response<()> {
+        self.master.set_param_any(&self.name, value).and(Ok(()))
+    }
+
     pub fn delete(&self) -> Response<()> {
         self.master.delete_param(&self.name).and(Ok(()))
     }
@@ -192,4 +208,32 @@ impl<'a> Parameter<'a> {
     pub fn search(&self) -> Response<String> {
         self.master.search_param(&self.name)
     }
+}
+
+fn yaml_to_xmlrpc(val: Yaml) -> Result<xml_rpc::Value> {
+    Ok(match val {
+        Yaml::Real(v) => xml_rpc::Value::Double(v.parse().chain_err(|| "Failed to parse float")?),
+        Yaml::Integer(v) => xml_rpc::Value::Int(v as i32),
+        Yaml::String(v) => xml_rpc::Value::String(v),
+        Yaml::Boolean(v) => xml_rpc::Value::Bool(v),
+        Yaml::Array(v) => xml_rpc::Value::Array(
+            v.into_iter().map(yaml_to_xmlrpc).collect::<Result<_>>()?,
+        ),
+        Yaml::Hash(v) => xml_rpc::Value::Struct(v.into_iter()
+            .map(|(k, v)| Ok((yaml_to_string(k)?, yaml_to_xmlrpc(v)?)))
+            .collect::<Result<_>>()?),
+        Yaml::Alias(_) => bail!("Alias is not supported"),
+        Yaml::Null => bail!("Illegal null value"),
+        Yaml::BadValue => bail!("Bad value provided"),
+    })
+}
+
+fn yaml_to_string(val: Yaml) -> Result<String> {
+    Ok(match val {
+        Yaml::Real(v) | Yaml::String(v) => v,
+        Yaml::Integer(v) => v.to_string(),
+        Yaml::Boolean(true) => "true".into(),
+        Yaml::Boolean(false) => "false".into(),
+        _ => bail!("Hash keys need to be strings"),
+    })
 }

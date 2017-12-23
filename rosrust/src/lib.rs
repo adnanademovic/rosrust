@@ -17,6 +17,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_rosmsg;
 extern crate xml_rpc;
+extern crate yaml_rust;
 
 pub use api::Ros;
 pub use tcpros::{Client, PublisherStream, Message, ServicePair as Service};

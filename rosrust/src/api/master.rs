@@ -96,6 +96,19 @@ impl Master {
         request!(self; setParam; key, value)
     }
 
+    pub fn set_param_any(&self, key: &str, value: xml_rpc::Value) -> Result<()> {
+        self.client
+            .request_tree_with_tree(
+                "setParam",
+                vec![
+                    xml_rpc::Value::String(self.client_id.clone()),
+                    xml_rpc::Value::String(key.into()),
+                    value,
+                ],
+            )
+            .and(Ok(()))
+    }
+
     pub fn get_param<'a, T: Deserialize<'a>>(&self, key: &str) -> Result<T> {
         request!(self; getParam; key)
     }

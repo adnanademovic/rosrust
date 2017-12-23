@@ -42,6 +42,16 @@ fn main() {
         println!("Create own parameter /baz with 'rosparam' to observe interaction.");
     }
 
+    // Access existing parameter
+    let param = ros.param("~privbaz").unwrap();
+    println!("Handling ~privbaz:");
+    if param.exists().unwrap() {
+        println!("Get raw: {:?}", param.get_raw().unwrap());
+        println!("Search: {:?}", param.search().unwrap());
+    } else {
+        println!("Create ~privbaz by passing _privbaz:=value to observe interaction.");
+    }
+
     #[derive(Debug, Deserialize, Serialize)]
     struct TestStruct {
         foo: String,

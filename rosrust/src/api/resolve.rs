@@ -50,6 +50,29 @@ pub fn mappings() -> Vec<(String, String)> {
         .collect()
 }
 
+pub fn params() -> Vec<(String, String)> {
+    args()
+        .skip(1)
+        .filter(|v| v.starts_with("_"))
+        .filter(|v| !v.starts_with("__"))
+        .map(|v| {
+            v.splitn(2, ":=").map(String::from).collect::<Vec<String>>()
+        })
+        .filter(|v| v.len() == 2)
+        .map(|v| v.into_iter())
+        .map(|mut v| {
+            (
+                v.next().expect(UNEXPECTED_EMPTY_ARRAY).replacen(
+                    '_',
+                    "~",
+                    1,
+                ),
+                v.next().expect(UNEXPECTED_EMPTY_ARRAY),
+            )
+        })
+        .collect()
+}
+
 fn find_with_prefix(prefix: &str) -> Option<String> {
     args().skip(1).find(|v| v.starts_with(prefix)).map(|v| {
         String::from(v.trim_left_matches(prefix))
@@ -124,7 +147,7 @@ mod tests {
 
     #[test]
     #[allow(unused_variables)]
-    fn maps_good_and_ignores_everything_else() {
+    fn mappings_maps_good_and_ignores_everything_else() {
         let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
         set_args(&vec![]);
         assert_eq!(Vec::<(String, String)>::new(), mappings());
@@ -148,6 +171,41 @@ mod tests {
                 (String::from("/x_y"), String::from("~i")),
             ],
             mappings()
+        );
+    }
+
+    #[test]
+    #[allow(unused_variables)]
+    fn params_default_to_empty_vector() {
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
+        set_args(&vec![]);
+        assert_eq!(Vec::<(String, String)>::new(), params());
+    }
+
+    #[test]
+    #[allow(unused_variables)]
+    fn params_maps_good_and_ignores_everything_else() {
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
+        set_args(&vec![]);
+        assert_eq!(Vec::<(String, String)>::new(), params());
+        set_args(&vec![
+            "a:=x",
+            "b=e",
+            "/c:=d",
+            "e:=/f_g",
+            "__name:=something",
+            "_param:=something",
+            "a:=b:=c",
+            "~oo_e:=/ab_c",
+            "_foo:=123:=456",
+            "/x_y:=~i",
+        ]);
+        assert_eq!(
+            vec![
+                (String::from("~param"), String::from("something")),
+                (String::from("~foo"), String::from("123:=456")),
+            ],
+            params()
         );
     }
 
