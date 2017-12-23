@@ -3,7 +3,6 @@ extern crate env_logger;
 extern crate rosrust;
 
 use rosrust::Ros;
-use std::{thread, time};
 
 rosmsg_include!();
 
@@ -15,13 +14,14 @@ fn main() {
 
     let mut count = 0;
 
-    loop {
+    let mut rate = ros.rate(10.0);
+    while ros.is_ok() {
         let mut msg = msg::std_msgs::String::new();
         msg.data = format!("hello world {}", count);
 
         chatter_pub.send(msg).unwrap();
 
-        thread::sleep(time::Duration::from_millis(100));
+        rate.sleep();
 
         count += 1;
     }

@@ -6,15 +6,15 @@ use std::sync::Arc;
 use tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
 
 #[derive(Clone)]
-pub struct Publisher<'a, T: Message> {
+pub struct Publisher<T: Message> {
     stream: PublisherStream<T>,
-    _raii: Arc<InteractorRaii<PublisherInfo<'a>>>,
+    _raii: Arc<InteractorRaii<PublisherInfo>>,
 }
 
-impl<'a, T: Message> Publisher<'a, T> {
+impl<T: Message> Publisher<T> {
     pub(crate) fn new(
-        master: &'a Master,
-        slave: &'a mut Slave,
+        master: Arc<Master>,
+        slave: Arc<Slave>,
         hostname: &str,
         name: &str,
     ) -> Result<Self> {
@@ -25,7 +25,7 @@ impl<'a, T: Message> Publisher<'a, T> {
             name: name.into(),
         };
 
-        match master.register_publisher(&name, &T::msg_type()) {
+        match info.master.register_publisher(&name, &T::msg_type()) {
             Ok(_) => Ok(Self {
                 stream,
                 _raii: Arc::new(InteractorRaii::new(info)),
@@ -48,13 +48,13 @@ impl<'a, T: Message> Publisher<'a, T> {
     }
 }
 
-struct PublisherInfo<'a> {
-    master: &'a Master,
-    slave: &'a Slave,
+struct PublisherInfo {
+    master: Arc<Master>,
+    slave: Arc<Slave>,
     name: String,
 }
 
-impl<'a> Interactor for PublisherInfo<'a> {
+impl Interactor for PublisherInfo {
     fn unregister(&mut self) -> Response<()> {
         self.slave.remove_publication(&self.name);
         self.master.unregister_publisher(&self.name).map(|_| ())
@@ -62,14 +62,14 @@ impl<'a> Interactor for PublisherInfo<'a> {
 }
 
 #[derive(Clone)]
-pub struct Subscriber<'a> {
-    _raii: Arc<InteractorRaii<SubscriberInfo<'a>>>,
+pub struct Subscriber {
+    _raii: Arc<InteractorRaii<SubscriberInfo>>,
 }
 
-impl<'a> Subscriber<'a> {
+impl Subscriber {
     pub(crate) fn new<T: Message, F: Fn(T) -> () + Send + 'static>(
-        master: &'a Master,
-        slave: &'a mut Slave,
+        master: Arc<Master>,
+        slave: Arc<Slave>,
         name: &str,
         callback: F,
     ) -> Result<Self> {
@@ -108,13 +108,13 @@ impl<'a> Subscriber<'a> {
     }
 }
 
-struct SubscriberInfo<'a> {
-    master: &'a Master,
-    slave: &'a Slave,
+struct SubscriberInfo {
+    master: Arc<Master>,
+    slave: Arc<Slave>,
     name: String,
 }
 
-impl<'a> Interactor for SubscriberInfo<'a> {
+impl Interactor for SubscriberInfo {
     fn unregister(&mut self) -> Response<()> {
         self.slave.remove_subscription(&self.name);
         self.master.unregister_subscriber(&self.name).map(|_| ())
@@ -122,14 +122,14 @@ impl<'a> Interactor for SubscriberInfo<'a> {
 }
 
 #[derive(Clone)]
-pub struct Service<'a> {
-    _raii: Arc<InteractorRaii<ServiceInfo<'a>>>,
+pub struct Service {
+    _raii: Arc<InteractorRaii<ServiceInfo>>,
 }
 
-impl<'a> Service<'a> {
+impl Service {
     pub(crate) fn new<T, F>(
-        master: &'a Master,
-        slave: &'a mut Slave,
+        master: Arc<Master>,
+        slave: Arc<Slave>,
         hostname: &str,
         name: &str,
         handler: F,
@@ -147,7 +147,7 @@ impl<'a> Service<'a> {
             name: name.into(),
         };
 
-        if let Err(err) = master.register_service(name, &info.api) {
+        if let Err(err) = info.master.register_service(name, &info.api) {
             info.unregister()?;
             Err(err.into())
         } else {
@@ -156,14 +156,14 @@ impl<'a> Service<'a> {
     }
 }
 
-struct ServiceInfo<'a> {
-    master: &'a Master,
-    slave: &'a Slave,
+struct ServiceInfo {
+    master: Arc<Master>,
+    slave: Arc<Slave>,
     name: String,
     api: String,
 }
 
-impl<'a> Interactor for ServiceInfo<'a> {
+impl Interactor for ServiceInfo {
     fn unregister(&mut self) -> Response<()> {
         self.slave.remove_service(&self.name);
         self.master.unregister_service(&self.name, &self.api).map(

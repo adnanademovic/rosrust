@@ -29,9 +29,3 @@ pub mod build_tools;
 mod rosxmlrpc;
 mod tcpros;
 pub mod msg;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
-}

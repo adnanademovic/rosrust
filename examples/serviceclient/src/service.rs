@@ -3,7 +3,6 @@ extern crate env_logger;
 extern crate rosrust;
 
 use rosrust::Ros;
-use std::{thread, time};
 
 rosmsg_include!();
 
@@ -17,7 +16,5 @@ fn main() {
         Ok(msg::roscpp_tutorials::TwoIntsRes { sum: req.a + req.b })
     }).unwrap();
 
-    loop {
-        thread::sleep(time::Duration::from_secs(100));
-    }
+    ros.spin();
 }

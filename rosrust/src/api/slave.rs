@@ -1,7 +1,7 @@
 use futures::sync::mpsc::channel as futures_channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use super::error::{self, ErrorKind, Result, ResultExt};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
@@ -18,7 +18,13 @@ pub struct Slave {
 type SerdeResult<T> = Result<T>;
 
 impl Slave {
-    pub fn new(master_uri: &str, hostname: &str, port: u16, name: &str) -> Result<Slave> {
+    pub fn new(
+        master_uri: &str,
+        hostname: &str,
+        port: u16,
+        name: &str,
+        outer_shutdown_tx: Sender<()>,
+    ) -> Result<Slave> {
         use std::net::ToSocketAddrs;
         use futures::{Future, Stream};
 
@@ -47,6 +53,7 @@ impl Slave {
             if let Err(err) = bound_handler.run_until(shutdown_future) {
                 info!("Error during ROS Slave API initiation: {}", err);
             }
+            outer_shutdown_tx.send(()).is_ok();
         });
 
         let port = port_rx.recv().expect(FAILED_TO_LOCK).chain_err(
@@ -67,11 +74,7 @@ impl Slave {
         return &self.uri;
     }
 
-    pub fn add_publishers_to_subscription<T>(
-        &mut self,
-        topic: &str,
-        publishers: T,
-    ) -> SerdeResult<()>
+    pub fn add_publishers_to_subscription<T>(&self, topic: &str, publishers: T) -> SerdeResult<()>
     where
         T: Iterator<Item = String>,
     {
@@ -84,7 +87,7 @@ impl Slave {
     }
 
     pub fn add_service<T, F>(
-        &mut self,
+        &self,
         hostname: &str,
         service: &str,
         handler: F,
@@ -117,7 +120,7 @@ impl Slave {
     }
 
     pub fn add_publication<T>(
-        &mut self,
+        &self,
         hostname: &str,
         topic: &str,
     ) -> error::tcpros::Result<PublisherStream<T>>
@@ -142,7 +145,7 @@ impl Slave {
         );
     }
 
-    pub fn add_subscription<T, F>(&mut self, topic: &str, callback: F) -> Result<()>
+    pub fn add_subscription<T, F>(&self, topic: &str, callback: F) -> Result<()>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,

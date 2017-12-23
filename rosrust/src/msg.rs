@@ -1,18 +1,21 @@
+use std::cmp;
 use std::ops;
 
 const BILLION: i64 = 1000000000;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Time {
     pub sec: i32,
     pub nsec: i32,
 }
 
 impl Time {
+    #[inline]
     pub fn new() -> Time {
-        Time { sec: 0, nsec: 0 }
+        Self::default()
     }
 
+    #[inline]
     pub fn from_nanos(t: i64) -> Time {
         Time {
             sec: (t / BILLION) as i32,
@@ -20,22 +23,45 @@ impl Time {
         }
     }
 
-    fn nanos(self) -> i64 {
+    #[inline]
+    fn nanos(&self) -> i64 {
         self.sec as i64 * BILLION + self.nsec as i64
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+impl cmp::PartialEq for Time {
+    fn eq(&self, other: &Self) -> bool {
+        self.nanos() == other.nanos()
+    }
+}
+
+impl cmp::PartialOrd for Time {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.nanos().partial_cmp(&other.nanos())
+    }
+}
+
+impl cmp::Eq for Time {}
+
+impl cmp::Ord for Time {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.nanos().cmp(&other.nanos())
+    }
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Duration {
     pub sec: i32,
     pub nsec: i32,
 }
 
 impl Duration {
+    #[inline]
     pub fn new() -> Duration {
-        Duration { sec: 0, nsec: 0 }
+        Self::default()
     }
 
+    #[inline]
     pub fn from_nanos(t: i64) -> Duration {
         Duration {
             sec: (t / BILLION) as i32,
@@ -43,8 +69,29 @@ impl Duration {
         }
     }
 
-    fn nanos(self) -> i64 {
+    #[inline]
+    fn nanos(&self) -> i64 {
         self.sec as i64 * BILLION + self.nsec as i64
+    }
+}
+
+impl cmp::PartialEq for Duration {
+    fn eq(&self, other: &Self) -> bool {
+        self.nanos() == other.nanos()
+    }
+}
+
+impl cmp::PartialOrd for Duration {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.nanos().partial_cmp(&other.nanos())
+    }
+}
+
+impl cmp::Eq for Duration {}
+
+impl cmp::Ord for Duration {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.nanos().cmp(&other.nanos())
     }
 }
 

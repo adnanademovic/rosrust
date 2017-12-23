@@ -1,4 +1,9 @@
+use msg::{Duration, Time};
 use serde::{Serialize, Deserialize};
+use std::sync::{Arc, mpsc};
+use std::time;
+use super::clock::{Clock, Rate, RealClock, SimulatedClock};
+use super::clock::rosgraph_msgs::Clock as ClockMsg;
 use super::master::{self, Master, Topic};
 use super::slave::Slave;
 use super::error::{ErrorKind, Result, ResultExt};
@@ -8,15 +13,17 @@ use super::raii::{Publisher, Subscriber, Service};
 use super::resolve;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
 use xml_rpc;
-use std::time::Duration;
 use yaml_rust::{Yaml, YamlLoader};
 
 pub struct Ros {
-    master: Master,
-    slave: Slave,
+    master: Arc<Master>,
+    slave: Arc<Slave>,
     hostname: String,
     resolver: Resolver,
     name: String,
+    clock: Arc<Clock>,
+    static_subs: Vec<Subscriber>,
+    shutdown_rx: mpsc::Receiver<()>,
 }
 
 impl Ros {
@@ -40,6 +47,19 @@ impl Ros {
             )?;
             param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
+
+        if ros.param("/use_sim_time")
+            .and_then(|v| v.get().ok())
+            .unwrap_or(false)
+        {
+            let clock = Arc::new(SimulatedClock::default());
+            let ros_clock = clock.clone();
+            let sub = ros.subscribe::<ClockMsg, _>("/clock", move |v| clock.trigger(v.clock))
+                .chain_err(|| "Failed to subscribe to simulated clock")?;
+            ros.static_subs.push(sub);
+            ros.clock = ros_clock;
+        }
+
         Ok(ros)
     }
 
@@ -55,14 +75,20 @@ impl Ros {
         let name = format!("{}/{}", namespace, name);
         let resolver = Resolver::new(&name)?;
 
-        let slave = Slave::new(&master_uri, &hostname, 0, &name)?;
+        let (shutdown_tx, shutdown_rx) = mpsc::channel();
+
+        let slave = Slave::new(&master_uri, &hostname, 0, &name, shutdown_tx)?;
         let master = Master::new(&master_uri, &name, &slave.uri());
+
         Ok(Ros {
-            master: master,
-            slave: slave,
+            master: Arc::new(master),
+            slave: Arc::new(slave),
             hostname: String::from(hostname),
             resolver: resolver,
             name: name,
+            clock: Arc::new(RealClock::default()),
+            static_subs: Vec::new(),
+            shutdown_rx,
         })
     }
 
@@ -80,6 +106,31 @@ impl Ros {
 
     pub fn hostname(&self) -> &str {
         return &self.hostname;
+    }
+
+    pub fn now(&self) -> Time {
+        self.clock.now()
+    }
+
+    pub fn sleep(&self, d: Duration) {
+        self.clock.sleep(d);
+    }
+
+    pub fn rate(&self, rate: f64) -> Rate {
+        let nanos = 1_000_000_000.0 / rate;
+        Rate::new(
+            self.clock.clone(),
+            self.now(),
+            Duration::from_nanos(nanos as i64),
+        )
+    }
+
+    pub fn is_ok(&self) -> bool {
+        self.shutdown_rx.try_recv() == Err(mpsc::TryRecvError::Empty)
+    }
+
+    pub fn spin(&self) {
+        self.shutdown_rx.recv().is_ok();
     }
 
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
@@ -111,7 +162,7 @@ impl Ros {
         Ok(Client::new(&self.name, &uri, &name))
     }
 
-    pub fn wait_for_service(&self, service: &str, timeout: Option<Duration>) -> Result<()> {
+    pub fn wait_for_service(&self, service: &str, timeout: Option<time::Duration>) -> Result<()> {
         use rosxmlrpc::ResponseError;
         use std::thread::sleep;
 
@@ -129,7 +180,7 @@ impl Ros {
                             return Err(ErrorKind::TimeoutError.into());
                         }
                     }
-                    sleep(Duration::from_millis(100));
+                    sleep(time::Duration::from_millis(100));
                     continue;
                 }
                 _ => {}
@@ -145,8 +196,8 @@ impl Ros {
     {
         let name = self.resolver.translate(service)?;
         Service::new::<T, F>(
-            &self.master,
-            &mut self.slave,
+            self.master.clone(),
+            self.slave.clone(),
             &self.hostname,
             &name,
             handler,
@@ -159,7 +210,7 @@ impl Ros {
         F: Fn(T) -> () + Send + 'static,
     {
         let name = self.resolver.translate(topic)?;
-        Subscriber::new::<T, F>(&self.master, &mut self.slave, &name, callback)
+        Subscriber::new::<T, F>(self.master.clone(), self.slave.clone(), &name, callback)
     }
 
     pub fn publish<T>(&mut self, topic: &str) -> Result<Publisher<T>>
@@ -167,7 +218,12 @@ impl Ros {
         T: Message,
     {
         let name = self.resolver.translate(topic)?;
-        Publisher::new(&self.master, &mut self.slave, &self.hostname, &name)
+        Publisher::new(
+            self.master.clone(),
+            self.slave.clone(),
+            &self.hostname,
+            &name,
+        )
     }
 }
 
