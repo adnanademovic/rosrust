@@ -1,6 +1,6 @@
 use itertools::{self, Itertools};
 use regex::Regex;
-use super::error::{Result, ResultExt};
+use error::{Result, ResultExt};
 use std::collections::HashMap;
 
 pub struct Msg {

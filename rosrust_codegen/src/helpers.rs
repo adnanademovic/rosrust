@@ -1,6 +1,6 @@
 use std::collections::{LinkedList, HashMap, HashSet};
-use super::msg::Msg;
-use super::error::{Result, ResultExt};
+use msg::Msg;
+use error::{Result, ResultExt};
 use std::fs::File;
 use std::path::Path;
 use regex::RegexBuilder;

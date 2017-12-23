@@ -1,3 +1,13 @@
+#![recursion_limit = "1024"]
+
+extern crate crypto;
+#[macro_use]
+extern crate error_chain;
+extern crate itertools;
+#[macro_use]
+extern crate lazy_static;
+extern crate regex;
+
 pub mod msg;
 pub mod helpers;
 pub mod error;

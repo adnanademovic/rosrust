@@ -4,7 +4,9 @@ members = [
     "examples/pubsub",
     "examples/serviceclient",
     "rosrust",
+    "rosrust_codegen",
 ]
 
 [patch.crates-io]
 "rosrust" = { path = "rosrust" }
+"rosrust_codegen" = { path = "rosrust_codegen" }

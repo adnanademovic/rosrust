@@ -12,6 +12,8 @@ extern crate lazy_static;
 extern crate log;
 extern crate nix;
 extern crate regex;
+#[macro_use]
+extern crate rosrust_codegen;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -24,8 +26,6 @@ pub use tcpros::{Client, PublisherStream, Message, ServicePair as Service};
 pub use api::error;
 
 mod api;
-#[macro_use]
-pub mod build_tools;
 mod rosxmlrpc;
 mod tcpros;
 pub mod msg;

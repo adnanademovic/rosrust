@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use super::helpers;
-use super::error::Result;
+use helpers;
+use error::Result;
 
 pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String> {
     let mut output = Vec::<String>::new();
