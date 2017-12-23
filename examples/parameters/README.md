@@ -15,4 +15,4 @@ Get raw: Array([Int(1), Int(2), Double(3.3), String("foo"), String("bar"), Array
 (..)
 ```
 
-This is even more tolerant than `rospy`, which would require quotation marks hash keys.
+This is even more tolerant than `rospy`, which would require quotation marks around hash keys.

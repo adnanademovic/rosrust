@@ -42,7 +42,7 @@ fn main() {
         println!("Create own parameter /baz with 'rosparam' to observe interaction.");
     }
 
-    // Access existing parameter
+    // Access command line parameter
     let param = ros.param("~privbaz").unwrap();
     println!("Handling ~privbaz:");
     if param.exists().unwrap() {
