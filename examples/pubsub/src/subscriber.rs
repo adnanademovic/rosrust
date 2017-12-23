@@ -1,6 +1,7 @@
 extern crate env_logger;
-#[macro_use]
 extern crate rosrust;
+#[macro_use]
+extern crate rosrust_codegen;
 
 use rosrust::Ros;
 

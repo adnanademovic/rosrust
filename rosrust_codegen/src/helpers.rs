@@ -187,7 +187,7 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
 mod tests {
     use super::*;
 
-    static FILEPATH: &'static str = "src/build_tools/msg_examples";
+    static FILEPATH: &'static str = "src/msg_examples";
 
     #[test]
     fn get_message_map_fetches_leaf_message() {

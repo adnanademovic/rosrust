@@ -22,7 +22,7 @@ use std::path::Path;
 macro_rules! rosmsg_main {
     ($($msg:expr),*)=> {
         fn main() {
-            $crate::build_tools::depend_on_messages(&[
+            $crate::depend_on_messages(&[
             $(
                 $msg,
             )*

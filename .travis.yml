@@ -1,6 +1,6 @@
 language: rust
 env:
-  - ROSRUST_MSG_PATH=/home/travis/build/adnanademovic/rosrust/rosrust/src/build_tools/msg_examples
+  - ROSRUST_MSG_PATH=/home/travis/build/adnanademovic/rosrust/rosrust_codegen/src/msg_examples
 rust:
   - stable
   - beta

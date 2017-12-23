@@ -128,7 +128,7 @@ fn string_into_pair<'a>(input: &'a str) -> Result<(&'a str, &'a str)> {
 mod tests {
     use super::*;
 
-    static FILEPATH: &'static str = "src/build_tools/msg_examples";
+    static FILEPATH: &'static str = "src/msg_examples";
 
     #[test]
     fn depend_on_messages_printout() {
