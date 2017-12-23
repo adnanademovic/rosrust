@@ -37,10 +37,10 @@ pub fn name(default: &str) -> String {
 pub fn mappings() -> Vec<(String, String)> {
     args()
         .skip(1)
-        .filter(|v| !v.starts_with("__"))
+        .filter(|v| !v.starts_with("_"))
         .map(|v| v.split(":=").map(String::from).collect::<Vec<String>>())
         .filter(|v| v.len() == 2)
-        .map(|v| v.into_iter().map(fix_prefix))
+        .map(|v| v.into_iter())
         .map(|mut v| {
             (
                 v.next().expect(UNEXPECTED_EMPTY_ARRAY),
@@ -48,14 +48,6 @@ pub fn mappings() -> Vec<(String, String)> {
             )
         })
         .collect()
-}
-
-fn fix_prefix(v: String) -> String {
-    if v.starts_with("_") {
-        format!("~{}", v.trim_left_matches("_"))
-    } else {
-        v
-    }
 }
 
 fn find_with_prefix(prefix: &str) -> Option<String> {
@@ -142,9 +134,10 @@ mod tests {
             "/c:=d",
             "e:=/f_g",
             "__name:=something",
+            "_param:=something",
             "a:=b:=c",
-            "_oo_e:=/ab_c",
-            "/x_y:=_i",
+            "~oo_e:=/ab_c",
+            "/x_y:=~i",
         ]);
         assert_eq!(
             vec![
