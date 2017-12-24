@@ -19,7 +19,7 @@ pub fn depend_on_messages(
     let packages = message_map
         .messages
         .iter()
-        .map(|(&(ref pack, ref _name), ref _value)| pack.clone())
+        .map(|(&(ref pack, ref _name), _value)| pack.clone())
         .chain(message_map.services.iter().map(|&(ref pack, ref _name)| {
             pack.clone()
         }))
@@ -29,8 +29,8 @@ pub fn depend_on_messages(
         let names = message_map
             .messages
             .iter()
-            .filter(|&(&(ref pack, ref _name), ref _value)| pack == &package)
-            .map(|(&(ref _pack, ref name), ref _value)| name.clone())
+            .filter(|&(&(ref pack, ref _name), _value)| pack == &package)
+            .map(|(&(ref _pack, ref name), _value)| name.clone())
             .collect::<HashSet<String>>();
         for name in &names {
             let key = (package.clone(), name.clone());
@@ -40,7 +40,7 @@ pub fn depend_on_messages(
             let hash = hashes.get(&key).expect(
                 "Internal implementation contains mismatch in map keys",
             );
-            let definition = helpers::generate_message_definition(&message_map.messages, &message)?;
+            let definition = helpers::generate_message_definition(&message_map.messages, message)?;
             output.push(message.struct_string(crate_prefix));
             output.push(format!(
                 "        impl {}Message for {} {{",
@@ -48,7 +48,7 @@ pub fn depend_on_messages(
                 message.name
             ));
             output.push(create_function("msg_definition", &definition));
-            output.push(create_function("md5sum", &hash));
+            output.push(create_function("md5sum", hash));
             output.push(create_function("msg_type", &message.get_type()));
             output.push("        }".into());
             output.push(format!("        impl {} {{", message.name));
@@ -76,7 +76,7 @@ pub fn depend_on_messages(
                 name
             ));
             output.push(create_function("msg_definition", ""));
-            output.push(create_function("md5sum", &hash));
+            output.push(create_function("md5sum", hash));
             output.push(create_function(
                 "msg_type",
                 &format!("{}/{}", package, name),
@@ -110,7 +110,7 @@ fn create_function(name: &str, value: &str) -> String {
     )
 }
 
-fn string_into_pair<'a>(input: &'a str) -> Result<(&'a str, &'a str)> {
+fn string_into_pair(input: &str) -> Result<(&str, &str)> {
     let mut parts = input.splitn(2, '/');
     let package = match parts.next() {
         Some(v) => v,

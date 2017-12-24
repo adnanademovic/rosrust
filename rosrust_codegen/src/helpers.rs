@@ -1,6 +1,7 @@
 use std::collections::{LinkedList, HashMap, HashSet};
 use msg::Msg;
 use error::{Result, ResultExt};
+use std;
 use std::fs::File;
 use std::path::Path;
 use regex::RegexBuilder;
@@ -54,8 +55,8 @@ fn calculate_md5_from_representation(v: &str) -> String {
     hasher.result_str()
 }
 
-pub fn generate_message_definition(
-    message_map: &HashMap<(String, String), Msg>,
+pub fn generate_message_definition<S: std::hash::BuildHasher>(
+    message_map: &HashMap<(String, String), Msg, S>,
     message: &Msg,
 ) -> Result<String> {
     let mut handled_messages = HashSet::<(String, String)>::new();
@@ -133,6 +134,7 @@ enum MessageCase {
     Service(String, Msg, Msg),
 }
 
+#[allow(unknown_lints, trivial_regex)]
 fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
     use std::io::Read;
     for folder in folders {
@@ -146,7 +148,7 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             f.read_to_string(&mut contents).chain_err(
                 || "Failed to read file to string!",
             )?;
-            return Msg::new(&package, &name, &contents).map(|v| MessageCase::Message(v));
+            return Msg::new(package, name, &contents).map(MessageCase::Message);
         }
         let full_path = Path::new(&folder)
             .join(&package)
@@ -171,8 +173,8 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             if parts.next().is_some() {
                 bail!("Too many splits in service");
             }
-            let req = Msg::new(&package, &format!("{}Req", name), req)?;
-            let res = Msg::new(&package, &format!("{}Res", name), res)?;
+            let req = Msg::new(package, &format!("{}Req", name), req)?;
+            let res = Msg::new(package, &format!("{}Res", name), res)?;
             return Ok(MessageCase::Service(name.into(), req, res));
         }
     }

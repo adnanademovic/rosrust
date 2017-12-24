@@ -52,13 +52,13 @@ impl Msg {
     ) -> ::std::result::Result<String, ()> {
         let constants = self.fields
             .iter()
-            .filter(|ref v| v.is_constant())
-            .map(|ref v| v.md5_string(&self.package, hashes))
+            .filter(|v| v.is_constant())
+            .map(|v| v.md5_string(&self.package, hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
         let fields = self.fields
             .iter()
-            .filter(|ref v| !v.is_constant())
-            .map(|ref v| v.md5_string(&self.package, hashes))
+            .filter(|v| !v.is_constant())
+            .map(|v| v.md5_string(&self.package, hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
         let representation = constants
             .into_iter()
@@ -247,7 +247,7 @@ fn match_line(data: &str) -> Option<Result<FieldInfo>> {
 }
 
 #[inline]
-fn strip_useless<'a>(data: &'a str) -> Result<&'a str> {
+fn strip_useless(data: &str) -> Result<&str> {
     Ok(
         data.splitn(2, '#')
             .next()
@@ -331,9 +331,9 @@ impl FieldInfo {
         Some(match self.datatype {
             DataType::Bool => format!("{}: bool = {:?};", self.name, value != "0"),
             DataType::String => format!("{}: &'static str = {:?};", self.name, value),
-            DataType::Time => return None,
-            DataType::Duration => return None,
-            DataType::LocalStruct(..) => return None,
+            DataType::Time |
+            DataType::Duration |
+            DataType::LocalStruct(..) |
             DataType::RemoteStruct(..) => return None,
             _ => {
                 let datatype = self.datatype.rust_type(crate_prefix);
@@ -344,7 +344,7 @@ impl FieldInfo {
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
-            datatype: parse_datatype(&datatype).ok_or_else(|| {
+            datatype: parse_datatype(datatype).ok_or_else(|| {
                 format!("Unsupported datatype: {}", datatype)
             })?,
             name: name.to_owned(),
@@ -419,7 +419,7 @@ impl DataType {
                 DataType::I32 => "int32",
                 DataType::I64 => "int64",
                 DataType::U8(true) => "uint8",
-                DataType::U8(false) => "uint8",
+                DataType::U8(false) => "char",
                 DataType::U16 => "uint16",
                 DataType::U32 => "uint32",
                 DataType::U64 => "uint64",
@@ -463,7 +463,7 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
         "Header" => Some(DataType::RemoteStruct("std_msgs".into(), "Header".into())),
         _ => {
             let parts = datatype.split('/').collect::<Vec<_>>();
-            if parts.iter().any(|v| v.len() == 0) {
+            if parts.iter().any(|v| v.is_empty()) {
                 return None;
             }
             match parts.len() {
