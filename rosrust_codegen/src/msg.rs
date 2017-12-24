@@ -396,11 +396,11 @@ impl FieldInfo {
 #[derive(Debug, PartialEq)]
 enum DataType {
     Bool,
-    I8,
+    I8(bool),
     I16,
     I32,
     I64,
-    U8,
+    U8(bool),
     U16,
     U32,
     U64,
@@ -417,11 +417,11 @@ impl DataType {
     fn rust_type(&self) -> String {
         match *self {
             DataType::Bool => "bool".into(),
-            DataType::I8 => "i8".into(),
+            DataType::I8(_) => "i8".into(),
             DataType::I16 => "i16".into(),
             DataType::I32 => "i32".into(),
             DataType::I64 => "i64".into(),
-            DataType::U8 => "u8".into(),
+            DataType::U8(_) => "u8".into(),
             DataType::U16 => "u16".into(),
             DataType::U32 => "u32".into(),
             DataType::U64 => "u64".into(),
@@ -437,8 +437,8 @@ impl DataType {
 
     fn is_builtin(&self) -> bool {
         match *self {
-            DataType::Bool | DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64 |
-            DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64 | DataType::F32 |
+            DataType::Bool | DataType::I8(_) | DataType::I16 | DataType::I32 | DataType::I64 |
+            DataType::U8(_) | DataType::U16 | DataType::U32 | DataType::U64 | DataType::F32 |
             DataType::F64 | DataType::String | DataType::Time | DataType::Duration => true,
             DataType::LocalStruct(_) |
             DataType::RemoteStruct(_, _) => false,
@@ -448,11 +448,11 @@ impl DataType {
     fn rust_newtype(&self) -> String {
         match *self {
             DataType::Bool => "false".into(),
-            DataType::I8 => "0i8".into(),
+            DataType::I8(_) => "0i8".into(),
             DataType::I16 => "0i16".into(),
             DataType::I32 => "0i32".into(),
             DataType::I64 => "0i64".into(),
-            DataType::U8 => "0u8".into(),
+            DataType::U8(_) => "0u8".into(),
             DataType::U16 => "0u16".into(),
             DataType::U32 => "0u32".into(),
             DataType::U64 => "0u64".into(),
@@ -470,11 +470,13 @@ impl DataType {
         Ok(
             match *self {
                 DataType::Bool => "bool",
-                DataType::I8 => "int8",
+                DataType::I8(true) => "int8",
+                DataType::I8(false) => "byte",
                 DataType::I16 => "int16",
                 DataType::I32 => "int32",
                 DataType::I64 => "int64",
-                DataType::U8 => "uint8",
+                DataType::U8(true) => "uint8",
+                DataType::U8(false) => "uint8",
                 DataType::U16 => "uint16",
                 DataType::U32 => "uint32",
                 DataType::U64 => "uint64",
@@ -500,11 +502,13 @@ impl DataType {
 fn parse_datatype(datatype: &str) -> Option<DataType> {
     match datatype {
         "bool" => Some(DataType::Bool),
-        "int8" | "byte" => Some(DataType::I8),
+        "int8" => Some(DataType::I8(true)),
+        "byte" => Some(DataType::I8(false)),
         "int16" => Some(DataType::I16),
         "int32" => Some(DataType::I32),
         "int64" => Some(DataType::I64),
-        "uint8" | "char" => Some(DataType::U8),
+        "uint8" => Some(DataType::U8(true)),
+        "char" => Some(DataType::U8(false)),
         "uint16" => Some(DataType::U16),
         "uint32" => Some(DataType::U32),
         "uint64" => Some(DataType::U64),
@@ -774,7 +778,7 @@ mod tests {
 
         assert_eq!(
             FieldInfo {
-                datatype: DataType::U8,
+                datatype: DataType::U8(false),
                 name: "myname".into(),
                 case: FieldCase::Array(127),
             },

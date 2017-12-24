@@ -244,10 +244,15 @@ mod tests {
     fn get_message_map_traverses_all_passed_messages_dependency_tree() {
         let message_map = get_message_map(
             &[FILEPATH],
-            &[("geometry_msgs", "PoseStamped"), ("sensor_msgs", "Imu")],
+            &[
+                ("geometry_msgs", "PoseStamped"),
+                ("sensor_msgs", "Imu"),
+                ("rosgraph_msgs", "Clock"),
+                ("rosgraph_msgs", "Log"),
+            ],
         ).unwrap()
             .messages;
-        assert_eq!(message_map.len(), 7);
+        assert_eq!(message_map.len(), 9);
         assert!(message_map.contains_key(
             &("geometry_msgs".into(), "Vector3".into()),
         ));
@@ -269,16 +274,27 @@ mod tests {
         assert!(message_map.contains_key(
             &("std_msgs".into(), "Header".into()),
         ));
+        assert!(message_map.contains_key(
+            &("rosgraph_msgs".into(), "Clock".into()),
+        ));
+        assert!(message_map.contains_key(
+            &("rosgraph_msgs".into(), "Log".into()),
+        ));
     }
 
     #[test]
     fn calculate_md5_works() {
         let message_map = get_message_map(
             &[FILEPATH],
-            &[("geometry_msgs", "PoseStamped"), ("sensor_msgs", "Imu")],
+            &[
+                ("geometry_msgs", "PoseStamped"),
+                ("sensor_msgs", "Imu"),
+                ("rosgraph_msgs", "Clock"),
+                ("rosgraph_msgs", "Log"),
+            ],
         ).unwrap();
         let hashes = calculate_md5(&message_map).unwrap();
-        assert_eq!(hashes.len(), 7);
+        assert_eq!(hashes.len(), 9);
         assert_eq!(
             *hashes
                 .get(&("geometry_msgs".into(), "Vector3".into()))
@@ -316,6 +332,16 @@ mod tests {
         assert_eq!(
             *hashes.get(&("sensor_msgs".into(), "Imu".into())).unwrap(),
             "6a62c6daae103f4ff57a132d6f95cec2".to_owned()
+        );
+        assert_eq!(
+            *hashes
+                .get(&("rosgraph_msgs".into(), "Clock".into()))
+                .unwrap(),
+            "a9c97c1d230cfc112e270351a944ee47".to_owned()
+        );
+        assert_eq!(
+            *hashes.get(&("rosgraph_msgs".into(), "Log".into())).unwrap(),
+            "acffd30cd6b6de30f120938c17c593fb".to_owned()
         );
     }
 
