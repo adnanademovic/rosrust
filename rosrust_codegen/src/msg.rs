@@ -103,17 +103,14 @@ impl Msg {
 
     pub fn const_string(&self) -> String {
         let mut output = Vec::<String>::new();
-        output.push("            #[allow(non_snake_case)]".into());
-        output.push(format!("            pub mod {} {{", self.name));
         for field in &self.fields {
             if let Some(s) = field.to_const_string() {
                 output.push(
-                    "                #[allow(dead_code,non_upper_case_globals)]".into(),
+                    "            #[allow(dead_code,non_upper_case_globals)]".into(),
                 );
-                output.push(format!("                pub {}", s));
+                output.push(format!("            pub const {}", s));
             }
         }
-        output.push("            }".into());
         output.join("\n")
     }
 
@@ -363,21 +360,15 @@ impl FieldInfo {
             _ => return None,
         };
         Some(match self.datatype {
-            DataType::Bool => format!("const {}: bool = {:?};", self.name, value != "0"),
-            DataType::String => format!("static {}: &'static str = {:?};", self.name, value),
+            DataType::Bool => format!("{}: bool = {:?};", self.name, value != "0"),
+            DataType::String => format!("{}: &'static str = {:?};", self.name, value),
             DataType::Time => return None,
             DataType::Duration => return None,
             DataType::LocalStruct(..) => return None,
             DataType::RemoteStruct(..) => return None,
             _ => {
                 let datatype = self.datatype.rust_type();
-                format!(
-                    "const {}: {} = {} as {};",
-                    self.name,
-                    datatype,
-                    value,
-                    datatype
-                )
+                format!("{}: {} = {} as {};", self.name, datatype, value, datatype)
             }
         })
     }

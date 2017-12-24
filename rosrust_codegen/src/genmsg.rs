@@ -48,18 +48,9 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             output.push("        }".into());
             output.push(format!("        impl {} {{", message.name));
             output.push(message.new_string());
+            output.push(message.const_string());
             output.push("        }".into());
         }
-        output.push("        #[allow(non_snake_case)]".into());
-        output.push("        pub mod CONST {".into());
-        for name in &names {
-            let message = message_map
-                .messages
-                .get(&(package.clone(), name.clone()))
-                .expect("Internal implementation contains mismatch in map keys");
-            output.push(message.const_string());
-        }
-        output.push("        }".into());
         let names = message_map
             .services
             .iter()
@@ -132,10 +123,7 @@ mod tests {
 
     #[test]
     fn depend_on_messages_printout() {
-        let data = depend_on_messages(
-            &[FILEPATH],
-            &["geometry_msgs/PoseStamped", "sensor_msgs/Imu"],
-        ).unwrap();
+        let data = depend_on_messages(&[FILEPATH], &["rosgraph_msgs/Log"]).unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
