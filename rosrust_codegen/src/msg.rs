@@ -1,4 +1,3 @@
-use itertools::{self, Itertools};
 use regex::Regex;
 use error::{Result, ResultExt};
 use std::collections::HashMap;
@@ -19,38 +18,6 @@ impl Msg {
             fields: fields,
             source: source.trim().into(),
         })
-    }
-
-    pub fn new_string(&self) -> String {
-        let mut lines = Vec::new();
-        lines.push(format!("            pub fn new() -> {} {{", self.name));
-        lines.push(format!("                {} {{", self.name));
-        for field in self.fields.iter() {
-            match field.case {
-                FieldCase::Unit => {
-                    lines.push(format!(
-                        "                    {}: {},",
-                        field.name,
-                        field.datatype.rust_newtype()
-                    ));
-                }
-                FieldCase::Vector => {
-                    lines.push(format!("                    {}: Vec::new(),", field.name));
-                }
-                FieldCase::Array(l) => {
-                    let newtype = field.datatype.rust_newtype();
-                    lines.push(format!(
-                        "                    {}: [{}],",
-                        field.name,
-                        itertools::repeat_n(newtype.as_str(), l).join(", ")
-                    ));
-                }
-                FieldCase::Const(..) => {}
-            }
-        }
-        lines.push("                }".into());
-        lines.push("            }".into());
-        lines.join("\n")
     }
 
     pub fn get_type(&self) -> String {
@@ -101,10 +68,10 @@ impl Msg {
         Ok(representation)
     }
 
-    pub fn const_string(&self) -> String {
+    pub fn const_string(&self, crate_prefix: &str) -> String {
         let mut output = Vec::<String>::new();
         for field in &self.fields {
-            if let Some(s) = field.to_const_string() {
+            if let Some(s) = field.to_const_string(crate_prefix) {
                 output.push(
                     "            #[allow(dead_code,non_upper_case_globals)]".into(),
                 );
@@ -114,7 +81,7 @@ impl Msg {
         output.join("\n")
     }
 
-    pub fn struct_string(&self) -> String {
+    pub fn struct_string(&self, crate_prefix: &str) -> String {
         let mut output = Vec::<String>::new();
         output.push(
             "        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into(),
@@ -124,7 +91,7 @@ impl Msg {
         );
         output.push(format!("        pub struct {} {{", self.name));
         for field in &self.fields {
-            if let Some(s) = field.to_string() {
+            if let Some(s) = field.to_string(crate_prefix) {
                 output.push(format!("            pub {}", s));
             }
         }
@@ -346,8 +313,8 @@ impl FieldInfo {
         })
     }
 
-    fn to_string(&self) -> Option<String> {
-        let datatype = self.datatype.rust_type();
+    fn to_string(&self, crate_prefix: &str) -> Option<String> {
+        let datatype = self.datatype.rust_type(crate_prefix);
         match self.case {
             FieldCase::Unit => Some(format!("{}: {},", self.name, datatype)),
             FieldCase::Vector => Some(format!("{}: Vec<{}>,", self.name, datatype)),
@@ -356,7 +323,7 @@ impl FieldInfo {
         }
     }
 
-    fn to_const_string(&self) -> Option<String> {
+    fn to_const_string(&self, crate_prefix: &str) -> Option<String> {
         let value = match self.case {
             FieldCase::Const(ref value) => value,
             _ => return None,
@@ -369,7 +336,7 @@ impl FieldInfo {
             DataType::LocalStruct(..) => return None,
             DataType::RemoteStruct(..) => return None,
             _ => {
-                let datatype = self.datatype.rust_type();
+                let datatype = self.datatype.rust_type(crate_prefix);
                 format!("{}: {} = {} as {};", self.name, datatype, value, datatype)
             }
         })
@@ -407,7 +374,7 @@ enum DataType {
 }
 
 impl DataType {
-    fn rust_type(&self) -> String {
+    fn rust_type(&self, crate_prefix: &str) -> String {
         match *self {
             DataType::Bool => "bool".into(),
             DataType::I8(_) => "i8".into(),
@@ -421,8 +388,8 @@ impl DataType {
             DataType::F32 => "f32".into(),
             DataType::F64 => "f64".into(),
             DataType::String => "::std::string::String".into(),
-            DataType::Time => "::rosrust::msg::Time".into(),
-            DataType::Duration => "::rosrust::msg::Duration".into(),
+            DataType::Time => format!("{}Time", crate_prefix),
+            DataType::Duration => format!("{}Duration", crate_prefix),
             DataType::LocalStruct(ref name) => name.clone(),
             DataType::RemoteStruct(ref pkg, ref name) => format!("super::{}::{}", pkg, name),
         }
@@ -435,23 +402,6 @@ impl DataType {
             DataType::F64 | DataType::String | DataType::Time | DataType::Duration => true,
             DataType::LocalStruct(_) |
             DataType::RemoteStruct(_, _) => false,
-        }
-    }
-
-    fn rust_newtype(&self) -> String {
-        match *self {
-            DataType::Bool => "false".into(),
-            DataType::I8(_) => "0i8".into(),
-            DataType::I16 => "0i16".into(),
-            DataType::I32 => "0i32".into(),
-            DataType::I64 => "0i64".into(),
-            DataType::U8(_) => "0u8".into(),
-            DataType::U16 => "0u16".into(),
-            DataType::U32 => "0u32".into(),
-            DataType::U64 => "0u64".into(),
-            DataType::F32 => "0f32".into(),
-            DataType::F64 => "0f64".into(),
-            _ => format!("{}::new()", self.rust_type()),
         }
     }
 

@@ -8,7 +8,6 @@ version = "0.0.1"
 
 [dependencies]
 error-chain = "0.11.0"
-itertools = "0.7.4"
 lazy_static = "1.0.0"
 regex = "0.2.3"
 rust-crypto = "0.2.36"

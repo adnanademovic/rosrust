@@ -2,7 +2,11 @@ use std::collections::HashSet;
 use helpers;
 use error::Result;
 
-pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String> {
+pub fn depend_on_messages(
+    folders: &[&str],
+    messages: &[&str],
+    crate_prefix: &str,
+) -> Result<String> {
     let mut output = Vec::<String>::new();
     output.push("#[macro_use]\nextern crate serde_derive;".into());
     output.push("pub mod msg {".into());
@@ -37,9 +41,10 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
                 "Internal implementation contains mismatch in map keys",
             );
             let definition = helpers::generate_message_definition(&message_map.messages, &message)?;
-            output.push(message.struct_string());
+            output.push(message.struct_string(crate_prefix));
             output.push(format!(
-                "        impl ::rosrust::Message for {} {{",
+                "        impl {}Message for {} {{",
+                crate_prefix,
                 message.name
             ));
             output.push(create_function("msg_definition", &definition));
@@ -47,8 +52,12 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             output.push(create_function("msg_type", &message.get_type()));
             output.push("        }".into());
             output.push(format!("        impl {} {{", message.name));
-            output.push(message.const_string());
-            output.push("            fn new() -> Self { Self::default() }".into());
+            output.push(message.const_string(crate_prefix));
+            output.push("            #[allow(dead_code)]".into());
+            output.push("            #[inline]".into());
+            output.push(
+                "            pub fn new() -> Self { Self::default() }".into(),
+            );
             output.push("        }".into());
         }
         let names = message_map
@@ -66,7 +75,11 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             );
             output.push("        #[derive(Serialize,Deserialize,Debug)]".into());
             output.push(format!("        pub struct {} {{}}", name));
-            output.push(format!("        impl ::rosrust::Message for {} {{", name));
+            output.push(format!(
+                "        impl {}Message for {} {{",
+                crate_prefix,
+                name
+            ));
             output.push(create_function("msg_definition", ""));
             output.push(create_function("md5sum", &hash));
             output.push(create_function(
@@ -75,7 +88,11 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             ));
             output.push("        }".into());
 
-            output.push(format!("        impl ::rosrust::Service for {} {{", name));
+            output.push(format!(
+                "        impl {}Service for {} {{",
+                crate_prefix,
+                name
+            ));
             output.push(format!("            type Request = {}Req;", name));
             output.push(format!("            type Response = {}Res;", name));
             output.push("        }".into());
@@ -89,6 +106,7 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
 fn create_function(name: &str, value: &str) -> String {
     format!(
         r#"
+            #[inline]
             fn {}() -> ::std::string::String {{
                 {:?}.into()
             }}"#,
@@ -123,22 +141,27 @@ mod tests {
 
     #[test]
     fn depend_on_messages_printout() {
-        let data = depend_on_messages(&[FILEPATH], &["rosgraph_msgs/Clock", "rosgraph_msgs/Log"])
-            .unwrap();
+        let data = depend_on_messages(
+            &[FILEPATH],
+            &["rosgraph_msgs/Clock", "rosgraph_msgs/Log"],
+            "::rosrust::",
+        ).unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
 
     #[test]
     fn benchmark_genmsg() {
-        let data = depend_on_messages(&[FILEPATH], &["benchmark_msgs/Overall"]).unwrap();
+        let data = depend_on_messages(&[FILEPATH], &["benchmark_msgs/Overall"], "::rosrust::")
+            .unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
 
     #[test]
     fn benchmark_genmsg_service() {
-        let data = depend_on_messages(&[FILEPATH], &["simple_srv/Something"]).unwrap();
+        let data = depend_on_messages(&[FILEPATH], &["simple_srv/Something"], "::rosrust::")
+            .unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }

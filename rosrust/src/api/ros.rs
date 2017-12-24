@@ -1,9 +1,9 @@
-use msg::{Duration, Time};
+use msg::rosgraph_msgs::Clock as ClockMsg;
+use time::{Duration, Time};
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, mpsc};
 use std::time;
 use super::clock::{Clock, Rate, RealClock, SimulatedClock};
-use super::clock::rosgraph_msgs::Clock as ClockMsg;
 use super::master::{self, Master, Topic};
 use super::slave::Slave;
 use super::error::{ErrorKind, Result, ResultExt};

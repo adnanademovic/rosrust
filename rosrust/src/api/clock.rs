@@ -1,10 +1,10 @@
-use msg::{Duration, Time};
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
 use std::thread::sleep;
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
+use time::{Duration, Time};
 
 static BEFORE_EPOCH: &'static str = "Requested time is before UNIX epoch.";
 
@@ -155,26 +155,3 @@ impl Clock for SimulatedClock {
 
 static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
 static SLEEPING_THREAD_MISSING: &'static str = "Failed to find sleeping thread";
-
-pub mod rosgraph_msgs {
-    use Message;
-    use msg::Time;
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Clock {
-        pub clock: Time,
-    }
-    impl Message for Clock {
-        fn msg_definition() -> ::std::string::String {
-            "# roslib/Clock is used for publishing simulated time in ROS. \n# This message simply communicates the current time.\n# For more information, see http://www.ros.org/wiki/Clock\ntime clock\n".into()
-        }
-
-        fn md5sum() -> ::std::string::String {
-            "a9c97c1d230cfc112e270351a944ee47".into()
-        }
-
-        fn msg_type() -> ::std::string::String {
-            "rosgraph_msgs/Clock".into()
-        }
-    }
-}
