@@ -59,15 +59,6 @@ pub fn depend_on_messages(messages: &[&str], crate_prefix: &str) {
         .split(':')
         .filter_map(append_src_folder)
         .collect::<Vec<String>>();
-    let local_paths = vec![
-        Path::new(file!())
-            .parent()
-            .expect("Unexpected path")
-            .join("msg_examples")
-            .to_str()
-            .map(String::from)
-            .expect("Unexpected path"),
-    ];
     let extra_paths = env::var("ROSRUST_MSG_PATH")
         .unwrap_or_default()
         .split(':')
@@ -76,7 +67,6 @@ pub fn depend_on_messages(messages: &[&str], crate_prefix: &str) {
     let paths = cmake_paths
         .iter()
         .chain(cmake_alt_paths.iter())
-        .chain(local_paths.iter())
         .chain(extra_paths.iter())
         .map(|v| v.as_str())
         .collect::<Vec<&str>>();
