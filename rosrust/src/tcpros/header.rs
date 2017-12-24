@@ -23,7 +23,7 @@ pub fn match_field(
         Some(actual) => actual,
         None => bail!(ErrorKind::HeaderMissingField(field.into())),
     };
-    if actual != &expected {
+    if actual != expected {
         bail!(ErrorKind::HeaderMismatch(
             field.into(),
             expected.into(),

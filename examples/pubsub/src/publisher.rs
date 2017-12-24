@@ -20,7 +20,7 @@ fn main() {
         let mut msg = msg::std_msgs::String::default();
         msg.data = format!("hello world {}", count);
 
-        chatter_pub.send(msg).unwrap();
+        chatter_pub.send(&msg).unwrap();
 
         rate.sleep();
 

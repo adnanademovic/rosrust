@@ -87,7 +87,7 @@ impl<T: Path> Add<T> for Buffer {
 
 impl<T: Path> AddAssign<T> for Buffer {
     fn add_assign(&mut self, rhs: T) {
-        self.chain.extend_from_slice(&mut rhs.get());
+        self.chain.extend_from_slice(rhs.get());
     }
 }
 

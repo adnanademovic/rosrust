@@ -44,11 +44,11 @@ where
     T: Message,
     U: std::io::Write + std::io::Read,
 {
-    read_request::<T, U>(&mut stream, &topic)?;
+    read_request::<T, U>(&mut stream, topic)?;
     write_response::<T, U>(&mut stream)
 }
 
-fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: TargetList<U>)
+fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: &TargetList<U>)
 where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
@@ -107,7 +107,7 @@ impl Publisher {
         let (targets, data) = fork();
         let topic_name = String::from(topic);
         thread::spawn(move || {
-            listen_for_subscribers::<T, _, _>(&topic_name, listener, targets)
+            listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets)
         });
         Publisher {
             subscriptions: data,
@@ -148,8 +148,8 @@ impl<T: Message> PublisherStream<T> {
         })
     }
 
-    pub fn send(&mut self, message: T) -> Result<()> {
-        let bytes = to_vec(&message)?;
+    pub fn send(&mut self, message: &T) -> Result<()> {
+        let bytes = to_vec(message)?;
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
         self.stream.send(bytes).expect("Connected thread died");

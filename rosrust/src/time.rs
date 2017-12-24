@@ -1,7 +1,7 @@
 use std::cmp;
 use std::ops;
 
-const BILLION: i64 = 1000000000;
+const BILLION: i64 = 1_000_000_000;
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Time {
@@ -25,7 +25,7 @@ impl Time {
 
     #[inline]
     fn nanos(&self) -> i64 {
-        self.sec as i64 * BILLION + self.nsec as i64
+        i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }
 }
 
@@ -71,7 +71,7 @@ impl Duration {
 
     #[inline]
     fn nanos(&self) -> i64 {
-        self.sec as i64 * BILLION + self.nsec as i64
+        i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }
 }
 

@@ -45,7 +45,7 @@ impl Client {
                     FAILURE_CODE => Err(ResponseError::Server(message)),
                     SUCCESS_CODE => Ok(data),
                     _ => Err(ResponseError::Server(
-                        format!("Bad response code returned from server"),
+                        "Bad response code returned from server".into(),
                     )),
                 }
             }

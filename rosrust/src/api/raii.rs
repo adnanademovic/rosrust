@@ -25,7 +25,7 @@ impl<T: Message> Publisher<T> {
             name: name.into(),
         };
 
-        match info.master.register_publisher(&name, &T::msg_type()) {
+        match info.master.register_publisher(name, &T::msg_type()) {
             Ok(_) => Ok(Self {
                 stream,
                 _raii: Arc::new(InteractorRaii::new(info)),
@@ -43,7 +43,7 @@ impl<T: Message> Publisher<T> {
     }
 
     #[inline]
-    pub fn send(&mut self, message: T) -> Result<()> {
+    pub fn send(&mut self, message: &T) -> Result<()> {
         self.stream.send(message).map_err(|v| v.into())
     }
 }
@@ -78,7 +78,7 @@ impl Subscriber {
         match master.register_subscriber(name, &T::msg_type()) {
             Ok(publishers) => {
                 if let Err(err) = slave.add_publishers_to_subscription(
-                    &name,
+                    name,
                     publishers.into_iter(),
                 )
                 {

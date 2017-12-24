@@ -53,7 +53,7 @@ impl Ros {
             .unwrap_or(false)
         {
             let clock = Arc::new(SimulatedClock::default());
-            let ros_clock = clock.clone();
+            let ros_clock = Arc::clone(&clock);
             let sub = ros.subscribe::<ClockMsg, _>("/clock", move |v| clock.trigger(v.clock))
                 .chain_err(|| "Failed to subscribe to simulated clock")?;
             ros.static_subs.push(sub);
@@ -64,9 +64,9 @@ impl Ros {
     }
 
     fn new_raw(master_uri: &str, hostname: &str, namespace: &str, name: &str) -> Result<Ros> {
-        let namespace = namespace.trim_right_matches("/");
+        let namespace = namespace.trim_right_matches('/');
 
-        if name.contains("/") {
+        if name.contains('/') {
             bail!(ErrorKind::Naming(
                 naming::error::ErrorKind::IllegalCharacter(name.into()),
             ));
@@ -77,8 +77,8 @@ impl Ros {
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
-        let slave = Slave::new(&master_uri, &hostname, 0, &name, shutdown_tx)?;
-        let master = Master::new(&master_uri, &name, &slave.uri());
+        let slave = Slave::new(master_uri, hostname, 0, &name, shutdown_tx)?;
+        let master = Master::new(master_uri, &name, slave.uri());
 
         Ok(Ros {
             master: Arc::new(master),
@@ -96,22 +96,27 @@ impl Ros {
         self.resolver.map(source, destination).map_err(|v| v.into())
     }
 
+    #[inline]
     pub fn uri(&self) -> &str {
-        return self.slave.uri();
+        self.slave.uri()
     }
 
+    #[inline]
     pub fn name(&self) -> &str {
-        return &self.name;
+        &self.name
     }
 
+    #[inline]
     pub fn hostname(&self) -> &str {
-        return &self.hostname;
+        &self.hostname
     }
 
+    #[inline]
     pub fn now(&self) -> Time {
         self.clock.now()
     }
 
+    #[inline]
     pub fn sleep(&self, d: Duration) {
         self.clock.sleep(d);
     }
@@ -119,16 +124,18 @@ impl Ros {
     pub fn rate(&self, rate: f64) -> Rate {
         let nanos = 1_000_000_000.0 / rate;
         Rate::new(
-            self.clock.clone(),
+            Arc::clone(&self.clock),
             self.now(),
             Duration::from_nanos(nanos as i64),
         )
     }
 
+    #[inline]
     pub fn is_ok(&self) -> bool {
         self.shutdown_rx.try_recv() == Err(mpsc::TryRecvError::Empty)
     }
 
+    #[inline]
     pub fn spin(&self) {
         self.shutdown_rx.recv().is_ok();
     }
@@ -196,8 +203,8 @@ impl Ros {
     {
         let name = self.resolver.translate(service)?;
         Service::new::<T, F>(
-            self.master.clone(),
-            self.slave.clone(),
+            Arc::clone(&self.master),
+            Arc::clone(&self.slave),
             &self.hostname,
             &name,
             handler,
@@ -210,7 +217,12 @@ impl Ros {
         F: Fn(T) -> () + Send + 'static,
     {
         let name = self.resolver.translate(topic)?;
-        Subscriber::new::<T, F>(self.master.clone(), self.slave.clone(), &name, callback)
+        Subscriber::new::<T, F>(
+            Arc::clone(&self.master),
+            Arc::clone(&self.slave),
+            &name,
+            callback,
+        )
     }
 
     pub fn publish<T>(&mut self, topic: &str) -> Result<Publisher<T>>
@@ -219,8 +231,8 @@ impl Ros {
     {
         let name = self.resolver.translate(topic)?;
         Publisher::new(
-            self.master.clone(),
-            self.slave.clone(),
+            Arc::clone(&self.master),
+            Arc::clone(&self.slave),
             &self.hostname,
             &name,
         )

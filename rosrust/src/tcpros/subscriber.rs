@@ -28,7 +28,7 @@ impl Subscriber {
         let topic_name = String::from(topic);
         let data_stream = data_tx.clone();
         thread::spawn(move || {
-            join_connections::<T>(data_tx, pub_rx, &caller_id, &topic_name)
+            join_connections::<T>(&data_tx, pub_rx, &caller_id, &topic_name)
         });
         thread::spawn(move || handle_data::<T, F>(data_rx, callback));
         Subscriber {
@@ -82,7 +82,7 @@ where
 }
 
 fn join_connections<T>(
-    data_stream: Sender<Option<Vec<u8>>>,
+    data_stream: &Sender<Option<Vec<u8>>>,
     publishers: Receiver<SocketAddr>,
     caller_id: &str,
     topic: &str,
@@ -91,7 +91,7 @@ fn join_connections<T>(
 {
     // Ends when publisher sender is destroyed, which happens at Subscriber destruction
     for publisher in publishers {
-        let result = join_connection::<T>(&data_stream, &publisher, caller_id, topic)
+        let result = join_connection::<T>(data_stream, &publisher, caller_id, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
             let info = err.iter()

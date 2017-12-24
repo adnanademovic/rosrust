@@ -60,7 +60,7 @@ impl Service {
         let service_name = String::from(service);
         let node_name = String::from(node_name);
         thread::spawn(move || {
-            listen_for_clients::<T, _, _, _>(service_name, node_name, handler, listener)
+            listen_for_clients::<T, _, _, _>(&service_name, &node_name, handler, listener)
         });
         Service {
             api: String::from(api),
@@ -71,7 +71,7 @@ impl Service {
     }
 }
 
-fn listen_for_clients<T, U, V, F>(service: String, node_name: String, handler: F, connections: V)
+fn listen_for_clients<T, U, V, F>(service: &str, node_name: &str, handler: F, connections: V)
 where
     T: ServicePair,
     U: std::io::Read + std::io::Write + Send + 'static,
@@ -81,7 +81,7 @@ where
     let handler = Arc::new(handler);
     for mut stream in connections {
         // Service request starts by exchanging connection headers
-        if let Err(err) = exchange_headers::<T, _>(&mut stream, &service, &node_name) {
+        if let Err(err) = exchange_headers::<T, _>(&mut stream, service, node_name) {
             error!(
                 "Failed to exchange headers for service '{}': {}",
                 service,
@@ -91,7 +91,7 @@ where
         }
 
         // Spawn a thread for handling requests
-        spawn_request_handler::<T, U, F>(stream, handler.clone());
+        spawn_request_handler::<T, U, F>(stream, Arc::clone(&handler));
     }
 }
 
@@ -137,7 +137,7 @@ where
 {
     thread::spawn(move || if let Err(err) = handle_request_loop::<T, U, F>(
         stream,
-        handler,
+        &handler,
     )
     {
         let info = err.iter()
@@ -148,20 +148,15 @@ where
     });
 }
 
-fn handle_request_loop<T, U, F>(mut stream: U, handler: Arc<F>) -> Result<()>
+fn handle_request_loop<T, U, F>(mut stream: U, handler: &Arc<F>) -> Result<()>
 where
     T: ServicePair,
     U: std::io::Read + std::io::Write,
     F: Fn(T::Request) -> ServiceResult<T::Response>,
 {
-    loop {
-        // Receive request from client
-        // Break out of loop in case of failure to read request
-        let req = match from_reader(&mut stream) {
-            Ok(req) => req,
-            Err(_) => break,
-        };
-
+    // Receive request from client
+    // Break out of loop in case of failure to read request
+    while let Ok(req) = from_reader(&mut stream) {
         // Call function that handles request and returns response
         match handler(req) {
             Ok(res) => {

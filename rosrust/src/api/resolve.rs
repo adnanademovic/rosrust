@@ -4,7 +4,7 @@ pub fn master() -> String {
     if let Some(v) = find_with_prefix("__master:=") {
         return v;
     }
-    env::var("ROS_MASTER_URI").unwrap_or(String::from("http://localhost:11311/"))
+    env::var("ROS_MASTER_URI").unwrap_or_else(|_| String::from("http://localhost:11311/"))
 }
 
 pub fn hostname() -> String {
@@ -27,17 +27,17 @@ pub fn namespace() -> String {
     if let Some(v) = find_with_prefix("__ns:=") {
         return v;
     }
-    env::var("ROS_NAMESPACE").unwrap_or(String::new())
+    env::var("ROS_NAMESPACE").unwrap_or_default()
 }
 
 pub fn name(default: &str) -> String {
-    find_with_prefix("__name:=").unwrap_or(String::from(default))
+    find_with_prefix("__name:=").unwrap_or_else(|| String::from(default))
 }
 
 pub fn mappings() -> Vec<(String, String)> {
     args()
         .skip(1)
-        .filter(|v| !v.starts_with("_"))
+        .filter(|v| !v.starts_with('_'))
         .map(|v| v.split(":=").map(String::from).collect::<Vec<String>>())
         .filter(|v| v.len() == 2)
         .map(|v| v.into_iter())
@@ -53,7 +53,7 @@ pub fn mappings() -> Vec<(String, String)> {
 pub fn params() -> Vec<(String, String)> {
     args()
         .skip(1)
-        .filter(|v| v.starts_with("_"))
+        .filter(|v| v.starts_with('_'))
         .filter(|v| !v.starts_with("__"))
         .map(|v| {
             v.splitn(2, ":=").map(String::from).collect::<Vec<String>>()
@@ -89,7 +89,7 @@ fn system_hostname() -> String {
     let hostname = hostname
         .into_iter()
         .take_while(|&v| *v != 0u8)
-        .map(|v| *v)
+        .cloned()
         .collect::<Vec<_>>();
     String::from_utf8(hostname).expect("Hostname is not legal UTF-8")
 }

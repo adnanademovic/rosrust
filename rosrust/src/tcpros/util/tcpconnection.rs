@@ -5,11 +5,11 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 pub fn iterate(listener: TcpListener, tag: String) -> (Raii, TcpConnectionIterator) {
     let (tx, rx) = channel();
     let killer = Raii { killer: tx.clone() };
-    thread::spawn(move || listener_thread(listener, tag, tx));
+    thread::spawn(move || listener_thread(&listener, &tag, &tx));
     (killer, TcpConnectionIterator { listener: rx })
 }
 
-fn listener_thread(connections: TcpListener, tag: String, out: Sender<Option<TcpStream>>) {
+fn listener_thread(connections: &TcpListener, tag: &str, out: &Sender<Option<TcpStream>>) {
     for stream in connections.incoming() {
         match stream {
             Ok(stream) => {

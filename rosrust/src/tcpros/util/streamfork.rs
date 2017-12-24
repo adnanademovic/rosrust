@@ -5,11 +5,11 @@ use std::thread;
 pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
     let (streams_sender, streams) = channel();
     let (data_sender, data) = channel();
-    thread::spawn(move || fork_thread::<T>(streams, data));
+    thread::spawn(move || fork_thread::<T>(&streams, data));
     (TargetList(streams_sender), DataStream(data_sender))
 }
 
-fn fork_thread<T: Write + Send + 'static>(streams: Receiver<T>, data: Receiver<Vec<u8>>) {
+fn fork_thread<T: Write + Send + 'static>(streams: &Receiver<T>, data: Receiver<Vec<u8>>) {
     let mut targets = Vec::new();
     for buffer in data {
         while let Ok(target) = streams.try_recv() {

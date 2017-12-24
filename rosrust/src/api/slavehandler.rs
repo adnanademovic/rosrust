@@ -52,9 +52,9 @@ impl SlaveHandler {
 
         server.register_value("shutdown", "Shutdown", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next().ok_or(ResponseError::Client(
-                "Missing argument 'caller_id'".into(),
-            ))?;
+            let _caller_id = args.next().ok_or_else(|| {
+                ResponseError::Client("Missing argument 'caller_id'".into())
+            })?;
             let message = match args.next() {
                 Some(Value::String(message)) => message,
                 _ => return Err(ResponseError::Client("Missing argument 'message'".into())),
@@ -72,14 +72,14 @@ impl SlaveHandler {
         server.register_value("getPid", "PID", |_args| Ok(Value::Int(getpid().into())));
 
         let subscriptions = Arc::new(Mutex::new(HashMap::<String, Subscriber>::new()));
-        let subs = subscriptions.clone();
+        let subs = Arc::clone(&subscriptions);
 
         server.register_value("getSubscriptions", "List of subscriptions", move |_args| {
             Ok(Value::Array(
                 subs.lock()
                     .expect(FAILED_TO_LOCK)
                     .values()
-                    .map(|ref v| {
+                    .map(|v| {
                         Value::Array(vec![
                             Value::String(v.topic.clone()),
                             Value::String(v.msg_type.clone()),
@@ -90,14 +90,14 @@ impl SlaveHandler {
         });
 
         let publications = Arc::new(Mutex::new(HashMap::<String, Publisher>::new()));
-        let pubs = publications.clone();
+        let pubs = Arc::clone(&publications);
 
         server.register_value("getPublications", "List of publications", move |_args| {
             Ok(Value::Array(
                 pubs.lock()
                     .expect(FAILED_TO_LOCK)
                     .values()
-                    .map(|ref v| {
+                    .map(|v| {
                         Value::Array(vec![
                             Value::String(v.topic.clone()),
                             Value::String(v.msg_type.clone()),
@@ -113,13 +113,13 @@ impl SlaveHandler {
         });
 
         let name_string = String::from(name);
-        let subs = subscriptions.clone();
+        let subs = Arc::clone(&subscriptions);
 
         server.register_value("publisherUpdate", "Publishers updated", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next().ok_or(ResponseError::Client(
-                "Missing argument 'caller_id'".into(),
-            ))?;
+            let _caller_id = args.next().ok_or_else(|| {
+                ResponseError::Client("Missing argument 'caller_id'".into())
+            })?;
             let topic = match args.next() {
                 Some(Value::String(topic)) => topic,
                 _ => return Err(ResponseError::Client("Missing argument 'topic'".into())),
@@ -154,13 +154,13 @@ impl SlaveHandler {
         });
 
         let hostname_string = String::from(hostname);
-        let pubs = publications.clone();
+        let pubs = Arc::clone(&publications);
 
         server.register_value("requestTopic", "Chosen protocol", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next().ok_or(ResponseError::Client(
-                "Missing argument 'caller_id'".into(),
-            ))?;
+            let _caller_id = args.next().ok_or_else(|| {
+                ResponseError::Client("Missing argument 'caller_id'".into())
+            })?;
             let topic = match args.next() {
                 Some(Value::String(topic)) => topic,
                 _ => return Err(ResponseError::Client("Missing argument 'topic'".into())),
@@ -176,7 +176,7 @@ impl SlaveHandler {
                 None => return Err(ResponseError::Client("Missing argument 'protocols'".into())),
             };
             let (ip, port) = match pubs.lock().expect(FAILED_TO_LOCK).get(&topic) {
-                Some(publisher) => (hostname_string.clone(), publisher.port as i32),
+                Some(publisher) => (hostname_string.clone(), i32::from(publisher.port)),
                 None => {
                     return Err(ResponseError::Client(
                         "Requested topic not published by node".into(),
@@ -228,7 +228,7 @@ where
 {
     if let Some(mut subscription) = subscriptions.get_mut(topic) {
         for publisher in publishers {
-            if let Err(err) = connect_to_publisher(&mut subscription, &name, &publisher, &topic) {
+            if let Err(err) = connect_to_publisher(&mut subscription, name, &publisher, topic) {
                 let info = err.iter()
                     .map(|v| format!("{}", v))
                     .collect::<Vec<_>>()

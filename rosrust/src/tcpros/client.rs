@@ -1,6 +1,7 @@
 use byteorder::ReadBytesExt;
 use std::net::TcpStream;
 use std::thread;
+use std::sync::Arc;
 use std::collections::HashMap;
 use std;
 use serde_rosmsg::{from_reader, to_writer};
@@ -14,9 +15,9 @@ pub struct ClientResponse<T> {
 
 impl<T> ClientResponse<T> {
     pub fn read(self) -> Result<ServiceResult<T>> {
-        self.handle.join().unwrap_or(Err(
-            ErrorKind::ServiceResponseUnknown.into(),
-        ))
+        self.handle.join().unwrap_or_else(|_| {
+            Err(ErrorKind::ServiceResponseUnknown.into())
+        })
     }
 }
 
@@ -62,7 +63,7 @@ impl<T: ServicePair> Client<T> {
     }
 
     pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
-        let info = self.info.clone();
+        let info = Arc::clone(&self.info);
         ClientResponse {
             handle: thread::spawn(move || {
                 Self::request_body(&args, &info.uri, &info.caller_id, &info.service)

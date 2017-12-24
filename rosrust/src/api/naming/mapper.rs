@@ -22,7 +22,7 @@ impl Mapper {
             Some((key, child_keys)) => {
                 self.children
                     .entry(key.clone())
-                    .or_insert(Mapper::new())
+                    .or_insert_with(Mapper::new)
                     .add(child_keys, value);
             }
         }

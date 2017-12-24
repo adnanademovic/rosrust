@@ -30,9 +30,9 @@ impl Slave {
 
         let (shutdown_tx, shutdown_rx) = futures_channel(1);
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
-        let pubs = handler.publications.clone();
-        let subs = handler.subscriptions.clone();
-        let services = handler.services.clone();
+        let pubs = Arc::clone(&handler.publications);
+        let subs = Arc::clone(&handler.subscriptions);
+        let services = Arc::clone(&handler.services);
         let (port_tx, port_rx) = channel();
         let socket_addr = match (hostname, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
@@ -70,8 +70,9 @@ impl Slave {
         })
     }
 
+    #[inline]
     pub fn uri(&self) -> &str {
-        return &self.uri;
+        &self.uri
     }
 
     pub fn add_publishers_to_subscription<T>(&self, topic: &str, publishers: T) -> SerdeResult<()>
