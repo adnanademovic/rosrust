@@ -119,7 +119,9 @@ impl Msg {
         output.push(
             "        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into(),
         );
-        output.push("        #[derive(Serialize,Deserialize,Debug)]".into());
+        output.push(
+            "        #[derive(Serialize,Deserialize,Debug,Default)]".into(),
+        );
         output.push(format!("        pub struct {} {{", self.name));
         for field in &self.fields {
             if let Some(s) = field.to_string() {

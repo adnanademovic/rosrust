@@ -47,8 +47,8 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<String>
             output.push(create_function("msg_type", &message.get_type()));
             output.push("        }".into());
             output.push(format!("        impl {} {{", message.name));
-            output.push(message.new_string());
             output.push(message.const_string());
+            output.push("            fn new() -> Self { Self::default() }".into());
             output.push("        }".into());
         }
         let names = message_map
@@ -123,7 +123,8 @@ mod tests {
 
     #[test]
     fn depend_on_messages_printout() {
-        let data = depend_on_messages(&[FILEPATH], &["rosgraph_msgs/Log"]).unwrap();
+        let data = depend_on_messages(&[FILEPATH], &["rosgraph_msgs/Clock", "rosgraph_msgs/Log"])
+            .unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
