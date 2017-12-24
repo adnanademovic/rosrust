@@ -53,11 +53,6 @@ pub fn depend_on_messages(
             output.push("        }".into());
             output.push(format!("        impl {} {{", message.name));
             output.push(message.const_string(crate_prefix));
-            output.push("            #[allow(dead_code)]".into());
-            output.push("            #[inline]".into());
-            output.push(
-                "            pub fn new() -> Self { Self::default() }".into(),
-            );
             output.push("        }".into());
         }
         let names = message_map

@@ -17,7 +17,7 @@ fn main() {
 
     let mut rate = ros.rate(10.0);
     while ros.is_ok() {
-        let mut msg = msg::std_msgs::String::new();
+        let mut msg = msg::std_msgs::String::default();
         msg.data = format!("hello world {}", count);
 
         chatter_pub.send(msg).unwrap();

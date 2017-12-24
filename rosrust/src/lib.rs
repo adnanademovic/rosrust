@@ -6,6 +6,9 @@ extern crate crypto;
 extern crate error_chain;
 extern crate futures;
 extern crate itertools;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate nix;
