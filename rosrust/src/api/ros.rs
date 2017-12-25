@@ -150,9 +150,9 @@ impl Ros {
         }
     }
 
-    pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
+    pub fn param(&self, name: &str) -> Option<Parameter> {
         self.resolver.translate(name).ok().map(|v| Parameter {
-            master: &self.master,
+            master: Arc::clone(&self.master),
             name: v,
         })
     }
@@ -247,20 +247,27 @@ impl Ros {
         )
     }
 
-    pub fn log(&mut self, level: i8, msg: &str, file: &str, line: u32) {
+    pub fn log(&mut self, level: i8, msg: String, file: &str, line: u32) {
         let logger = &mut match self.logger {
             Some(ref mut v) => v,
             None => return,
         };
+        let topics = self.slave
+            .publications
+            .lock()
+            .expect("Failed to acquire lock on mutex")
+            .keys()
+            .cloned()
+            .collect();
         let message = Log {
             header: Header::default(),
             level,
-            msg: msg.into(),
+            msg,
             name: self.name.clone(),
             line,
             file: file.into(),
             function: String::default(),
-            topics: vec![],
+            topics,
         };
         if let Err(err) = logger.send(message) {
             error!("Logging error: {}", err);
@@ -268,12 +275,12 @@ impl Ros {
     }
 }
 
-pub struct Parameter<'a> {
-    master: &'a Master,
+pub struct Parameter {
+    master: Arc<Master>,
     name: String,
 }
 
-impl<'a> Parameter<'a> {
+impl Parameter {
     pub fn name(&self) -> &str {
         &self.name
     }

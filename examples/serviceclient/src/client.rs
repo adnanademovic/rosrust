@@ -1,9 +1,9 @@
 extern crate env_logger;
+#[macro_use]
 extern crate rosrust;
 #[macro_use]
 extern crate rosrust_codegen;
 
-use rosrust::Ros;
 use std::{env, time};
 
 rosmsg_include!();
@@ -14,23 +14,24 @@ fn main() {
     let args: Vec<_> = env::args().collect();
 
     if args.len() != 3 {
-        println!("usage: client X Y");
+        eprintln!("usage: client X Y");
         return;
     }
 
     let a = args[1].parse::<i64>().unwrap();
     let b = args[2].parse::<i64>().unwrap();
 
-    let ros = Ros::new("add_two_ints_client").unwrap();
+    // Initialize node
+    rosrust::init("add_two_ints_client");
 
-    ros.wait_for_service("add_two_ints", Some(time::Duration::from_secs(10)))
-        .unwrap();
+    // Wait ten seconds for the service to appear
+    rosrust::wait_for_service("add_two_ints", Some(time::Duration::from_secs(10))).unwrap();
 
-    let client = ros.client::<msg::roscpp_tutorials::TwoInts>("add_two_ints")
-        .unwrap();
+    // Create client for the service
+    let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
 
-    // Sync approach
-    println!(
+    // Synchronous call that blocks the thread until a response is received
+    ros_info!(
         "{} + {} = {}",
         a,
         b,
@@ -41,7 +42,7 @@ fn main() {
             .sum
     );
 
-    // Async approach
+    // Asynchronous call that can be resolved later on
     let retval = client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b });
-    println!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
+    ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
 }

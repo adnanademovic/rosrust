@@ -4,26 +4,21 @@ extern crate rosrust;
 #[macro_use]
 extern crate rosrust_codegen;
 
-use rosrust::Ros;
-use std::sync::{Arc, Mutex};
-
 rosmsg_include!();
 
 fn main() {
     env_logger::init().unwrap();
 
-    let ros = Arc::new(Mutex::new(Ros::new("listener").unwrap()));
-    let ros_thread = Arc::clone(&ros);
+    // Initialize node
+    rosrust::init("listener");
 
+    // Create subscriber
     // The subscriber is stopped when the returned object is destroyed
-    let _subscriber_raii = ros.lock()
-        .unwrap()
-        .subscribe("chatter", move |v: msg::std_msgs::String| {
-            let mut ros = ros_thread.lock().unwrap();
-            println!("{}", v.data);
-            ros_info!(ros, v.data);
-        })
-        .unwrap();
+    let _subscriber_raii = rosrust::subscribe("chatter", |v: msg::std_msgs::String| {
+        // Callback for handling received messages
+        ros_info!("Received: {}", v.data);
+    }).unwrap();
 
-    let spin = { ros.lock().unwrap().spin() };
+    // Block the thread until a shutdown signal is received
+    rosrust::spin();
 }

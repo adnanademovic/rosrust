@@ -10,9 +10,9 @@ use tcpros::{Message, Publisher, PublisherStream, Service, ServicePair, ServiceR
 pub struct Slave {
     name: String,
     uri: String,
-    publications: Arc<Mutex<HashMap<String, Publisher>>>,
-    subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
-    services: Arc<Mutex<HashMap<String, Service>>>,
+    pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
+    pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
+    pub services: Arc<Mutex<HashMap<String, Service>>>,
 }
 
 type SerdeResult<T> = Result<T>;
