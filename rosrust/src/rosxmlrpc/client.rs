@@ -1,27 +1,20 @@
-use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use xml_rpc::{self, Params, Value};
 use super::{Response, ResponseError, ERROR_CODE, FAILURE_CODE, SUCCESS_CODE};
 
 pub struct Client {
-    client: Mutex<xml_rpc::Client>,
     master_uri: String,
 }
 
 impl Client {
     pub fn new(master_uri: &str) -> Result<Client, xml_rpc::error::Error> {
         Ok(Client {
-            client: Mutex::new(xml_rpc::Client::new()?),
             master_uri: master_uri.to_owned(),
         })
     }
 
     pub fn request_tree_with_tree(&self, name: &str, params: Params) -> Response<Value> {
-        let mut client = self.client.lock().map_err(|err| {
-            ResponseError::Client(format!("Failed to acquire lock on socket: {}", err))
-        })?;
-        let mut response = client
-            .call_value(&self.master_uri.parse().unwrap(), name, params)
+        let mut response = xml_rpc::call_value(&self.master_uri.parse().unwrap(), name, params)
             .map_err(|err| {
                 ResponseError::Client(format!("Failed to perform call to server: {}", err))
             })?

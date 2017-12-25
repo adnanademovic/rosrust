@@ -1,4 +1,5 @@
 extern crate env_logger;
+#[macro_use]
 extern crate rosrust;
 #[macro_use]
 extern crate rosrust_codegen;
@@ -20,7 +21,9 @@ fn main() {
         let mut msg = msg::std_msgs::String::default();
         msg.data = format!("hello world {}", count);
 
-        chatter_pub.send(&msg).unwrap();
+        ros_info!(ros, msg.data);
+
+        chatter_pub.send(msg).unwrap();
 
         rate.sleep();
 

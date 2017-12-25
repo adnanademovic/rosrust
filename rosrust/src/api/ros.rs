@@ -1,4 +1,5 @@
-use msg::rosgraph_msgs::Clock as ClockMsg;
+use msg::rosgraph_msgs::{Clock as ClockMsg, Log};
+use msg::std_msgs::Header;
 use time::{Duration, Time};
 use serde::{Deserialize, Serialize};
 use std::sync::{mpsc, Arc};
@@ -23,7 +24,8 @@ pub struct Ros {
     name: String,
     clock: Arc<Clock>,
     static_subs: Vec<Subscriber>,
-    shutdown_rx: mpsc::Receiver<()>,
+    logger: Option<Publisher<Log>>,
+    shutdown_rx: Option<mpsc::Receiver<()>>,
 }
 
 impl Ros {
@@ -59,6 +61,8 @@ impl Ros {
             ros.clock = ros_clock;
         }
 
+        ros.logger = Some(ros.publish("/rosout")?);
+
         Ok(ros)
     }
 
@@ -87,7 +91,8 @@ impl Ros {
             name: name,
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
-            shutdown_rx,
+            logger: None,
+            shutdown_rx: Some(shutdown_rx),
         })
     }
 
@@ -131,12 +136,18 @@ impl Ros {
 
     #[inline]
     pub fn is_ok(&self) -> bool {
-        self.shutdown_rx.try_recv() == Err(mpsc::TryRecvError::Empty)
+        if let Some(ref rx) = self.shutdown_rx {
+            rx.try_recv() == Err(mpsc::TryRecvError::Empty)
+        } else {
+            return false;
+        }
     }
 
     #[inline]
-    pub fn spin(&self) {
-        self.shutdown_rx.recv().is_ok();
+    pub fn spin(&mut self) -> Spinner {
+        Spinner {
+            shutdown_rx: self.shutdown_rx.take(),
+        }
     }
 
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
@@ -230,9 +241,30 @@ impl Ros {
         Publisher::new(
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
+            Arc::clone(&self.clock),
             &self.hostname,
             &name,
         )
+    }
+
+    pub fn log(&mut self, level: i8, msg: &str, file: &str, line: u32) {
+        let logger = &mut match self.logger {
+            Some(ref mut v) => v,
+            None => return,
+        };
+        let message = Log {
+            header: Header::default(),
+            level,
+            msg: msg.into(),
+            name: self.name.clone(),
+            line,
+            file: file.into(),
+            function: String::default(),
+            topics: vec![],
+        };
+        if let Err(err) = logger.send(message) {
+            error!("Logging error: {}", err);
+        }
     }
 }
 
@@ -301,4 +333,16 @@ fn yaml_to_string(val: Yaml) -> Result<String> {
         Yaml::Boolean(false) => "false".into(),
         _ => bail!("Hash keys need to be strings"),
     })
+}
+
+pub struct Spinner {
+    shutdown_rx: Option<mpsc::Receiver<()>>,
+}
+
+impl Drop for Spinner {
+    fn drop(&mut self) {
+        if let Some(ref rx) = self.shutdown_rx {
+            rx.recv().is_ok();
+        }
+    }
 }

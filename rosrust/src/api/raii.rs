@@ -1,12 +1,16 @@
 use super::error::Result;
 use super::master::Master;
 use super::slave::Slave;
+use super::clock::Clock;
 use rosxmlrpc::Response;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
 
 #[derive(Clone)]
 pub struct Publisher<T: Message> {
+    clock: Arc<Clock>,
+    seq: Arc<AtomicUsize>,
     stream: PublisherStream<T>,
     _raii: Arc<InteractorRaii<PublisherInfo>>,
 }
@@ -15,6 +19,7 @@ impl<T: Message> Publisher<T> {
     pub(crate) fn new(
         master: Arc<Master>,
         slave: Arc<Slave>,
+        clock: Arc<Clock>,
         hostname: &str,
         name: &str,
     ) -> Result<Self> {
@@ -28,6 +33,8 @@ impl<T: Message> Publisher<T> {
         match info.master.register_publisher(name, &T::msg_type()) {
             Ok(_) => Ok(Self {
                 stream,
+                clock,
+                seq: Arc::new(AtomicUsize::new(0)),
                 _raii: Arc::new(InteractorRaii::new(info)),
             }),
             Err(error) => {
@@ -42,8 +49,9 @@ impl<T: Message> Publisher<T> {
     }
 
     #[inline]
-    pub fn send(&mut self, message: &T) -> Result<()> {
-        self.stream.send(message).map_err(|v| v.into())
+    pub fn send(&mut self, mut message: T) -> Result<()> {
+        message.set_header(&self.clock, &self.seq);
+        self.stream.send(&message).map_err(|v| v.into())
     }
 }
 

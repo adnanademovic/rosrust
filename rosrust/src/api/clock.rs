@@ -29,7 +29,7 @@ impl Rate {
     }
 }
 
-pub trait Clock {
+pub trait Clock: Send + Sync {
     fn now(&self) -> Time;
     fn sleep(&self, d: Duration);
     fn wait_until(&self, t: Time);

@@ -1,12 +1,13 @@
 pub use self::ros::Ros;
-pub use self::clock::Rate;
+pub use self::clock::{Clock, Rate};
 
 mod clock;
 pub mod error;
+pub mod logger;
 mod master;
-mod slave;
-mod ros;
-mod slavehandler;
-mod naming;
 mod raii;
 mod resolve;
+mod ros;
+mod slave;
+mod slavehandler;
+mod naming;
