@@ -82,7 +82,9 @@ fn append_share_folder(path: &str) -> Option<String> {
 }
 
 fn append_src_folder(path: &str) -> Option<String> {
-    Path::new(path).join("..").join("src").to_str().map(|v| {
-        v.to_owned()
-    })
+    Path::new(path)
+        .join("..")
+        .join("src")
+        .to_str()
+        .map(|v| v.to_owned())
 }

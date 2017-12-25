@@ -40,7 +40,9 @@ impl<'a> Path for Slice<'a> {
     }
 
     fn take(self) -> Buffer {
-        Buffer { chain: Vec::from(self.chain) }
+        Buffer {
+            chain: Vec::from(self.chain),
+        }
     }
 }
 
@@ -230,8 +232,7 @@ mod tests {
             )
         );
         assert!(
-            "/"
-                .parse::<Buffer>()
+            "/".parse::<Buffer>()
                 .expect(FAILED_TO_HANDLE)
                 .parent()
                 .is_err()

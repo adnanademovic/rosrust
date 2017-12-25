@@ -6,7 +6,7 @@ use serde_rosmsg::to_vec;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header;
 use super::Message;
-use super::util::streamfork::{fork, TargetList, DataStream};
+use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
 
 pub struct Publisher {
@@ -56,9 +56,8 @@ where
 {
     // This listener stream never breaks by itself since it's a TcpListener
     for mut stream in listener {
-        let result = exchange_headers::<T, _>(&mut stream, topic).chain_err(|| {
-            ErrorKind::TopicConnectionFail(topic.into())
-        });
+        let result = exchange_headers::<T, _>(&mut stream, topic)
+            .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
             let info = err.iter()
                 .map(|v| format!("{}", v))
@@ -106,9 +105,7 @@ impl Publisher {
     {
         let (targets, data) = fork();
         let topic_name = String::from(topic);
-        thread::spawn(move || {
-            listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets)
-        });
+        thread::spawn(move || listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets));
         Publisher {
             subscriptions: data,
             port: port,

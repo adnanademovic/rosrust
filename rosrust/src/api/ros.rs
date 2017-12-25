@@ -1,7 +1,7 @@
 use msg::rosgraph_msgs::Clock as ClockMsg;
 use time::{Duration, Time};
-use serde::{Serialize, Deserialize};
-use std::sync::{Arc, mpsc};
+use serde::{Deserialize, Serialize};
+use std::sync::{mpsc, Arc};
 use std::time;
 use super::clock::{Clock, Rate, RealClock, SimulatedClock};
 use super::master::{self, Master, Topic};
@@ -9,7 +9,7 @@ use super::slave::Slave;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::super::rosxmlrpc::Response;
 use super::naming::{self, Resolver};
-use super::raii::{Publisher, Subscriber, Service};
+use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
 use xml_rpc;
@@ -42,9 +42,8 @@ impl Ros {
                 .into_iter()
                 .next()
                 .ok_or_else(|| format!("Failed to load YAML: {}", dest))?;
-            let param = ros.param(&src).ok_or_else(
-                || format!("Failed to resolve name: {}", src),
-            )?;
+            let param = ros.param(&src)
+                .ok_or_else(|| format!("Failed to resolve name: {}", src))?;
             param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
 
@@ -141,11 +140,9 @@ impl Ros {
     }
 
     pub fn param<'a, 'b>(&'a self, name: &'b str) -> Option<Parameter<'a>> {
-        self.resolver.translate(name).ok().map(|v| {
-            Parameter {
-                master: &self.master,
-                name: v,
-            }
+        self.resolver.translate(name).ok().map(|v| Parameter {
+            master: &self.master,
+            name: v,
         })
     }
 
@@ -158,9 +155,9 @@ impl Ros {
     }
 
     pub fn topics(&self) -> Response<Vec<Topic>> {
-        self.master.get_topic_types().map(|v| {
-            v.into_iter().map(Into::into).collect()
-        })
+        self.master
+            .get_topic_types()
+            .map(|v| v.into_iter().map(Into::into).collect())
     }
 
     pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>> {
@@ -284,9 +281,9 @@ fn yaml_to_xmlrpc(val: Yaml) -> Result<xml_rpc::Value> {
         Yaml::Integer(v) => xml_rpc::Value::Int(v as i32),
         Yaml::String(v) => xml_rpc::Value::String(v),
         Yaml::Boolean(v) => xml_rpc::Value::Bool(v),
-        Yaml::Array(v) => xml_rpc::Value::Array(
-            v.into_iter().map(yaml_to_xmlrpc).collect::<Result<_>>()?,
-        ),
+        Yaml::Array(v) => {
+            xml_rpc::Value::Array(v.into_iter().map(yaml_to_xmlrpc).collect::<Result<_>>()?)
+        }
         Yaml::Hash(v) => xml_rpc::Value::Struct(v.into_iter()
             .map(|(k, v)| Ok((yaml_to_string(k)?, yaml_to_xmlrpc(v)?)))
             .collect::<Result<_>>()?),

@@ -55,18 +55,14 @@ pub fn params() -> Vec<(String, String)> {
         .skip(1)
         .filter(|v| v.starts_with('_'))
         .filter(|v| !v.starts_with("__"))
-        .map(|v| {
-            v.splitn(2, ":=").map(String::from).collect::<Vec<String>>()
-        })
+        .map(|v| v.splitn(2, ":=").map(String::from).collect::<Vec<String>>())
         .filter(|v| v.len() == 2)
         .map(|v| v.into_iter())
         .map(|mut v| {
             (
-                v.next().expect(UNEXPECTED_EMPTY_ARRAY).replacen(
-                    '_',
-                    "~",
-                    1,
-                ),
+                v.next()
+                    .expect(UNEXPECTED_EMPTY_ARRAY)
+                    .replacen('_', "~", 1),
                 v.next().expect(UNEXPECTED_EMPTY_ARRAY),
             )
         })
@@ -74,18 +70,18 @@ pub fn params() -> Vec<(String, String)> {
 }
 
 fn find_with_prefix(prefix: &str) -> Option<String> {
-    args().skip(1).find(|v| v.starts_with(prefix)).map(|v| {
-        String::from(v.trim_left_matches(prefix))
-    })
+    args()
+        .skip(1)
+        .find(|v| v.starts_with(prefix))
+        .map(|v| String::from(v.trim_left_matches(prefix)))
 }
 
 #[cfg(not(test))]
 fn system_hostname() -> String {
     use nix::unistd::gethostname;
     let mut hostname = [0u8; 256];
-    gethostname(&mut hostname).expect(
-        "Hostname is either unavailable or too long to fit into buffer",
-    );
+    gethostname(&mut hostname)
+        .expect("Hostname is either unavailable or too long to fit into buffer");
     let hostname = hostname
         .into_iter()
         .take_while(|&v| *v != 0u8)
@@ -318,7 +314,6 @@ mod tests {
         set_args(&vec!["__master:=http://somebody2:21212/"]);
         assert_eq!(String::from("http://somebody2:21212/"), master());
     }
-
 
     #[test]
     #[allow(unused_variables)]

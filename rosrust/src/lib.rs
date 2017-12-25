@@ -21,7 +21,7 @@ extern crate xml_rpc;
 extern crate yaml_rust;
 
 pub use api::Ros;
-pub use tcpros::{Client, PublisherStream, Message, ServicePair as Service};
+pub use tcpros::{Client, Message, PublisherStream, ServicePair as Service};
 pub use api::error;
 pub use time::{Duration, Time};
 

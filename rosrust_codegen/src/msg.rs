@@ -72,9 +72,7 @@ impl Msg {
         let mut output = Vec::<String>::new();
         for field in &self.fields {
             if let Some(s) = field.to_const_string(crate_prefix) {
-                output.push(
-                    "            #[allow(dead_code,non_upper_case_globals)]".into(),
-                );
+                output.push("            #[allow(dead_code,non_upper_case_globals)]".into());
                 output.push(format!("            pub const {}", s));
             }
         }
@@ -83,12 +81,8 @@ impl Msg {
 
     pub fn struct_string(&self, crate_prefix: &str) -> String {
         let mut output = Vec::<String>::new();
-        output.push(
-            "        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into(),
-        );
-        output.push(
-            "        #[derive(Serialize,Deserialize,Debug,Default)]".into(),
-        );
+        output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
+        output.push("        #[derive(Serialize,Deserialize,Debug,Default)]".into());
         output.push(format!("        pub struct {} {{", self.name));
         for field in &self.fields {
             if let Some(s) = field.to_string(crate_prefix) {
@@ -248,17 +242,15 @@ fn match_line(data: &str) -> Option<Result<FieldInfo>> {
 
 #[inline]
 fn strip_useless(data: &str) -> Result<&str> {
-    Ok(
-        data.splitn(2, '#')
-            .next()
-            .ok_or_else(|| {
-                format!(
-                    "Somehow splitting a line resulted in 0 parts?! Happened here: {}",
-                    data
-                )
-            })?
-            .trim(),
-    )
+    Ok(data.splitn(2, '#')
+        .next()
+        .ok_or_else(|| {
+            format!(
+                "Somehow splitting a line resulted in 0 parts?! Happened here: {}",
+                data
+            )
+        })?
+        .trim())
 }
 
 #[inline]
@@ -306,8 +298,7 @@ impl FieldInfo {
         let datatype = self.datatype.md5_string(package, hashes)?;
         Ok(match (self.datatype.is_builtin(), &self.case) {
             (_, &FieldCase::Const(ref v)) => format!("{} {}={}", datatype, self.name, v),
-            (false, _) |
-            (_, &FieldCase::Unit) => format!("{} {}", datatype, self.name),
+            (false, _) | (_, &FieldCase::Unit) => format!("{} {}", datatype, self.name),
             (true, &FieldCase::Vector) => format!("{}[] {}", datatype, self.name),
             (true, &FieldCase::Array(l)) => format!("{}[{}] {}", datatype, l, self.name),
         })
@@ -331,10 +322,10 @@ impl FieldInfo {
         Some(match self.datatype {
             DataType::Bool => format!("{}: bool = {:?};", self.name, value != "0"),
             DataType::String => format!("{}: &'static str = {:?};", self.name, value),
-            DataType::Time |
-            DataType::Duration |
-            DataType::LocalStruct(..) |
-            DataType::RemoteStruct(..) => return None,
+            DataType::Time
+            | DataType::Duration
+            | DataType::LocalStruct(..)
+            | DataType::RemoteStruct(..) => return None,
             _ => {
                 let datatype = self.datatype.rust_type(crate_prefix);
                 format!("{}: {} = {} as {};", self.name, datatype, value, datatype)
@@ -344,9 +335,8 @@ impl FieldInfo {
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
-            datatype: parse_datatype(datatype).ok_or_else(|| {
-                format!("Unsupported datatype: {}", datatype)
-            })?,
+            datatype: parse_datatype(datatype)
+                .ok_or_else(|| format!("Unsupported datatype: {}", datatype))?,
             name: name.to_owned(),
             case: case,
         })
@@ -397,11 +387,21 @@ impl DataType {
 
     fn is_builtin(&self) -> bool {
         match *self {
-            DataType::Bool | DataType::I8(_) | DataType::I16 | DataType::I32 | DataType::I64 |
-            DataType::U8(_) | DataType::U16 | DataType::U32 | DataType::U64 | DataType::F32 |
-            DataType::F64 | DataType::String | DataType::Time | DataType::Duration => true,
-            DataType::LocalStruct(_) |
-            DataType::RemoteStruct(_, _) => false,
+            DataType::Bool
+            | DataType::I8(_)
+            | DataType::I16
+            | DataType::I32
+            | DataType::I64
+            | DataType::U8(_)
+            | DataType::U16
+            | DataType::U32
+            | DataType::U64
+            | DataType::F32
+            | DataType::F64
+            | DataType::String
+            | DataType::Time
+            | DataType::Duration => true,
+            DataType::LocalStruct(_) | DataType::RemoteStruct(_, _) => false,
         }
     }
 
@@ -410,35 +410,31 @@ impl DataType {
         package: &str,
         hashes: &HashMap<(String, String), String>,
     ) -> ::std::result::Result<String, ()> {
-        Ok(
-            match *self {
-                DataType::Bool => "bool",
-                DataType::I8(true) => "int8",
-                DataType::I8(false) => "byte",
-                DataType::I16 => "int16",
-                DataType::I32 => "int32",
-                DataType::I64 => "int64",
-                DataType::U8(true) => "uint8",
-                DataType::U8(false) => "char",
-                DataType::U16 => "uint16",
-                DataType::U32 => "uint32",
-                DataType::U64 => "uint64",
-                DataType::F32 => "float32",
-                DataType::F64 => "float64",
-                DataType::String => "string",
-                DataType::Time => "time",
-                DataType::Duration => "duration",
-                DataType::LocalStruct(ref name) => {
-                    hashes
-                        .get(&(package.to_owned(), name.clone()))
-                        .ok_or(())?
-                        .as_str()
-                }
-                DataType::RemoteStruct(ref pkg, ref name) => {
-                    hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
-                }
-            }.into(),
-        )
+        Ok(match *self {
+            DataType::Bool => "bool",
+            DataType::I8(true) => "int8",
+            DataType::I8(false) => "byte",
+            DataType::I16 => "int16",
+            DataType::I32 => "int32",
+            DataType::I64 => "int64",
+            DataType::U8(true) => "uint8",
+            DataType::U8(false) => "char",
+            DataType::U16 => "uint16",
+            DataType::U32 => "uint32",
+            DataType::U64 => "uint64",
+            DataType::F32 => "float32",
+            DataType::F64 => "float64",
+            DataType::String => "string",
+            DataType::Time => "time",
+            DataType::Duration => "duration",
+            DataType::LocalStruct(ref name) => hashes
+                .get(&(package.to_owned(), name.clone()))
+                .ok_or(())?
+                .as_str(),
+            DataType::RemoteStruct(ref pkg, ref name) => {
+                hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
+            }
+        }.into())
     }
 }
 
@@ -702,9 +698,8 @@ mod tests {
                 name: "myname".into(),
                 case: FieldCase::Unit,
             },
-            match_line(
-                "  geom_msgs/Twist   myname    # this clearly should succeed",
-            ).unwrap()
+            match_line("  geom_msgs/Twist   myname    # this clearly should succeed",)
+                .unwrap()
                 .unwrap()
         );
 
@@ -755,7 +750,7 @@ mod tests {
     fn match_lines_parses_real_messages() {
         let data = match_lines(include_str!(
             "msg_examples/geometry_msgs/msg/TwistWithCovariance.\
-                                             msg"
+             msg"
         )).unwrap();
         assert_eq!(
             vec![
@@ -823,9 +818,7 @@ mod tests {
         );
         let dependencies = get_dependency_set(&data);
         assert_eq!(dependencies.len(), 1);
-        assert!(dependencies.contains(
-            &("geometry_msgs".into(), "Twist".into()),
-        ));
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Twist".into()),));
 
         let data = Msg::new(
             "geometry_msgs",
@@ -851,9 +844,7 @@ mod tests {
         );
         let dependencies = get_dependency_set(&data);
         assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(
-            &("geometry_msgs".into(), "Pose".into()),
-        ));
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Pose".into()),));
         assert!(dependencies.contains(&("std_msgs".into(), "Header".into())));
 
         let data = Msg::new(
@@ -905,12 +896,8 @@ mod tests {
         );
         let dependencies = get_dependency_set(&data);
         assert_eq!(dependencies.len(), 3);
-        assert!(dependencies.contains(
-            &("geometry_msgs".into(), "Vector3".into()),
-        ));
-        assert!(dependencies.contains(
-            &("geometry_msgs".into(), "Quaternion".into()),
-        ));
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Vector3".into()),));
+        assert!(dependencies.contains(&("geometry_msgs".into(), "Quaternion".into()),));
         assert!(dependencies.contains(&("std_msgs".into(), "Header".into())));
     }
 }

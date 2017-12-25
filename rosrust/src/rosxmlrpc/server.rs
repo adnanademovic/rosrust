@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use xml_rpc;
 
-use super::{ERROR_CODE, FAILURE_CODE, SUCCESS_CODE, Response, ResponseError};
+use super::{Response, ResponseError, ERROR_CODE, FAILURE_CODE, SUCCESS_CODE};
 
 pub struct Server {
     server: xml_rpc::Server,
@@ -21,9 +21,8 @@ impl Server {
         K: Into<String>,
         T: Fn(xml_rpc::Params) -> Response<xml_rpc::Value> + Send + Sync + 'static,
     {
-        self.server.register_value(name, move |args| {
-            Ok(response_to_params(msg, handler(args)))
-        })
+        self.server
+            .register_value(name, move |args| Ok(response_to_params(msg, handler(args))))
     }
 
     pub fn bind(self, uri: &SocketAddr) -> xml_rpc::error::Result<xml_rpc::server::BoundServer> {

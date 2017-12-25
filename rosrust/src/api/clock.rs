@@ -41,9 +41,9 @@ pub struct RealClock {}
 impl Clock for RealClock {
     #[inline]
     fn now(&self) -> Time {
-        let time = SystemTime::now().duration_since(UNIX_EPOCH).expect(
-            BEFORE_EPOCH,
-        );
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect(BEFORE_EPOCH);
         Time {
             sec: time.as_secs() as i32,
             nsec: time.subsec_nanos() as i32,
@@ -77,9 +77,9 @@ impl cmp::PartialEq for Timeout {
 
 impl cmp::PartialOrd for Timeout {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.timestamp.partial_cmp(&other.timestamp).map(
-            cmp::Ordering::reverse,
-        )
+        self.timestamp
+            .partial_cmp(&other.timestamp)
+            .map(cmp::Ordering::reverse)
     }
 }
 
@@ -130,9 +130,7 @@ impl Clock for SimulatedClock {
         if d.sec < 0 || d.nsec < 0 {
             return;
         }
-        let current = {
-            self.data.lock().expect(FAILED_TO_LOCK).current.clone()
-        };
+        let current = { self.data.lock().expect(FAILED_TO_LOCK).current.clone() };
         self.wait_until(current + d);
     }
 
@@ -140,12 +138,11 @@ impl Clock for SimulatedClock {
     fn wait_until(&self, timestamp: Time) {
         let (tx, rx) = channel();
         {
-            self.data.lock().expect(FAILED_TO_LOCK).timeouts.push(
-                Timeout {
-                    timestamp,
-                    tx,
-                },
-            );
+            self.data
+                .lock()
+                .expect(FAILED_TO_LOCK)
+                .timeouts
+                .push(Timeout { timestamp, tx });
         }
         if rx.recv().is_err() {
             warn!("Sleep beyond simulated clock");

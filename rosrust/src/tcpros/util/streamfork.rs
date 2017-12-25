@@ -1,5 +1,5 @@
 use std::io::Write;
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {

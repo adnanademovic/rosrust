@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use futures::sync::mpsc::Sender;
 use super::error::{self, ErrorKind, Result};
-use tcpros::{Publisher, Subscriber, Service};
-use xml_rpc::{self, Value, Params};
+use tcpros::{Publisher, Service, Subscriber};
+use xml_rpc::{self, Params, Value};
 
 pub struct SlaveHandler {
     pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
@@ -33,7 +33,6 @@ impl SlaveHandler {
 
         let mut server = Server::default();
 
-
         server.register_value("getBusStats", "Bus stats", |_args| {
             // TODO: implement actual stats displaying
             Err(ResponseError::Server("Method not implemented".into()))
@@ -52,9 +51,8 @@ impl SlaveHandler {
 
         server.register_value("shutdown", "Shutdown", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next().ok_or_else(|| {
-                ResponseError::Client("Missing argument 'caller_id'".into())
-            })?;
+            let _caller_id = args.next()
+                .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
             let message = match args.next() {
                 Some(Value::String(message)) => message,
                 _ => return Err(ResponseError::Client("Missing argument 'message'".into())),
@@ -117,9 +115,8 @@ impl SlaveHandler {
 
         server.register_value("publisherUpdate", "Publishers updated", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next().ok_or_else(|| {
-                ResponseError::Client("Missing argument 'caller_id'".into())
-            })?;
+            let _caller_id = args.next()
+                .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
             let topic = match args.next() {
                 Some(Value::String(topic)) => topic,
                 _ => return Err(ResponseError::Client("Missing argument 'topic'".into())),
@@ -147,9 +144,7 @@ impl SlaveHandler {
                 &name_string,
                 &topic,
                 publishers.into_iter(),
-            ).map_err(|v| {
-                ResponseError::Server(format!("Failed to handle publishers: {}", v))
-            })?;
+            ).map_err(|v| ResponseError::Server(format!("Failed to handle publishers: {}", v)))?;
             Ok(Value::Int(0))
         });
 
@@ -158,9 +153,8 @@ impl SlaveHandler {
 
         server.register_value("requestTopic", "Chosen protocol", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next().ok_or_else(|| {
-                ResponseError::Client("Missing argument 'caller_id'".into())
-            })?;
+            let _caller_id = args.next()
+                .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
             let topic = match args.next() {
                 Some(Value::String(topic)) => topic,
                 _ => return Err(ResponseError::Client("Missing argument 'topic'".into())),
@@ -169,8 +163,7 @@ impl SlaveHandler {
                 Some(Value::Array(protocols)) => protocols,
                 Some(_) => {
                     return Err(ResponseError::Client(
-                        "Protocols need to be provided as [ [String, XmlRpcLegalValue] ]"
-                            .into(),
+                        "Protocols need to be provided as [ [String, XmlRpcLegalValue] ]".into(),
                     ))
                 }
                 None => return Err(ResponseError::Client("Missing argument 'protocols'".into())),
@@ -266,11 +259,11 @@ fn request_topic(
 ) -> error::rosxmlrpc::Result<(String, String, i32)> {
     let (_code, _message, protocols): (i32, String, (String, String, i32)) = xml_rpc::Client::new()
         .unwrap()
-        .call(&publisher_uri.parse().unwrap(), "requestTopic", &(
-            caller_id,
-            topic,
-            [["TCPROS"]],
-        ))
+        .call(
+            &publisher_uri.parse().unwrap(),
+            "requestTopic",
+            &(caller_id, topic, [["TCPROS"]]),
+        )
         .unwrap()
         .unwrap();
     Ok(protocols)

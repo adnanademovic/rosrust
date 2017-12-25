@@ -71,7 +71,6 @@ mod tests {
         assert!(Resolver::new("/a//b").is_err());
     }
 
-
     #[test]
     fn rejects_illegal_names() {
         let r = Resolver::new("/some/long/path").expect(FAILED_TO_RESOLVE);

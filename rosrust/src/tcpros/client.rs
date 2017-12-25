@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std;
 use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result, ResultExt};
-use super::header::{encode, decode};
+use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
 
 pub struct ClientResponse<T> {
@@ -15,9 +15,9 @@ pub struct ClientResponse<T> {
 
 impl<T> ClientResponse<T> {
     pub fn read(self) -> Result<ServiceResult<T>> {
-        self.handle.join().unwrap_or_else(|_| {
-            Err(ErrorKind::ServiceResponseUnknown.into())
-        })
+        self.handle
+            .join()
+            .unwrap_or_else(|_| Err(ErrorKind::ServiceResponseUnknown.into()))
     }
 }
 
@@ -78,9 +78,8 @@ impl<T: ServicePair> Client<T> {
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
         let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
-        let mut stream = connection.chain_err(|| {
-            ErrorKind::ServiceConnectionFail(service.into(), uri.into())
-        })?;
+        let mut stream =
+            connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
 
         // Service request starts by exchanging connection headers
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
@@ -89,9 +88,8 @@ impl<T: ServicePair> Client<T> {
         to_writer(&mut stream, &args)?;
 
         // Service responds with a boolean byte, signalling success
-        let success = read_verification_byte(&mut stream).chain_err(|| {
-            ErrorKind::ServiceResponseInterruption
-        })?;
+        let success = read_verification_byte(&mut stream)
+            .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
             // Decode response as response type upon success
             Ok(from_reader(&mut stream)?)

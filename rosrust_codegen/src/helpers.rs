@@ -1,4 +1,4 @@
-use std::collections::{LinkedList, HashMap, HashSet};
+use std::collections::{HashMap, HashSet, LinkedList};
 use msg::Msg;
 use error::{Result, ResultExt};
 use std;
@@ -145,9 +145,8 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             .with_extension("msg");
         if let Ok(mut f) = File::open(&full_path) {
             let mut contents = String::new();
-            f.read_to_string(&mut contents).chain_err(
-                || "Failed to read file to string!",
-            )?;
+            f.read_to_string(&mut contents)
+                .chain_err(|| "Failed to read file to string!")?;
             return Msg::new(package, name, &contents).map(MessageCase::Message);
         }
         let full_path = Path::new(&folder)
@@ -157,9 +156,8 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             .with_extension("srv");
         if let Ok(mut f) = File::open(&full_path) {
             let mut contents = String::new();
-            f.read_to_string(&mut contents).chain_err(
-                || "Failed to read file to string!",
-            )?;
+            f.read_to_string(&mut contents)
+                .chain_err(|| "Failed to read file to string!")?;
             let re = RegexBuilder::new("^---$").multi_line(true).build()?;
             let mut parts = re.split(&contents);
             let req = match parts.next() {
@@ -180,8 +178,7 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
     }
     bail!(format!(
         "Could not find requested message in provided folders: {}/{}",
-        package,
-        name
+        package, name
     ));
 }
 
@@ -197,9 +194,7 @@ mod tests {
             .unwrap()
             .messages;
         assert_eq!(message_map.len(), 1);
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Point".into()),
-        ));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into()),));
     }
 
     #[test]
@@ -208,15 +203,9 @@ mod tests {
             .unwrap()
             .messages;
         assert_eq!(message_map.len(), 3);
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Point".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Pose".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Quaternion".into()),
-        ));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Pose".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Quaternion".into()),));
     }
 
     #[test]
@@ -225,21 +214,11 @@ mod tests {
             .unwrap()
             .messages;
         assert_eq!(message_map.len(), 5);
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Point".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Pose".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "PoseStamped".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Quaternion".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("std_msgs".into(), "Header".into()),
-        ));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Pose".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "PoseStamped".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Quaternion".into()),));
+        assert!(message_map.contains_key(&("std_msgs".into(), "Header".into()),));
     }
 
     #[test]
@@ -255,33 +234,15 @@ mod tests {
         ).unwrap()
             .messages;
         assert_eq!(message_map.len(), 9);
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Vector3".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Point".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Pose".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "PoseStamped".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("geometry_msgs".into(), "Quaternion".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("sensor_msgs".into(), "Imu".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("std_msgs".into(), "Header".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("rosgraph_msgs".into(), "Clock".into()),
-        ));
-        assert!(message_map.contains_key(
-            &("rosgraph_msgs".into(), "Log".into()),
-        ));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Vector3".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Pose".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "PoseStamped".into()),));
+        assert!(message_map.contains_key(&("geometry_msgs".into(), "Quaternion".into()),));
+        assert!(message_map.contains_key(&("sensor_msgs".into(), "Imu".into()),));
+        assert!(message_map.contains_key(&("std_msgs".into(), "Header".into()),));
+        assert!(message_map.contains_key(&("rosgraph_msgs".into(), "Clock".into()),));
+        assert!(message_map.contains_key(&("rosgraph_msgs".into(), "Log".into()),));
     }
 
     #[test]
@@ -361,11 +322,11 @@ mod tests {
         assert_eq!(
             definition,
             "# This represents a vector in free space. \n# It is only meant to represent \
-                    a direction. Therefore, it does not\n# make sense to apply a translation to \
-                    it (e.g., when applying a \n# generic rigid transformation to a Vector3, tf2 \
-                    will only apply the\n# rotation). If you want your data to be translatable \
-                    too, use the\n# geometry_msgs/Point message instead.\n\nfloat64 x\nfloat64 \
-                    y\nfloat64 z\n"
+             a direction. Therefore, it does not\n# make sense to apply a translation to \
+             it (e.g., when applying a \n# generic rigid transformation to a Vector3, tf2 \
+             will only apply the\n# rotation). If you want your data to be translatable \
+             too, use the\n# geometry_msgs/Point message instead.\n\nfloat64 x\nfloat64 \
+             y\nfloat64 z\n"
         );
         let message_map = get_message_map(&[FILEPATH], &[("geometry_msgs", "PoseStamped")])
             .unwrap()

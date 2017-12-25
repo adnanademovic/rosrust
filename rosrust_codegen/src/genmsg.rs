@@ -20,9 +20,12 @@ pub fn depend_on_messages(
         .messages
         .iter()
         .map(|(&(ref pack, ref _name), _value)| pack.clone())
-        .chain(message_map.services.iter().map(|&(ref pack, ref _name)| {
-            pack.clone()
-        }))
+        .chain(
+            message_map
+                .services
+                .iter()
+                .map(|&(ref pack, ref _name)| pack.clone()),
+        )
         .collect::<HashSet<String>>();
     for package in packages {
         output.push(format!("    pub mod {} {{", package));
@@ -34,18 +37,18 @@ pub fn depend_on_messages(
             .collect::<HashSet<String>>();
         for name in &names {
             let key = (package.clone(), name.clone());
-            let message = message_map.messages.get(&key).expect(
-                "Internal implementation contains mismatch in map keys",
-            );
-            let hash = hashes.get(&key).expect(
-                "Internal implementation contains mismatch in map keys",
-            );
+            let message = message_map
+                .messages
+                .get(&key)
+                .expect("Internal implementation contains mismatch in map keys");
+            let hash = hashes
+                .get(&key)
+                .expect("Internal implementation contains mismatch in map keys");
             let definition = helpers::generate_message_definition(&message_map.messages, message)?;
             output.push(message.struct_string(crate_prefix));
             output.push(format!(
                 "        impl {}Message for {} {{",
-                crate_prefix,
-                message.name
+                crate_prefix, message.name
             ));
             output.push(create_function("msg_definition", &definition));
             output.push(create_function("md5sum", hash));
@@ -62,18 +65,15 @@ pub fn depend_on_messages(
             .map(|&(ref _pack, ref name)| name.clone())
             .collect::<HashSet<String>>();
         for name in &names {
-            let hash = hashes.get(&(package.clone(), name.clone())).expect(
-                "Internal implementation contains mismatch in map keys",
-            );
-            output.push(
-                "        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into(),
-            );
+            let hash = hashes
+                .get(&(package.clone(), name.clone()))
+                .expect("Internal implementation contains mismatch in map keys");
+            output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
             output.push("        #[derive(Serialize,Deserialize,Debug)]".into());
             output.push(format!("        pub struct {} {{}}", name));
             output.push(format!(
                 "        impl {}Message for {} {{",
-                crate_prefix,
-                name
+                crate_prefix, name
             ));
             output.push(create_function("msg_definition", ""));
             output.push(create_function("md5sum", hash));
@@ -85,8 +85,7 @@ pub fn depend_on_messages(
 
             output.push(format!(
                 "        impl {}Service for {} {{",
-                crate_prefix,
-                name
+                crate_prefix, name
             ));
             output.push(format!("            type Request = {}Req;", name));
             output.push(format!("            type Response = {}Res;", name));
@@ -105,8 +104,7 @@ fn create_function(name: &str, value: &str) -> String {
             fn {}() -> ::std::string::String {{
                 {:?}.into()
             }}"#,
-        name,
-        value
+        name, value
     )
 }
 
@@ -118,12 +116,10 @@ fn string_into_pair(input: &str) -> Result<(&str, &str)> {
     };
     let name = match parts.next() {
         Some(v) => v,
-        None => {
-            bail!(
-                "Package string needs to be in package/name format: {}",
-                input
-            )
-        }
+        None => bail!(
+            "Package string needs to be in package/name format: {}",
+            input
+        ),
     };
     Ok((package, name))
 }
@@ -147,16 +143,16 @@ mod tests {
 
     #[test]
     fn benchmark_genmsg() {
-        let data = depend_on_messages(&[FILEPATH], &["benchmark_msgs/Overall"], "::rosrust::")
-            .unwrap();
+        let data =
+            depend_on_messages(&[FILEPATH], &["benchmark_msgs/Overall"], "::rosrust::").unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }
 
     #[test]
     fn benchmark_genmsg_service() {
-        let data = depend_on_messages(&[FILEPATH], &["simple_srv/Something"], "::rosrust::")
-            .unwrap();
+        let data =
+            depend_on_messages(&[FILEPATH], &["simple_srv/Something"], "::rosrust::").unwrap();
         println!("{}", data);
         // TODO: actually test this output data
     }

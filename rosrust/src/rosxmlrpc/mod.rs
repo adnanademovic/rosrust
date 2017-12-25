@@ -26,8 +26,7 @@ impl std::fmt::Display for ResponseError {
 impl std::error::Error for ResponseError {
     fn description(&self) -> &str {
         match *self {
-            ResponseError::Client(ref v) |
-            ResponseError::Server(ref v) => v,
+            ResponseError::Client(ref v) | ResponseError::Server(ref v) => v,
         }
     }
 

@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use xml_rpc::{self, Value, Params};
+use xml_rpc::{self, Params, Value};
 use super::{Response, ResponseError, ERROR_CODE, FAILURE_CODE, SUCCESS_CODE};
 
 pub struct Client {
@@ -28,8 +28,7 @@ impl Client {
             .map_err(|fault| {
                 ResponseError::Client(format!(
                     "Unexpected fault #{} received from server: {}",
-                    fault.code,
-                    fault.message
+                    fault.code, fault.message
                 ))
             })?
             .into_iter();
@@ -39,25 +38,19 @@ impl Client {
             first_item = response.next();
         }
         match (first_item, response.next(), response.next()) {
-            (Some(Value::Int(code)), Some(Value::String(message)), Some(data)) => {
-                match code {
-                    ERROR_CODE => Err(ResponseError::Client(message)),
-                    FAILURE_CODE => Err(ResponseError::Server(message)),
-                    SUCCESS_CODE => Ok(data),
-                    _ => Err(ResponseError::Server(
-                        "Bad response code returned from server".into(),
-                    )),
-                }
-            }
-            (code, message, data) => {
-                Err(ResponseError::Server(format!(
-                    "Response with three parameters (int code, str msg, value) \
-                    expected from server, received: ({:?}, {:?}, {:?})",
-                    code,
-                    message,
-                    data
-                )))
-            }
+            (Some(Value::Int(code)), Some(Value::String(message)), Some(data)) => match code {
+                ERROR_CODE => Err(ResponseError::Client(message)),
+                FAILURE_CODE => Err(ResponseError::Server(message)),
+                SUCCESS_CODE => Ok(data),
+                _ => Err(ResponseError::Server(
+                    "Bad response code returned from server".into(),
+                )),
+            },
+            (code, message, data) => Err(ResponseError::Server(format!(
+                "Response with three parameters (int code, str msg, value) \
+                 expected from server, received: ({:?}, {:?}, {:?})",
+                code, message, data
+            ))),
         }
     }
 

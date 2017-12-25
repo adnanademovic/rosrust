@@ -33,8 +33,7 @@ impl<T: Message> Publisher<T> {
             Err(error) => {
                 error!(
                     "Failed to register publisher for topic '{}': {}",
-                    name,
-                    error
+                    name, error
                 );
                 info.unregister()?;
                 Err(error.into())
@@ -77,15 +76,11 @@ impl Subscriber {
 
         match master.register_subscriber(name, &T::msg_type()) {
             Ok(publishers) => {
-                if let Err(err) = slave.add_publishers_to_subscription(
-                    name,
-                    publishers.into_iter(),
-                )
+                if let Err(err) = slave.add_publishers_to_subscription(name, publishers.into_iter())
                 {
                     error!(
                         "Failed to subscribe to all publishers of topic '{}': {}",
-                        name,
-                        err
+                        name, err
                     );
                 }
                 Ok(Self {
@@ -151,7 +146,9 @@ impl Service {
             info.unregister()?;
             Err(err.into())
         } else {
-            Ok(Self { _raii: Arc::new(InteractorRaii::new(info)) })
+            Ok(Self {
+                _raii: Arc::new(InteractorRaii::new(info)),
+            })
         }
     }
 }
@@ -166,9 +163,9 @@ struct ServiceInfo {
 impl Interactor for ServiceInfo {
     fn unregister(&mut self) -> Response<()> {
         self.slave.remove_service(&self.name);
-        self.master.unregister_service(&self.name, &self.api).map(
-            |_| (),
-        )
+        self.master
+            .unregister_service(&self.name, &self.api)
+            .map(|_| ())
     }
 }
 

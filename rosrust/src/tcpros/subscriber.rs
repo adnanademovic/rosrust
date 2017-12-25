@@ -1,12 +1,12 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::collections::HashMap;
 use std;
 use serde_rosmsg::from_slice;
 use super::error::{ErrorKind, Result, ResultExt};
-use super::header::{encode, decode, match_field};
+use super::header::{decode, encode, match_field};
 use super::Message;
 
 pub struct Subscriber {
@@ -27,9 +27,7 @@ impl Subscriber {
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
         let data_stream = data_tx.clone();
-        thread::spawn(move || {
-            join_connections::<T>(&data_tx, pub_rx, &caller_id, &topic_name)
-        });
+        thread::spawn(move || join_connections::<T>(&data_tx, pub_rx, &caller_id, &topic_name));
         thread::spawn(move || handle_data::<T, F>(data_rx, callback));
         Subscriber {
             data_stream: data_stream,
@@ -45,9 +43,9 @@ impl Subscriber {
             // Failure could only be caused by the join_connections
             // thread not running, which only happens after
             // Subscriber has been deconstructed
-            self.publishers_stream.send(address).expect(
-                "Connected thread died",
-            );
+            self.publishers_stream
+                .send(address)
+                .expect("Connected thread died");
         }
         Ok(())
     }

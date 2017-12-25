@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use super::error::{self, ErrorKind, Result, ResultExt};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
-use tcpros::{Message, Publisher, PublisherStream, Subscriber, Service, ServicePair, ServiceResult};
+use tcpros::{Message, Publisher, PublisherStream, Service, ServicePair, ServiceResult, Subscriber};
 
 pub struct Slave {
     name: String,
@@ -56,9 +56,10 @@ impl Slave {
             outer_shutdown_tx.send(()).is_ok();
         });
 
-        let port = port_rx.recv().expect(FAILED_TO_LOCK).chain_err(
-            || "Failed to get port",
-        )?;
+        let port = port_rx
+            .recv()
+            .expect(FAILED_TO_LOCK)
+            .chain_err(|| "Failed to get port")?;
         let uri = format!("http://{}:{}/", hostname, port);
 
         Ok(Slave {
@@ -98,11 +99,11 @@ impl Slave {
         F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
         use std::collections::hash_map::Entry;
-        match self.services.lock().expect(FAILED_TO_LOCK).entry(
-            String::from(
-                service,
-            ),
-        ) {
+        match self.services
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .entry(String::from(service))
+        {
             Entry::Occupied(..) => {
                 error!("Duplicate initiation of service '{}' attempted", service);
                 Err(ErrorKind::Duplicate("service".into()).into())
@@ -129,9 +130,11 @@ impl Slave {
         T: Message,
     {
         use std::collections::hash_map::Entry;
-        match self.publications.lock().expect(FAILED_TO_LOCK).entry(
-            String::from(topic),
-        ) {
+        match self.publications
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .entry(String::from(topic))
+        {
             Entry::Occupied(publisher_entry) => publisher_entry.get().stream(),
             Entry::Vacant(entry) => {
                 let publisher = Publisher::new::<T, _>(format!("{}:0", hostname).as_str(), topic)?;
@@ -141,9 +144,10 @@ impl Slave {
     }
 
     pub fn remove_publication(&self, topic: &str) {
-        self.publications.lock().expect(FAILED_TO_LOCK).remove(
-            topic,
-        );
+        self.publications
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .remove(topic);
     }
 
     pub fn add_subscription<T, F>(&self, topic: &str, callback: F) -> Result<()>
@@ -152,9 +156,11 @@ impl Slave {
         F: Fn(T) -> () + Send + 'static,
     {
         use std::collections::hash_map::Entry;
-        match self.subscriptions.lock().expect(FAILED_TO_LOCK).entry(
-            String::from(topic),
-        ) {
+        match self.subscriptions
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .entry(String::from(topic))
+        {
             Entry::Occupied(..) => {
                 error!("Duplicate subscription to topic '{}' attempted", topic);
                 Err(ErrorKind::Duplicate("subscription".into()).into())
@@ -168,9 +174,10 @@ impl Slave {
     }
 
     pub fn remove_subscription(&self, topic: &str) {
-        self.subscriptions.lock().expect(FAILED_TO_LOCK).remove(
-            topic,
-        );
+        self.subscriptions
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .remove(topic);
     }
 }
 

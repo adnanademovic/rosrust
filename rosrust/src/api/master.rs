@@ -161,7 +161,11 @@ pub struct SystemState {
 #[derive(Debug, Deserialize)]
 pub struct TopicDataTuple(String, Vec<String>);
 #[derive(Debug, Deserialize)]
-pub struct SystemStateTuple(Vec<TopicDataTuple>, Vec<TopicDataTuple>, Vec<TopicDataTuple>);
+pub struct SystemStateTuple(
+    Vec<TopicDataTuple>,
+    Vec<TopicDataTuple>,
+    Vec<TopicDataTuple>,
+);
 
 impl Into<SystemState> for SystemStateTuple {
     fn into(self) -> SystemState {

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use super::path::{Buffer, Slice, Path};
+use super::path::{Buffer, Path, Slice};
 
 pub struct Mapper {
     children: HashMap<String, Mapper>,
