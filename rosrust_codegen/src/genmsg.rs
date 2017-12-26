@@ -53,6 +53,7 @@ pub fn depend_on_messages(
             output.push(create_function("msg_definition", &definition));
             output.push(create_function("md5sum", hash));
             output.push(create_function("msg_type", &message.get_type()));
+            output.push(message.header_string(crate_prefix));
             output.push("        }".into());
             output.push(format!("        impl {} {{", message.name));
             output.push(message.const_string(crate_prefix));

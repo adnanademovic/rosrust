@@ -24,7 +24,7 @@ impl Time {
     }
 
     #[inline]
-    fn nanos(&self) -> i64 {
+    pub fn nanos(&self) -> i64 {
         i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }
 }
