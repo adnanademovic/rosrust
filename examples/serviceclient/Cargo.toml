@@ -7,10 +7,10 @@ version = "0.0.1"
 
 [dependencies]
 env_logger = "0.4.3"
-rosrust = "*"
-rosrust_codegen = "*"
-serde = "1.0.24"
-serde_derive = "1.0.24"
+rosrust = "0.6.0"
+rosrust_codegen = "0.6.0"
+serde = "1.0.25"
+serde_derive = "1.0.25"
 
 [[bin]]
 name = "client"
@@ -21,5 +21,4 @@ name = "service"
 path = "src/service.rs"
 
 [build-dependencies]
-env_logger = "0.4.3"
-rosrust_codegen = "*"
+rosrust_codegen = "0.6.0"

@@ -13,13 +13,13 @@ The following set of dependencies is needed for the full set of features:
 
 ```toml
 [dependencies]
-rosrust = "*"
-rosrust_codegen = "*"
-serde = "*"
-serde_derive = "*"
+rosrust = "0.6.0"
+rosrust_codegen = "0.6.0"
+serde = "1.0.25"
+serde_derive = "1.0.25"
 
 [build-dependencies]
-rosrust_codegen = "*"
+rosrust_codegen = "0.6.0"
 ```
 
 The build dependency is used for message generation.
