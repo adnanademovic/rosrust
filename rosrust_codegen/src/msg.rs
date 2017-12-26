@@ -92,6 +92,29 @@ impl Msg {
         output.push("        }".into());
         output.join("\n")
     }
+
+    pub fn header_string(&self, crate_prefix: &str) -> String {
+        if !self.fields.iter().any(FieldInfo::is_header) {
+            return String::new();
+        }
+        format!(
+            r#"
+            fn set_header(
+                &mut self,
+                clock: &::std::sync::Arc<{}Clock>,
+                seq: &::std::sync::Arc<::std::sync::atomic::AtomicUsize>,
+            ) {{
+                if self.header.seq == 0 {{
+                    self.header.seq =
+                        seq.fetch_add(1, ::std::sync::atomic::Ordering::SeqCst) as u32;
+                }}
+                if self.header.stamp.nanos() == 0 {{
+                    self.header.stamp = clock.now();
+                }}
+            }}"#,
+            crate_prefix
+        )
+    }
 }
 
 static IGNORE_WHITESPACE: &'static str = r"\s*";
@@ -302,6 +325,11 @@ impl FieldInfo {
             (true, &FieldCase::Vector) => format!("{}[] {}", datatype, self.name),
             (true, &FieldCase::Array(l)) => format!("{}[{}] {}", datatype, l, self.name),
         })
+    }
+
+    fn is_header(&self) -> bool {
+        self.case == FieldCase::Unit && self.name == "header"
+            && self.datatype == DataType::RemoteStruct("std_msgs".into(), "Header".into())
     }
 
     fn to_string(&self, crate_prefix: &str) -> Option<String> {
