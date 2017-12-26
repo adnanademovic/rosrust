@@ -4,14 +4,15 @@ extern crate rosrust;
 #[macro_use]
 extern crate rosrust_codegen;
 
-use std::{env, time};
+use std::time;
 
 rosmsg_include!();
 
 fn main() {
     env_logger::init().unwrap();
 
-    let args: Vec<_> = env::args().collect();
+    // Fetch args that are not meant for rosrust
+    let args: Vec<_> = rosrust::args();
 
     if args.len() != 3 {
         eprintln!("usage: client X Y");

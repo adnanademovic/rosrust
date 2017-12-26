@@ -69,6 +69,19 @@ pub fn params() -> Vec<(String, String)> {
         .collect()
 }
 
+pub fn get_unused_args() -> Vec<String> {
+    args()
+        .enumerate()
+        .filter_map(|(idx, v)| {
+            if idx == 0 || !v.contains(":=") {
+                Some(v)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn find_with_prefix(prefix: &str) -> Option<String> {
     args()
         .skip(1)
@@ -96,11 +109,13 @@ fn system_hostname() -> String {
 }
 
 #[cfg(not(test))]
+#[inline]
 fn args() -> std::env::Args {
     env::args()
 }
 
 #[cfg(test)]
+#[inline]
 fn args() -> std::vec::IntoIter<String> {
     tests::args_mock()
 }
@@ -202,6 +217,39 @@ mod tests {
                 (String::from("~foo"), String::from("123:=456")),
             ],
             params()
+        );
+    }
+
+    #[test]
+    #[allow(unused_variables)]
+    fn get_unused_args_gets_everything_without_equal_sign() {
+        let testcase = TESTCASE.lock().expect(FAILED_TO_LOCK);
+        set_args(&vec![]);
+        assert_eq!(vec![String::from("IGNORE")], get_unused_args());
+        set_args(&vec![
+            "a:=x",
+            "b=e",
+            "/c:=d",
+            "this",
+            "e:=/f_g",
+            "__name:=something",
+            "_param:=something",
+            "a:=b:=c",
+            "foo",
+            "~oo_e:=/ab_c",
+            "_foo:=123:=456",
+            "bar=:baz",
+            "/x_y:=~i",
+        ]);
+        assert_eq!(
+            vec![
+                String::from("IGNORE"),
+                String::from("b=e"),
+                String::from("this"),
+                String::from("foo"),
+                String::from("bar=:baz"),
+            ],
+            get_unused_args()
         );
     }
 

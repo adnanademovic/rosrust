@@ -199,7 +199,8 @@ use std::{env, time};
 fn main() {
     env_logger::init().unwrap();
 
-    let args: Vec<_> = env::args().collect();
+    // Fetch args that are not meant for rosrust
+    let args: Vec<_> = rosrust::args();
 
     if args.len() != 3 {
         eprintln!("usage: client X Y");
@@ -281,7 +282,7 @@ Similar to `rospy` and `roscpp`, you can use the command line to remap topics an
 
 For more information, look at the [official wiki](http://wiki.ros.org/Remapping%20Arguments), since the attempt was to 100% immitate this interface.
 
-Functions for fetching leftover command line arguments have yet to be implemented!
+You can get a vector of the leftover command line argument strings with `rosrust::args()`, allowing easy argument parsing. This includes the first argument, the application name.
 
 ## License
 

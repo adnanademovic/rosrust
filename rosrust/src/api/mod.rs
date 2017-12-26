@@ -6,7 +6,7 @@ mod clock;
 pub mod error;
 mod master;
 pub mod raii;
-mod resolve;
+pub mod resolve;
 mod ros;
 mod slave;
 mod slavehandler;

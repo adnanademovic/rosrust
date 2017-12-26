@@ -1,5 +1,6 @@
 use api::{Parameter, Rate, Ros, SystemState, Topic};
 use api::raii::{Publisher, Service, Subscriber};
+use api::resolve::get_unused_args;
 use error::Result;
 use rosxmlrpc::Response;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
@@ -27,6 +28,11 @@ pub fn try_init(name: &str) -> Result<()> {
 
 macro_rules! ros {
     () => {ROS.lock().expect(LOCK_FAIL).as_mut().expect(UNINITIALIZED)}
+}
+
+#[inline]
+pub fn args() -> Vec<String> {
+    get_unused_args()
 }
 
 #[inline]
