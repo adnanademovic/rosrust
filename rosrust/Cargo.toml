@@ -3,7 +3,7 @@ authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
 description = "Pure Rust implementation of a ROS client library"
 license = "MIT"
 name = "rosrust"
-readme = "README.md"
+readme = "../README.md"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.6.0"
 
