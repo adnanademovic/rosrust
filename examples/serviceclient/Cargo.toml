@@ -1,0 +1,24 @@
+[package]
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+license = "MIT"
+name = "serviceclient"
+repository = "https://github.com/adnanademovic/rosrust"
+version = "0.0.1"
+
+[dependencies]
+env_logger = "0.4.3"
+rosrust = "0.6.0"
+rosrust_codegen = "0.6.0"
+serde = "1.0.25"
+serde_derive = "1.0.25"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
+
+[[bin]]
+name = "service"
+path = "src/service.rs"
+
+[build-dependencies]
+rosrust_codegen = "0.6.0"

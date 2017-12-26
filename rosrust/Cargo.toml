@@ -1,0 +1,25 @@
+[package]
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+description = "Pure Rust implementation of a ROS client library"
+license = "MIT"
+name = "rosrust"
+readme = "../README.md"
+repository = "https://github.com/adnanademovic/rosrust"
+version = "0.6.0"
+
+[dependencies]
+byteorder = "1.2.1"
+error-chain = "0.11.0"
+futures = "0.1.17"
+lazy_static = "1.0.0"
+log = "0.4.0"
+nix = "0.9.0"
+rosrust_codegen = "0.6.0"
+serde = "1.0.25"
+serde_derive = "1.0.25"
+serde_rosmsg = "0.2.0"
+xml-rpc = "0.0.8"
+yaml-rust = "0.4.0"
+
+[build-dependencies]
+rosrust_codegen = "0.6.0"
