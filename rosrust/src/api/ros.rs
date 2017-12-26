@@ -30,7 +30,10 @@ pub struct Ros {
 
 impl Ros {
     pub fn new(name: &str) -> Result<Ros> {
-        let namespace = resolve::namespace();
+        let mut namespace = resolve::namespace();
+        if !namespace.starts_with('/') {
+            namespace = format!("/{}", namespace);
+        }
         let master_uri = resolve::master();
         let hostname = resolve::hostname();
         let name = resolve::name(name);
