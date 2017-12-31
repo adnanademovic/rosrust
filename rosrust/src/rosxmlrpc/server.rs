@@ -32,7 +32,7 @@ impl Server {
 
 fn response_to_params(msg: &str, response: Response<xml_rpc::Value>) -> xml_rpc::Params {
     use xml_rpc::Value;
-    match response {
+    let params = match response {
         Ok(v) => vec![Value::Int(SUCCESS_CODE), Value::String(msg.into()), v],
         Err(ResponseError::Client(err)) => {
             vec![Value::Int(ERROR_CODE), Value::String(err), Value::Int(0)]
@@ -40,7 +40,8 @@ fn response_to_params(msg: &str, response: Response<xml_rpc::Value>) -> xml_rpc:
         Err(ResponseError::Server(err)) => {
             vec![Value::Int(FAILURE_CODE), Value::String(err), Value::Int(0)]
         }
-    }
+    };
+    vec![Value::Array(params)]
 }
 
 fn error_response<T>(message: T) -> xml_rpc::Params
