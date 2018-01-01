@@ -50,7 +50,7 @@ impl Master {
     }
 
     pub fn unregister_subscriber(&self, topic: &str) -> Result<i32> {
-        request!(self; registerSubscriber; topic, &self.caller_api)
+        request!(self; unregisterSubscriber; topic, &self.caller_api)
     }
 
     pub fn register_publisher(&self, topic: &str, topic_type: &str) -> Result<Vec<String>> {
