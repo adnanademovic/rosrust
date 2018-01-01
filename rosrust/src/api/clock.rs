@@ -15,7 +15,8 @@ pub struct Rate {
 }
 
 impl Rate {
-    pub fn new(clock: Arc<Clock>, start: Time, delay: Duration) -> Rate {
+    pub fn new(clock: Arc<Clock>, delay: Duration) -> Rate {
+        let start = clock.now();
         Rate {
             clock,
             next: start,
@@ -33,6 +34,7 @@ pub trait Clock: Send + Sync {
     fn now(&self) -> Time;
     fn sleep(&self, d: Duration);
     fn wait_until(&self, t: Time);
+    fn await_init(&self) {}
 }
 
 #[derive(Clone, Default)]
@@ -107,10 +109,10 @@ impl SimulatedClock {
         let mut data = self.data.lock().expect(FAILED_TO_LOCK);
         data.current = time;
         loop {
-            if let Some(next) = data.timeouts.peek() {
-                if next.timestamp > data.current {
-                    return;
-                }
+            match data.timeouts.peek() {
+                None => break,
+                Some(next) if next.timestamp > data.current => break,
+                _ => {}
             }
             if let Some(next) = data.timeouts.pop() {
                 next.tx.send(()).expect(SLEEPING_THREAD_MISSING);
@@ -146,6 +148,12 @@ impl Clock for SimulatedClock {
         }
         if rx.recv().is_err() {
             warn!("Sleep beyond simulated clock");
+        }
+    }
+
+    fn await_init(&self) {
+        if self.data.lock().expect(FAILED_TO_LOCK).current == Time::default() {
+            self.wait_until(Time::from_nanos(1));
         }
     }
 }

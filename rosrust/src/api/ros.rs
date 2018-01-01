@@ -127,6 +127,7 @@ impl Ros {
 
     #[inline]
     pub fn sleep(&self, d: Duration) {
+        self.clock.await_init();
         self.clock.sleep(d);
     }
 
@@ -136,12 +137,9 @@ impl Ros {
     }
 
     pub fn rate(&self, rate: f64) -> Rate {
+        self.clock.await_init();
         let nanos = 1_000_000_000.0 / rate;
-        Rate::new(
-            Arc::clone(&self.clock),
-            self.now(),
-            Duration::from_nanos(nanos as i64),
-        )
+        Rate::new(Arc::clone(&self.clock), Duration::from_nanos(nanos as i64))
     }
 
     #[inline]
