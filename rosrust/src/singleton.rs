@@ -1,7 +1,8 @@
 use api::{Parameter, Rate, Ros, SystemState, Topic};
 use api::raii::{Publisher, Service, Subscriber};
 use api::resolve::get_unused_args;
-use error::Result;
+use ctrlc;
+use error::{Result, ResultExt};
 use rosxmlrpc::Response;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
 use time::{Duration, Time};
@@ -22,7 +23,14 @@ pub fn try_init(name: &str) -> Result<()> {
     if ros.is_some() {
         bail!(INITIALIZED);
     }
-    *ros = Some(Ros::new(name)?);
+    let client = Ros::new(name)?;
+    let shutdown_sender = client.shutdown_sender();
+    ctrlc::set_handler(move || {
+        if shutdown_sender.send(()).is_err() {
+            info!("ROS client is already down");
+        }
+    }).chain_err(|| CTRLC_FAIL)?;
+    *ros = Some(client);
     Ok(())
 }
 
@@ -137,6 +145,7 @@ pub fn log(level: i8, msg: String, file: &str, line: u32) {
     ros!().log(level, msg, file, line)
 }
 
+static CTRLC_FAIL: &str = "Failed to override SIGINT functionality.";
 static LOCK_FAIL: &str = "Failed to acquire lock on ROS instance.";
 static UNINITIALIZED: &str = "ROS uninitialized. Please run ros::init(name) first!";
 static INITIALIZED: &str = "ROS initialized multiple times through ros::init.";

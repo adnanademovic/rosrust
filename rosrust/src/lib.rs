@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 
 extern crate byteorder;
+extern crate ctrlc;
 #[macro_use]
 extern crate error_chain;
 extern crate futures;

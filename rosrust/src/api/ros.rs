@@ -25,6 +25,7 @@ pub struct Ros {
     clock: Arc<Clock>,
     static_subs: Vec<Subscriber>,
     logger: Option<Publisher<Log>>,
+    shutdown_tx: mpsc::Sender<()>,
     shutdown_rx: Option<mpsc::Receiver<()>>,
 }
 
@@ -83,7 +84,7 @@ impl Ros {
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
-        let slave = Slave::new(master_uri, hostname, 0, &name, shutdown_tx)?;
+        let slave = Slave::new(master_uri, hostname, 0, &name, shutdown_tx.clone())?;
         let master = Master::new(master_uri, &name, slave.uri());
 
         Ok(Ros {
@@ -95,6 +96,7 @@ impl Ros {
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
             logger: None,
+            shutdown_tx,
             shutdown_rx: Some(shutdown_rx),
         })
     }
@@ -126,6 +128,11 @@ impl Ros {
     #[inline]
     pub fn sleep(&self, d: Duration) {
         self.clock.sleep(d);
+    }
+
+    #[inline]
+    pub fn shutdown_sender(&self) -> mpsc::Sender<()> {
+        self.shutdown_tx.clone()
     }
 
     pub fn rate(&self, rate: f64) -> Rate {
