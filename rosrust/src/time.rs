@@ -1,4 +1,6 @@
 use std::cmp;
+use std::convert::From;
+use std::time;
 use std::ops;
 
 const BILLION: i64 = 1_000_000_000;
@@ -140,9 +142,19 @@ impl ops::Neg for Duration {
     }
 }
 
+impl From<time::Duration> for Duration {
+    fn from(std_duration: time::Duration) -> Self {
+        Duration {
+            sec: std_duration.as_secs() as i32,
+            nsec: std_duration.subsec_nanos() as i32,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Duration, Time};
+    use std::time;
 
     #[test]
     fn from_nanos_works() {
@@ -178,5 +190,18 @@ mod tests {
         assert_eq!(time.sec, -123456789);
         assert_eq!(time.nsec, -987654321);
         assert_eq!(time.nanos(), -123456789987654321);
+    }
+
+    #[test]
+    fn convert_works() {
+        let std_duration = time::Duration::new(123, 456);
+        let msg_duration = Duration::from(std_duration);
+        assert_eq!(msg_duration.sec, 123);
+        assert_eq!(msg_duration.nsec, 456);
+
+        let std_duration2 = time::Duration::new(9876, 54321);
+        let msg_duration2: Duration = std_duration2.into();
+        assert_eq!(msg_duration2.sec, 9876);
+        assert_eq!(msg_duration2.nsec, 54321);
     }
 }
