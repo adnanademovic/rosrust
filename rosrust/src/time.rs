@@ -1,5 +1,4 @@
 use std::cmp;
-use std::convert::From;
 use std::time;
 use std::ops;
 
