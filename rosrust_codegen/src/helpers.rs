@@ -166,7 +166,7 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             };
             let res = match parts.next() {
                 Some(v) => v,
-                None => bail!("Service needs to be split into two parts"),
+                None => "",
             };
             if parts.next().is_some() {
                 bail!("Too many splits in service");
@@ -416,6 +416,7 @@ float64 w\n\
         get_message_map(
             &[FILEPATH],
             &[
+                ("empty_srv", "Empty"),
                 ("empty_req_srv", "EmptyRequest"),
                 ("tricky_comment_srv", "TrickyComment"),
             ],
