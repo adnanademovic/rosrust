@@ -197,7 +197,7 @@ extern crate rosrust_codegen;
 use std::{env, time};
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     // Fetch args that are not meant for rosrust
     let args: Vec<_> = rosrust::args();
@@ -249,7 +249,7 @@ extern crate rosrust;
 extern crate serde_derive;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     // Initialize node
     rosrust::init("param_test");
