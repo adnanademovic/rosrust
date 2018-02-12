@@ -5,7 +5,7 @@ extern crate rosrust;
 extern crate serde_derive;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     // Initialize node
     rosrust::init("param_test");

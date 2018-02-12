@@ -7,7 +7,7 @@ extern crate rosrust_codegen;
 rosmsg_include!();
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     // Initialize node
     rosrust::init("talker");
