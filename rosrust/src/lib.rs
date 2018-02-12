@@ -22,7 +22,7 @@ pub use singleton::*;
 pub use tcpros::{Client, Message, PublisherStream, ServicePair as Service};
 pub use time::{Duration, Time};
 
-mod api;
+pub mod api;
 mod log_macros;
 mod rosxmlrpc;
 pub mod singleton;
