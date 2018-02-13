@@ -4,6 +4,7 @@ use std::thread;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std;
+use serde_rosmsg::error::ErrorKind as SerdeRosMsgErrorKind;
 use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result};
 use super::header;
@@ -135,7 +136,17 @@ where
     F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
 {
     thread::spawn(move || {
-        if let Err(err) = handle_request_loop::<T, U, F>(stream, &handler) {
+        if let Err(err) = handle_request::<T, U, F>(stream, &handler) {
+            // Return without logging error in case of BrokenPipe, which
+            // is expected.
+            if let &ErrorKind::SerdeRosmsg(ref se) = err.kind() {
+                if let &SerdeRosMsgErrorKind::Io(ref ie) = se.kind() {
+                    if std::io::ErrorKind::BrokenPipe == ie.kind() {
+                        // ignore this error, which is expected
+                        return;
+                    }
+                }
+            }
             let info = err.iter()
                 .map(|v| format!("{}", v))
                 .collect::<Vec<_>>()
@@ -145,7 +156,7 @@ where
     });
 }
 
-fn handle_request_loop<T, U, F>(mut stream: U, handler: &Arc<F>) -> Result<()>
+fn handle_request<T, U, F>(mut stream: U, handler: &Arc<F>) -> Result<()>
 where
     T: ServicePair,
     U: std::io::Read + std::io::Write,
@@ -153,25 +164,30 @@ where
 {
     // Receive request from client
     // Break out of loop in case of failure to read request
-    while let Ok(req) = from_reader(&mut stream) {
-        // Call function that handles request and returns response
-        match handler(req) {
-            Ok(res) => {
-                // Send True flag and response in case of success
-                stream.write_u8(1)?;
-                to_writer(&mut stream, &res)?;
+    match from_reader(&mut stream) {
+        Ok(req) => {
+            // Call function that handles request and returns response
+            match handler(req) {
+                Ok(res) => {
+                    // Send True flag and response in case of success
+                    stream.write_u8(1)?;
+                    to_writer(&mut stream, &res)?;
+                }
+                Err(message) => {
+                    // Send False flag and error message string in case of
+                    // failure
+                    stream.write_u8(0)?;
+                    to_writer(&mut stream, &message)?;
+                }
             }
-            Err(message) => {
-                // Send False flag and error message string in case of failure
-                stream.write_u8(0)?;
-                to_writer(&mut stream, &message)?;
-            }
-        };
+        },
+        Err(_) => {
+            // Upon failure to read request, send client failure message
+            // This can be caused by actual issues or by the client stopping
+            // the connection
+            stream.write_u8(0)?;
+            to_writer(&mut stream, &"Failed to parse passed arguments")?;
+        }
     }
-
-    // Upon failure to read request, send client failure message
-    // This can be caused by actual issues or by the client stopping the connection
-    stream.write_u8(0)?;
-    to_writer(&mut stream, &"Failed to parse passed arguments")?;
     Ok(())
 }
