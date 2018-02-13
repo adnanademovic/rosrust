@@ -35,3 +35,25 @@ error_chain! {
         }
     }
 }
+
+#[inline]
+fn is_closed_connection(err: &::std::io::Error) -> bool {
+    use std::io::ErrorKind as IoErrorKind;
+    match err.kind() {
+        IoErrorKind::BrokenPipe | IoErrorKind::ConnectionReset => true,
+        _ => false,
+    }
+}
+
+impl Error {
+    pub fn is_closed_connection(&self) -> bool {
+        match *self.kind() {
+            ErrorKind::SerdeRosmsg(ref serde_err) => match *serde_err.kind() {
+                ::serde_rosmsg::error::ErrorKind::Io(ref io_err) => is_closed_connection(io_err),
+                _ => false,
+            },
+            ErrorKind::Io(ref io_err) => is_closed_connection(io_err),
+            _ => false,
+        }
+    }
+}

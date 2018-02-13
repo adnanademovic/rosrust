@@ -84,7 +84,8 @@ where
         if let Err(err) = exchange_headers::<T, _>(&mut stream, service, node_name) {
             error!(
                 "Failed to exchange headers for service '{}': {}",
-                service, err
+                service,
+                err
             );
             continue;
         }
@@ -136,11 +137,13 @@ where
 {
     thread::spawn(move || {
         if let Err(err) = handle_request_loop::<T, U, F>(stream, &handler) {
-            let info = err.iter()
-                .map(|v| format!("{}", v))
-                .collect::<Vec<_>>()
-                .join("\nCaused by:");
-            error!("{}", info);
+            if !err.is_closed_connection() {
+                let info = err.iter()
+                    .map(|v| format!("{}", v))
+                    .collect::<Vec<_>>()
+                    .join("\nCaused by:");
+                error!("{}", info);
+            }
         }
     });
 }
