@@ -4,6 +4,7 @@ use std::thread;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std;
+use serde_rosmsg::error::ErrorKind as SerdeRosMsgErrorKind;
 use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result};
 use super::header;
@@ -136,6 +137,16 @@ where
 {
     thread::spawn(move || {
         if let Err(err) = handle_request::<T, U, F>(stream, &handler) {
+            // Return without logging error in case of BrokenPipe, which
+            // is expected.
+            if let &ErrorKind::SerdeRosmsg(ref se) = err.kind() {
+                if let &SerdeRosMsgErrorKind::Io(ref ie) = se.kind() {
+                    if std::io::ErrorKind::BrokenPipe == ie.kind() {
+                        // ignore this error, which is expected
+                        return;
+                    }
+                }
+            }
             let info = err.iter()
                 .map(|v| format!("{}", v))
                 .collect::<Vec<_>>()
