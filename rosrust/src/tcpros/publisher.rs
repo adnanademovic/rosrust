@@ -15,7 +15,7 @@ pub struct Publisher {
     pub port: u16,
     pub msg_type: String,
     pub topic: String,
-    last_message: Arc<Mutex<Vec<u8>>>,
+    last_message: Arc<Mutex<Arc<Vec<u8>>>>,
     _raii: tcpconnection::Raii,
 }
 
@@ -51,7 +51,7 @@ fn listen_for_subscribers<T, U, V>(
     topic: &str,
     listener: V,
     targets: &TargetList<U>,
-    last_message: Arc<Mutex<Vec<u8>>>,
+    last_message: Arc<Mutex<Arc<Vec<u8>>>>,
 ) where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
@@ -114,7 +114,7 @@ impl Publisher {
     {
         let (targets, data) = fork();
         let topic_name = String::from(topic);
-        let last_message = Arc::new(Mutex::new(Vec::new()));
+        let last_message = Arc::new(Mutex::new(Arc::new(Vec::new())));
         let last_msg_for_thread = Arc::clone(&last_message);
         thread::spawn(move || {
             listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets, last_msg_for_thread)
@@ -141,7 +141,7 @@ impl Publisher {
 #[derive(Clone)]
 pub struct PublisherStream<T: Message> {
     stream: DataStream,
-    last_message: Arc<Mutex<Vec<u8>>>,
+    last_message: Arc<Mutex<Arc<Vec<u8>>>>,
     datatype: std::marker::PhantomData<T>,
 }
 
@@ -162,9 +162,9 @@ impl<T: Message> PublisherStream<T> {
     }
 
     pub fn send(&mut self, message: &T) -> Result<()> {
-        let bytes = to_vec(message)?;
+        let bytes = Arc::new(to_vec(message)?);
 
-        *self.last_message.lock().unwrap() = bytes.clone();
+        *self.last_message.lock().unwrap() = Arc::clone(&bytes);
 
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
