@@ -2,6 +2,7 @@ use std::net::{TcpListener, ToSocketAddrs};
 use std::thread;
 use std::collections::HashMap;
 use std;
+use std::sync::{Arc, Mutex};
 use serde_rosmsg::to_vec;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header;
@@ -14,6 +15,7 @@ pub struct Publisher {
     pub port: u16,
     pub msg_type: String,
     pub topic: String,
+    last_message: Arc<Mutex<Vec<u8>>>,
     _raii: tcpconnection::Raii,
 }
 
@@ -45,8 +47,12 @@ where
     write_response::<T, U>(&mut stream)
 }
 
-fn listen_for_subscribers<T, U, V>(topic: &str, listener: V, targets: &TargetList<U>)
-where
+fn listen_for_subscribers<T, U, V>(
+    topic: &str,
+    listener: V,
+    targets: &TargetList<U>,
+    last_message: Arc<Mutex<Vec<u8>>>,
+) where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
     V: Iterator<Item = U>,
@@ -63,6 +69,12 @@ where
             error!("{}", info);
             continue;
         }
+
+        if let Err(err) = stream.write_all(&last_message.lock().unwrap()) {
+            error!("{}", err);
+            continue;
+        }
+
         if targets.add(stream).is_err() {
             // The TCP listener gets shut down when streamfork's thread deallocates.
             // This happens only when all the corresponding publisher streams get deallocated,
@@ -102,12 +114,17 @@ impl Publisher {
     {
         let (targets, data) = fork();
         let topic_name = String::from(topic);
-        thread::spawn(move || listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets));
+        let last_message = Arc::new(Mutex::new(Vec::new()));
+        let last_msg_for_thread = Arc::clone(&last_message);
+        thread::spawn(move || {
+            listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets, last_msg_for_thread)
+        });
         Publisher {
             subscriptions: data,
             port: port,
             msg_type: T::msg_type(),
             topic: String::from(topic),
+            last_message,
             _raii: raii,
         }
     }
@@ -124,6 +141,7 @@ impl Publisher {
 #[derive(Clone)]
 pub struct PublisherStream<T: Message> {
     stream: DataStream,
+    last_message: Arc<Mutex<Vec<u8>>>,
     datatype: std::marker::PhantomData<T>,
 }
 
@@ -139,11 +157,15 @@ impl<T: Message> PublisherStream<T> {
         Ok(PublisherStream {
             stream: publisher.subscriptions.clone(),
             datatype: std::marker::PhantomData,
+            last_message: Arc::clone(&publisher.last_message),
         })
     }
 
     pub fn send(&mut self, message: &T) -> Result<()> {
         let bytes = to_vec(message)?;
+
+        *self.last_message.lock().unwrap() = bytes.clone();
+
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
         self.stream.send(bytes).expect("Connected thread died");
