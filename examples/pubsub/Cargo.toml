@@ -17,6 +17,10 @@ name = "publisher"
 path = "src/publisher.rs"
 
 [[bin]]
+name = "publisher_latch_demo"
+path = "src/publisher_latch_demo.rs"
+
+[[bin]]
 name = "subscriber"
 path = "src/subscriber.rs"
 
