@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
@@ -9,7 +10,7 @@ pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
     (TargetList(streams_sender), DataStream(data_sender))
 }
 
-fn fork_thread<T: Write + Send + 'static>(streams: &Receiver<T>, data: Receiver<Vec<u8>>) {
+fn fork_thread<T: Write + Send + 'static>(streams: &Receiver<T>, data: Receiver<Arc<Vec<u8>>>) {
     let mut targets = Vec::new();
     for buffer in data {
         while let Ok(target) = streams.try_recv() {
@@ -36,10 +37,10 @@ impl<T: Write + Send + 'static> TargetList<T> {
 }
 
 #[derive(Clone)]
-pub struct DataStream(Sender<Vec<u8>>);
+pub struct DataStream(Sender<Arc<Vec<u8>>>);
 
 impl DataStream {
-    pub fn send(&self, data: Vec<u8>) -> ForkResult {
+    pub fn send(&self, data: Arc<Vec<u8>>) -> ForkResult {
         self.0.send(data).or(Err(()))
     }
 }

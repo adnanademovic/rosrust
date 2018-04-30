@@ -82,7 +82,7 @@ impl Msg {
     pub fn struct_string(&self, crate_prefix: &str) -> String {
         let mut output = Vec::<String>::new();
         output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
-        output.push("        #[derive(Serialize,Deserialize,Debug,Default)]".into());
+        output.push("        #[derive(Serialize,Deserialize,Clone,Debug,Default)]".into());
         output.push(format!("        pub struct {} {{", self.name));
         for field in &self.fields {
             if let Some(s) = field.to_string(crate_prefix) {
