@@ -143,6 +143,7 @@ pub struct PublisherStream<T: Message> {
     stream: DataStream,
     last_message: Arc<Mutex<Arc<Vec<u8>>>>,
     datatype: std::marker::PhantomData<T>,
+    latching: bool,
 }
 
 impl<T: Message> PublisherStream<T> {
@@ -158,13 +159,21 @@ impl<T: Message> PublisherStream<T> {
             stream: publisher.subscriptions.clone(),
             datatype: std::marker::PhantomData,
             last_message: Arc::clone(&publisher.last_message),
+            latching: true,
         })
+    }
+
+    #[inline]
+    pub fn set_latching(&mut self, latching: bool) {
+        self.latching = latching;
     }
 
     pub fn send(&mut self, message: &T) -> Result<()> {
         let bytes = Arc::new(to_vec(message)?);
 
-        *self.last_message.lock().unwrap() = Arc::clone(&bytes);
+        if self.latching {
+            *self.last_message.lock().unwrap() = Arc::clone(&bytes);
+        }
 
         // Subscriptions can only be closed from the Publisher side
         // There is no way for the streamfork thread to fail by itself
