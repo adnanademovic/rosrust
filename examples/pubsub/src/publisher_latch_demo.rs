@@ -15,7 +15,7 @@ fn main() {
     // Create publisher
     let mut chatter_pub_latched = rosrust::publish("chatter").unwrap();
     let mut chatter_pub_unlatched = rosrust::publish("chatter").unwrap();
-    chatter_pub_unlatched.set_latching(false);
+    chatter_pub_latched.set_latching(true);
 
     let mut msg = msg::std_msgs::String::default();
     msg.data = String::from("hello world latched");
