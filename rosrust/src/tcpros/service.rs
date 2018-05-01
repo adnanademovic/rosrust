@@ -84,8 +84,7 @@ where
         if let Err(err) = exchange_headers::<T, _>(&mut stream, service, node_name) {
             error!(
                 "Failed to exchange headers for service '{}': {}",
-                service,
-                err
+                service, err
             );
             continue;
         }
