@@ -159,7 +159,7 @@ impl<T: Message> PublisherStream<T> {
             stream: publisher.subscriptions.clone(),
             datatype: std::marker::PhantomData,
             last_message: Arc::clone(&publisher.last_message),
-            latching: true,
+            latching: false,
         })
     }
 
