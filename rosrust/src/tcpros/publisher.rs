@@ -168,6 +168,11 @@ impl<T: Message> PublisherStream<T> {
         self.latching = latching;
     }
 
+    #[inline]
+    pub fn set_queue_size(&mut self, queue_size: Option<usize>) {
+        self.stream.set_queue_size(queue_size);
+    }
+
     pub fn send(&mut self, message: &T) -> Result<()> {
         let bytes = Arc::new(to_vec(message)?);
 

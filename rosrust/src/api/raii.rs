@@ -54,6 +54,11 @@ impl<T: Message> Publisher<T> {
     }
 
     #[inline]
+    pub fn set_queue_size(&mut self, queue_size: Option<usize>) {
+        self.stream.set_queue_size(queue_size);
+    }
+
+    #[inline]
     pub fn send(&mut self, mut message: T) -> Result<()> {
         message.set_header(&self.clock, &self.seq);
         self.stream.send(&message).map_err(|v| v.into())
