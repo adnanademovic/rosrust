@@ -10,7 +10,7 @@ pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
     let (data_sender, data) = channel();
     let queue_size = Arc::new(AtomicUsize::new(usize::max_value()));
     let queue_size_for_thread = Arc::clone(&queue_size);
-    thread::spawn(move || fork_thread::<T>(&streams, data, queue_size_for_thread));
+    thread::spawn(move || fork_thread::<T>(&streams, &data, &queue_size_for_thread));
     (
         TargetList(streams_sender),
         DataStream {
@@ -35,12 +35,12 @@ fn fill_with_queued(data: &Receiver<Arc<Vec<u8>>>, queue: &mut VecDeque<Arc<Vec<
 
 fn fork_thread<T: Write + Send + 'static>(
     streams: &Receiver<T>,
-    data: Receiver<Arc<Vec<u8>>>,
-    queue_size: Arc<AtomicUsize>,
+    data: &Receiver<Arc<Vec<u8>>>,
+    queue_size: &AtomicUsize,
 ) {
     let mut targets = Vec::new();
     let mut datapoints = VecDeque::new();
-    while fill_with_queued(&data, &mut datapoints) {
+    while fill_with_queued(data, &mut datapoints) {
         datapoints.truncate(queue_size.load(Ordering::Relaxed));
         let buffer = match datapoints.pop_back() {
             Some(v) => v,

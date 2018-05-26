@@ -1,6 +1,6 @@
 use std::net::{TcpListener, TcpStream};
-use std::thread;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
 
 pub fn iterate(listener: TcpListener, tag: String) -> (Raii, TcpConnectionIterator) {
     let (tx, rx) = channel();

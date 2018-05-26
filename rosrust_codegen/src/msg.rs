@@ -1,5 +1,5 @@
-use regex::Regex;
 use error::{Result, ResultExt};
+use regex::Regex;
 use std::collections::HashMap;
 
 pub struct Msg {
@@ -15,7 +15,7 @@ impl Msg {
         Ok(Msg {
             package: package.to_owned(),
             name: name.to_owned(),
-            fields: fields,
+            fields,
             source: source.trim().into(),
         })
     }
@@ -39,8 +39,8 @@ impl Msg {
         &self,
         hashes: &HashMap<(String, String), String>,
     ) -> ::std::result::Result<String, ()> {
-        use crypto::md5::Md5;
         use crypto::digest::Digest;
+        use crypto::md5::Md5;
         let mut hasher = Md5::new();
         hasher.input_str(&self.get_md5_representation(hashes)?);
         Ok(hasher.result_str())
@@ -142,8 +142,9 @@ fn match_field(data: &str) -> Option<FieldLine> {
 fn match_vector_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            "^{}{}{}{}{}$", FIELD_TYPE, IGNORE_WHITESPACE, EMPTY_BRACKETS, ANY_WHITESPACE,
-            FIELD_NAME);
+            "^{}{}{}{}{}$",
+            FIELD_TYPE, IGNORE_WHITESPACE, EMPTY_BRACKETS, ANY_WHITESPACE, FIELD_NAME
+        );
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -159,8 +160,9 @@ fn match_vector_field(data: &str) -> Option<FieldLine> {
 fn match_array_field(data: &str) -> Option<(FieldLine, usize)> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            "^{}{}{}{}{}$", FIELD_TYPE, IGNORE_WHITESPACE, NUMBER_BRACKETS, ANY_WHITESPACE,
-            FIELD_NAME);
+            "^{}{}{}{}{}$",
+            FIELD_TYPE, IGNORE_WHITESPACE, NUMBER_BRACKETS, ANY_WHITESPACE, FIELD_NAME
+        );
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -179,8 +181,9 @@ fn match_array_field(data: &str) -> Option<(FieldLine, usize)> {
 fn match_const_string(data: &str) -> Option<(FieldLine, String)> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            r"^(string){}{}{}={}(.*)$", ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE,
-            IGNORE_WHITESPACE);
+            r"^(string){}{}{}={}(.*)$",
+            ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, IGNORE_WHITESPACE
+        );
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -199,8 +202,9 @@ fn match_const_string(data: &str) -> Option<(FieldLine, String)> {
 fn match_const_numeric(data: &str) -> Option<(FieldLine, String)> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            r"^{}{}{}{}={}(-?[0-9]+)$", FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME,
-            IGNORE_WHITESPACE, IGNORE_WHITESPACE);
+            r"^{}{}{}{}={}(-?[0-9]+)$",
+            FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, IGNORE_WHITESPACE
+        );
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
     }
     let captures = match RE.captures(data) {
@@ -366,7 +370,7 @@ impl FieldInfo {
             datatype: parse_datatype(datatype)
                 .ok_or_else(|| format!("Unsupported datatype: {}", datatype))?,
             name: name.to_owned(),
-            case: case,
+            case,
         })
     }
 }

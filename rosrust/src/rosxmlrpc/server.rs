@@ -11,7 +11,7 @@ impl Default for Server {
     fn default() -> Self {
         let mut server = xml_rpc::Server::default();
         server.set_on_missing(on_missing);
-        Server { server: server }
+        Server { server }
     }
 }
 

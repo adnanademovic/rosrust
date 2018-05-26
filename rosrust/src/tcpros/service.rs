@@ -1,14 +1,14 @@
-use byteorder::WriteBytesExt;
-use std::net::TcpListener;
-use std::thread;
-use std::sync::Arc;
-use std::collections::HashMap;
-use std;
-use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result};
 use super::header;
 use super::util::tcpconnection;
 use super::{ServicePair, ServiceResult};
+use byteorder::WriteBytesExt;
+use serde_rosmsg::{from_reader, to_writer};
+use std;
+use std::collections::HashMap;
+use std::net::TcpListener;
+use std::sync::Arc;
+use std::thread;
 
 pub struct Service {
     pub api: String,
@@ -147,7 +147,7 @@ where
     });
 }
 
-fn handle_request_loop<T, U, F>(mut stream: U, handler: &Arc<F>) -> Result<()>
+fn handle_request_loop<T, U, F>(mut stream: U, handler: &F) -> Result<()>
 where
     T: ServicePair,
     U: std::io::Read + std::io::Write,

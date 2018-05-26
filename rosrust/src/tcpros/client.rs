@@ -1,13 +1,13 @@
-use byteorder::ReadBytesExt;
-use std::net::TcpStream;
-use std::thread;
-use std::sync::Arc;
-use std::collections::HashMap;
-use std;
-use serde_rosmsg::{from_reader, to_writer};
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
+use byteorder::ReadBytesExt;
+use serde_rosmsg::{from_reader, to_writer};
+use std;
+use std::collections::HashMap;
+use std::net::TcpStream;
+use std::sync::Arc;
+use std::thread;
 
 pub struct ClientResponse<T> {
     handle: thread::JoinHandle<Result<ServiceResult<T>>>,

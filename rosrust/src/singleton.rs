@@ -1,13 +1,13 @@
-use api::{Parameter, Rate, Ros, SystemState, Topic};
 use api::raii::{Publisher, Service, Subscriber};
 use api::resolve::get_unused_args;
+use api::{Parameter, Rate, Ros, SystemState, Topic};
 use ctrlc;
 use error::{Result, ResultExt};
 use rosxmlrpc::Response;
-use tcpros::{Client, Message, ServicePair, ServiceResult};
-use time::{Duration, Time};
 use std::sync::Mutex;
 use std::time;
+use tcpros::{Client, Message, ServicePair, ServiceResult};
+use time::{Duration, Time};
 
 lazy_static! {
     static ref ROS: Mutex<Option<Ros>> = Mutex::new(None);
@@ -35,7 +35,9 @@ pub fn try_init(name: &str) -> Result<()> {
 }
 
 macro_rules! ros {
-    () => {ROS.lock().expect(LOCK_FAIL).as_mut().expect(UNINITIALIZED)}
+    () => {
+        ROS.lock().expect(LOCK_FAIL).as_mut().expect(UNINITIALIZED)
+    };
 }
 
 #[inline]

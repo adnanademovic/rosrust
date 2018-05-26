@@ -1,10 +1,10 @@
+use super::error::{self, ErrorKind, Result};
+use futures::sync::mpsc::Sender;
 use nix::unistd::getpid;
 use rosxmlrpc::{Response, ResponseError, Server};
-use std::net::SocketAddr;
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use futures::sync::mpsc::Sender;
-use super::error::{self, ErrorKind, Result};
 use tcpros::{Publisher, Service, Subscriber};
 use xml_rpc::{self, Params, Value};
 
@@ -198,10 +198,10 @@ impl SlaveHandler {
         });
 
         SlaveHandler {
-            subscriptions: subscriptions,
-            publications: publications,
+            subscriptions,
+            publications,
             services: Arc::new(Mutex::new(HashMap::new())),
-            server: server,
+            server,
         }
     }
 

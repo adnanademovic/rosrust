@@ -1,10 +1,10 @@
-use futures::sync::mpsc::channel as futures_channel;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{channel, Sender};
-use std::thread;
 use super::error::{self, ErrorKind, Result, ResultExt};
 use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
+use futures::sync::mpsc::channel as futures_channel;
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use tcpros::{Message, Publisher, PublisherStream, Service, ServicePair, ServiceResult, Subscriber};
 
 pub struct Slave {
@@ -25,8 +25,8 @@ impl Slave {
         name: &str,
         outer_shutdown_tx: Sender<()>,
     ) -> Result<Slave> {
-        use std::net::ToSocketAddrs;
         use futures::{Future, Stream};
+        use std::net::ToSocketAddrs;
 
         let (shutdown_tx, shutdown_rx) = futures_channel(1);
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
@@ -64,10 +64,10 @@ impl Slave {
 
         Ok(Slave {
             name: String::from(name),
-            uri: uri,
+            uri,
             publications: pubs,
             subscriptions: subs,
-            services: services,
+            services,
         })
     }
 

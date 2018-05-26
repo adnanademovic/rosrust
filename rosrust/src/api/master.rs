@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::super::rosxmlrpc::{self, Response as Result};
+use serde::{Deserialize, Serialize};
 use xml_rpc;
 
 pub struct Master {

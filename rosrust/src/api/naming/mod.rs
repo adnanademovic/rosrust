@@ -1,10 +1,10 @@
-use self::path::Path;
-use self::mapper::Mapper;
 pub use self::error::{Error, ErrorKind};
+use self::mapper::Mapper;
+use self::path::Path;
 
-mod path;
-mod mapper;
 pub mod error;
+mod mapper;
+mod path;
 
 pub struct Resolver {
     path: path::Buffer,
@@ -17,8 +17,8 @@ impl Resolver {
         let path = name.parse::<path::Buffer>()?;
         let namespace = path.parent()?.take();
         Ok(Resolver {
-            path: path,
-            namespace: namespace,
+            path,
+            namespace,
             mapper: Mapper::new(),
         })
     }
@@ -53,8 +53,8 @@ impl Resolver {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::path::Path;
+    use super::*;
 
     static FAILED_TO_RESOLVE: &'static str = "Failed to resolve";
 

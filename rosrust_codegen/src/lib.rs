@@ -7,10 +7,10 @@ extern crate error_chain;
 extern crate lazy_static;
 extern crate regex;
 
-pub mod msg;
-pub mod helpers;
 pub mod error;
 pub mod genmsg;
+pub mod helpers;
+pub mod msg;
 
 use std::env;
 use std::fs::File;
@@ -45,7 +45,9 @@ macro_rules! rosmsg_main_no_prefix {
 
 #[macro_export]
 macro_rules! rosmsg_include {
-    () => {include!(concat!(env!("OUT_DIR"), "/msg.rs"));}
+    () => {
+        include!(concat!(env!("OUT_DIR"), "/msg.rs"));
+    };
 }
 
 pub fn depend_on_messages(messages: &[&str], crate_prefix: &str) {

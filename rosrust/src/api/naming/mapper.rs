@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use super::path::{Buffer, Path, Slice};
+use std::collections::HashMap;
 
 pub struct Mapper {
     children: HashMap<String, Mapper>,
@@ -38,8 +38,8 @@ impl Mapper {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::path::{Buffer, Path};
+    use super::*;
 
     static FAILED_TO_MAP: &'static str = "Failed to map";
 

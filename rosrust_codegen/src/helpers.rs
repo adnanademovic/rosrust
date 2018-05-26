@@ -1,10 +1,10 @@
-use std::collections::{HashMap, HashSet, LinkedList};
-use msg::Msg;
 use error::{Result, ResultExt};
+use msg::Msg;
+use regex::RegexBuilder;
 use std;
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::File;
 use std::path::Path;
-use regex::RegexBuilder;
 
 pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String), String>> {
     let mut representations = HashMap::<(String, String), String>::new();
@@ -48,8 +48,8 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String
 }
 
 fn calculate_md5_from_representation(v: &str) -> String {
-    use crypto::md5::Md5;
     use crypto::digest::Digest;
+    use crypto::md5::Md5;
     let mut hasher = Md5::new();
     hasher.input_str(v);
     hasher.result_str()

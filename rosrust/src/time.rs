@@ -1,6 +1,6 @@
 use std::cmp;
-use std::time;
 use std::ops;
+use std::time;
 
 const BILLION: i64 = 1_000_000_000;
 

@@ -1,6 +1,6 @@
+use super::{Response, ResponseError, ERROR_CODE, FAILURE_CODE, SUCCESS_CODE};
 use serde::{Deserialize, Serialize};
 use xml_rpc::{self, Params, Value};
-use super::{Response, ResponseError, ERROR_CODE, FAILURE_CODE, SUCCESS_CODE};
 
 pub struct Client {
     master_uri: String,

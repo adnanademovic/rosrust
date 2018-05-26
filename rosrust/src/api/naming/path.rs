@@ -1,7 +1,7 @@
-use std;
-use std::ops::{Add, AddAssign};
-use std::fmt;
 use super::error::{Error, ErrorKind};
+use std;
+use std::fmt;
+use std::ops::{Add, AddAssign};
 
 pub trait Path {
     fn get(&self) -> &[String];

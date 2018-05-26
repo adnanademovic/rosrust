@@ -1,7 +1,7 @@
+use super::clock::Clock;
 use super::error::Result;
 use super::master::Master;
 use super::slave::Slave;
-use super::clock::Clock;
 use rosxmlrpc::Response;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;

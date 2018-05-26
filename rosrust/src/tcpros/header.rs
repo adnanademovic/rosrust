@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use std;
 use serde_rosmsg::{from_reader, to_writer, Error};
+use std;
+use std::collections::HashMap;
 
 pub fn decode<R: std::io::Read>(data: &mut R) -> Result<HashMap<String, String>, Error> {
     from_reader(data)

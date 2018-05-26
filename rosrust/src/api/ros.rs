@@ -1,18 +1,18 @@
-use msg::rosgraph_msgs::{Clock as ClockMsg, Log};
-use msg::std_msgs::Header;
-use time::{Duration, Time};
-use serde::{Deserialize, Serialize};
-use std::sync::{mpsc, Arc};
-use std::time;
-use super::clock::{Clock, Rate, RealClock, SimulatedClock};
-use super::master::{self, Master, Topic};
-use super::slave::Slave;
-use super::error::{ErrorKind, Result, ResultExt};
 use super::super::rosxmlrpc::Response;
+use super::clock::{Clock, Rate, RealClock, SimulatedClock};
+use super::error::{ErrorKind, Result, ResultExt};
+use super::master::{self, Master, Topic};
 use super::naming::{self, Resolver};
 use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
+use super::slave::Slave;
+use msg::rosgraph_msgs::{Clock as ClockMsg, Log};
+use msg::std_msgs::Header;
+use serde::{Deserialize, Serialize};
+use std::sync::{mpsc, Arc};
+use std::time;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
+use time::{Duration, Time};
 use xml_rpc;
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -91,8 +91,8 @@ impl Ros {
             master: Arc::new(master),
             slave: Arc::new(slave),
             hostname: String::from(hostname),
-            resolver: resolver,
-            name: name,
+            resolver,
+            name,
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
             logger: None,
@@ -199,7 +199,7 @@ impl Ros {
             match e {
                 ResponseError::Client(ref m) if m == "no provider" => {
                     if let Some(ref timeout) = timeout {
-                        if &now.elapsed() > timeout {
+                        if now.elapsed() > *timeout {
                             return Err(ErrorKind::TimeoutError.into());
                         }
                     }

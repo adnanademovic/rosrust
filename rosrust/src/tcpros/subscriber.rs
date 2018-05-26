@@ -1,13 +1,13 @@
+use super::Message;
+use super::error::{ErrorKind, Result, ResultExt};
+use super::header::{decode, encode, match_field};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use serde_rosmsg::from_slice;
+use std;
+use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-use std::collections::HashMap;
-use std;
-use serde_rosmsg::from_slice;
-use super::error::{ErrorKind, Result, ResultExt};
-use super::header::{decode, encode, match_field};
-use super::Message;
 
 pub struct Subscriber {
     data_stream: Sender<Option<Vec<u8>>>,
@@ -30,7 +30,7 @@ impl Subscriber {
         thread::spawn(move || join_connections::<T>(&data_tx, pub_rx, &caller_id, &topic_name));
         thread::spawn(move || handle_data::<T, F>(data_rx, callback));
         Subscriber {
-            data_stream: data_stream,
+            data_stream,
             publishers_stream: pub_tx,
             topic: String::from(topic),
             msg_type: T::msg_type(),

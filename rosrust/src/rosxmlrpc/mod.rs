@@ -1,6 +1,6 @@
-use std;
 pub use self::client::Client;
 pub use self::server::Server;
+use std;
 
 pub mod client;
 pub mod error;

@@ -1,14 +1,14 @@
-use std::net::{TcpListener, ToSocketAddrs};
-use std::thread;
-use std::collections::HashMap;
-use std;
-use std::sync::{Arc, Mutex};
-use serde_rosmsg::to_vec;
+use super::Message;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header;
-use super::Message;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
+use serde_rosmsg::to_vec;
+use std;
+use std::collections::HashMap;
+use std::net::{TcpListener, ToSocketAddrs};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 pub struct Publisher {
     subscriptions: DataStream,
@@ -51,7 +51,7 @@ fn listen_for_subscribers<T, U, V>(
     topic: &str,
     listener: V,
     targets: &TargetList<U>,
-    last_message: Arc<Mutex<Arc<Vec<u8>>>>,
+    last_message: &Mutex<Arc<Vec<u8>>>,
 ) where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
@@ -117,11 +117,11 @@ impl Publisher {
         let last_message = Arc::new(Mutex::new(Arc::new(Vec::new())));
         let last_msg_for_thread = Arc::clone(&last_message);
         thread::spawn(move || {
-            listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets, last_msg_for_thread)
+            listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets, &last_msg_for_thread)
         });
         Publisher {
             subscriptions: data,
-            port: port,
+            port,
             msg_type: T::msg_type(),
             topic: String::from(topic),
             last_message,

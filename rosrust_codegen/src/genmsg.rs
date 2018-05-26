@@ -1,6 +1,6 @@
-use std::collections::HashSet;
-use helpers;
 use error::Result;
+use helpers;
+use std::collections::HashSet;
 
 pub fn depend_on_messages(
     folders: &[&str],

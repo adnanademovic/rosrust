@@ -130,7 +130,7 @@ mod tests {
 
     static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
 
-    lazy_static!{
+    lazy_static! {
         static ref DATA: Mutex<Vec<String>> = Mutex::new(Vec::new());
         static ref TESTCASE: Mutex<()> = Mutex::new(());
     }
