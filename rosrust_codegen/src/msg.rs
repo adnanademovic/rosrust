@@ -1,11 +1,15 @@
 use error::{Result, ResultExt};
+use proc_macro2::{Literal, Span};
+use quote::ToTokens;
 use regex::Regex;
 use std::collections::HashMap;
+use syn::{self, Ident};
 
+#[derive(Clone)]
 pub struct Msg {
     pub package: String,
     pub name: String,
-    fields: Vec<FieldInfo>,
+    pub fields: Vec<FieldInfo>,
     pub source: String,
 }
 
@@ -18,6 +22,32 @@ impl Msg {
             fields,
             source: source.trim().into(),
         })
+    }
+
+    pub fn name_ident(&self) -> Ident {
+        Ident::new(&self.name, Span::call_site())
+    }
+
+    pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let name = self.name_ident();
+        let fields = self.fields
+            .iter()
+            .map(|v| v.field_token_stream(crate_prefix))
+            .collect::<Vec<_>>();
+        let const_fields = self.fields
+            .iter()
+            .map(|v| v.const_token_stream(crate_prefix))
+            .collect::<Vec<_>>();
+        quote!{
+            #[allow(dead_code, non_camel_case_types, non_snake_case)]
+            #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+            pub struct #name {
+                #(#fields)*
+            }
+            impl #name {
+                #(#const_fields)*
+            }
+        }
     }
 
     pub fn get_type(&self) -> String {
@@ -35,6 +65,7 @@ impl Msg {
             .collect()
     }
 
+    #[cfg(test)]
     pub fn calculate_md5(
         &self,
         hashes: &HashMap<(String, String), String>,
@@ -68,52 +99,29 @@ impl Msg {
         Ok(representation)
     }
 
-    pub fn const_string(&self, crate_prefix: &str) -> String {
-        let mut output = Vec::<String>::new();
-        for field in &self.fields {
-            if let Some(s) = field.to_const_string(crate_prefix) {
-                output.push("            #[allow(dead_code,non_upper_case_globals)]".into());
-                output.push(format!("            pub const {}", s));
-            }
-        }
-        output.join("\n")
+    pub fn has_header(&self) -> bool {
+        self.fields.iter().any(FieldInfo::is_header)
     }
 
-    pub fn struct_string(&self, crate_prefix: &str) -> String {
-        let mut output = Vec::<String>::new();
-        output.push("        #[allow(dead_code,non_camel_case_types,non_snake_case)]".into());
-        output.push("        #[derive(Serialize,Deserialize,Clone,Debug,Default)]".into());
-        output.push(format!("        pub struct {} {{", self.name));
-        for field in &self.fields {
-            if let Some(s) = field.to_string(crate_prefix) {
-                output.push(format!("            pub {}", s));
-            }
+    pub fn header_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        if !self.has_header() {
+            return quote!{};
         }
-        output.push("        }".into());
-        output.join("\n")
-    }
-
-    pub fn header_string(&self, crate_prefix: &str) -> String {
-        if !self.fields.iter().any(FieldInfo::is_header) {
-            return String::new();
-        }
-        format!(
-            r#"
+        quote!{
             fn set_header(
                 &mut self,
-                clock: &::std::sync::Arc<{}Clock>,
+                clock: &::std::sync::Arc<#crate_prefix Clock>,
                 seq: &::std::sync::Arc<::std::sync::atomic::AtomicUsize>,
-            ) {{
-                if self.header.seq == 0 {{
+            ) {
+                if self.header.seq == 0 {
                     self.header.seq =
                         seq.fetch_add(1, ::std::sync::atomic::Ordering::SeqCst) as u32;
-                }}
-                if self.header.stamp.nanos() == 0 {{
+                }
+                if self.header.stamp.nanos() == 0 {
                     self.header.stamp = clock.now();
-                }}
-            }}"#,
-            crate_prefix
-        )
+                }
+            }
+        }
     }
 }
 
@@ -294,19 +302,19 @@ struct FieldLine {
     field_name: String,
 }
 
-#[derive(Debug, PartialEq)]
-enum FieldCase {
+#[derive(Clone, Debug, PartialEq)]
+pub enum FieldCase {
     Unit,
     Vector,
     Array(usize),
     Const(String),
 }
 
-#[derive(Debug, PartialEq)]
-struct FieldInfo {
-    datatype: DataType,
-    name: String,
-    case: FieldCase,
+#[derive(Clone, Debug, PartialEq)]
+pub struct FieldInfo {
+    pub datatype: DataType,
+    pub name: String,
+    pub case: FieldCase,
 }
 
 impl FieldInfo {
@@ -314,6 +322,85 @@ impl FieldInfo {
         match self.case {
             FieldCase::Const(..) => true,
             _ => false,
+        }
+    }
+
+    pub fn field_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let datatype = self.datatype.token_stream(crate_prefix);
+        let name = Ident::new(&self.name, Span::call_site());
+        match self.case {
+            FieldCase::Unit => quote!{ pub #name: #datatype, },
+            FieldCase::Vector => quote!{ pub #name: Vec<#datatype>, },
+            FieldCase::Array(l) => quote!{ pub #name: [#datatype; #l], },
+            FieldCase::Const(_) => quote!{},
+        }
+    }
+
+    pub fn const_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let value = match self.case {
+            FieldCase::Const(ref value) => value,
+            _ => return quote!{},
+        };
+        let name = Ident::new(&self.name, Span::call_site());
+        let datatype = self.datatype.token_stream(crate_prefix);
+        let insides = match self.datatype {
+            DataType::Bool => {
+                let bool_value = if value != "0" {
+                    quote!{ true }
+                } else {
+                    quote!{ false }
+                };
+                quote!{ #name; bool = #bool_value }
+            }
+            DataType::String => quote!{ #name: &'static str = #value },
+            DataType::Time
+            | DataType::Duration
+            | DataType::LocalStruct(..)
+            | DataType::RemoteStruct(..) => return quote!{},
+            DataType::I8(_) => {
+                let numeric_value = syn::Lit::new(Literal::i8_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::I16 => {
+                let numeric_value = syn::Lit::new(Literal::i16_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::I32 => {
+                let numeric_value = syn::Lit::new(Literal::i32_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::I64 => {
+                let numeric_value = syn::Lit::new(Literal::i64_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::U8(_) => {
+                let numeric_value = syn::Lit::new(Literal::u8_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::U16 => {
+                let numeric_value = syn::Lit::new(Literal::u16_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::U32 => {
+                let numeric_value = syn::Lit::new(Literal::u32_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::U64 => {
+                let numeric_value = syn::Lit::new(Literal::u64_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::F32 => {
+                let numeric_value = syn::Lit::new(Literal::f32_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+            DataType::F64 => {
+                let numeric_value = syn::Lit::new(Literal::f64_suffixed(value.parse().unwrap()));
+                quote!{ #name: #datatype = #numeric_value as #datatype }
+            }
+        };
+        quote!{
+            #[allow(dead_code,non_upper_case_globals)]
+            pub const #insides;
         }
     }
 
@@ -336,35 +423,6 @@ impl FieldInfo {
             && self.datatype == DataType::RemoteStruct("std_msgs".into(), "Header".into())
     }
 
-    fn to_string(&self, crate_prefix: &str) -> Option<String> {
-        let datatype = self.datatype.rust_type(crate_prefix);
-        match self.case {
-            FieldCase::Unit => Some(format!("{}: {},", self.name, datatype)),
-            FieldCase::Vector => Some(format!("{}: Vec<{}>,", self.name, datatype)),
-            FieldCase::Array(l) => Some(format!("{}: [{}; {}],", self.name, datatype, l)),
-            FieldCase::Const(_) => None,
-        }
-    }
-
-    fn to_const_string(&self, crate_prefix: &str) -> Option<String> {
-        let value = match self.case {
-            FieldCase::Const(ref value) => value,
-            _ => return None,
-        };
-        Some(match self.datatype {
-            DataType::Bool => format!("{}: bool = {:?};", self.name, value != "0"),
-            DataType::String => format!("{}: &'static str = {:?};", self.name, value),
-            DataType::Time
-            | DataType::Duration
-            | DataType::LocalStruct(..)
-            | DataType::RemoteStruct(..) => return None,
-            _ => {
-                let datatype = self.datatype.rust_type(crate_prefix);
-                format!("{}: {} = {} as {};", self.name, datatype, value, datatype)
-            }
-        })
-    }
-
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
         Ok(FieldInfo {
             datatype: parse_datatype(datatype)
@@ -375,8 +433,8 @@ impl FieldInfo {
     }
 }
 
-#[derive(Debug, PartialEq)]
-enum DataType {
+#[derive(Clone, Debug, PartialEq)]
+pub enum DataType {
     Bool,
     I8(bool),
     I16,
@@ -396,24 +454,31 @@ enum DataType {
 }
 
 impl DataType {
-    fn rust_type(&self, crate_prefix: &str) -> String {
+    pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         match *self {
-            DataType::Bool => "bool".into(),
-            DataType::I8(_) => "i8".into(),
-            DataType::I16 => "i16".into(),
-            DataType::I32 => "i32".into(),
-            DataType::I64 => "i64".into(),
-            DataType::U8(_) => "u8".into(),
-            DataType::U16 => "u16".into(),
-            DataType::U32 => "u32".into(),
-            DataType::U64 => "u64".into(),
-            DataType::F32 => "f32".into(),
-            DataType::F64 => "f64".into(),
-            DataType::String => "::std::string::String".into(),
-            DataType::Time => format!("{}Time", crate_prefix),
-            DataType::Duration => format!("{}Duration", crate_prefix),
-            DataType::LocalStruct(ref name) => name.clone(),
-            DataType::RemoteStruct(ref pkg, ref name) => format!("super::{}::{}", pkg, name),
+            DataType::Bool => quote!{ bool },
+            DataType::I8(_) => quote!{ i8 },
+            DataType::I16 => quote!{ i16 },
+            DataType::I32 => quote!{ i32 },
+            DataType::I64 => quote!{ i64 },
+            DataType::U8(_) => quote!{ u8 },
+            DataType::U16 => quote!{ u16 },
+            DataType::U32 => quote!{ u32 },
+            DataType::U64 => quote!{ u64 },
+            DataType::F32 => quote!{ f32 },
+            DataType::F64 => quote!{ f64 },
+            DataType::String => quote!{ ::std::string::String },
+            DataType::Time => quote!{ #crate_prefix Time },
+            DataType::Duration => quote!{ #crate_prefix Duration },
+            DataType::LocalStruct(ref name) => {
+                let name = Ident::new(&name, Span::call_site());
+                quote!{ #name }
+            }
+            DataType::RemoteStruct(ref pkg, ref name) => {
+                let name = Ident::new(&name, Span::call_site());
+                let pkg = Ident::new(&pkg, Span::call_site());
+                quote!{ super::#pkg::#name }
+            }
         }
     }
 

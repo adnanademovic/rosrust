@@ -19,6 +19,3 @@ path = "src/client.rs"
 [[bin]]
 name = "service"
 path = "src/service.rs"
-
-[build-dependencies]
-rosrust_codegen = {path="../../rosrust_codegen"}

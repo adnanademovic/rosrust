@@ -7,9 +7,6 @@ readme = "../README.md"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.6.5"
 
-[build-dependencies]
-rosrust_codegen = "0.6.5"
-
 [dependencies]
 byteorder = "1.2.1"
 ctrlc = "3.0.3"

@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 
 extern crate proc_macro;
+extern crate proc_macro2;
 #[macro_use]
 extern crate quote;
 extern crate crypto;
@@ -15,51 +16,12 @@ mod error;
 mod genmsg;
 mod helpers;
 mod msg;
+mod output_layout;
 mod rosmsg_include;
-
-/*
-#[macro_export]
-macro_rules! rosmsg_main {
-    ($($msg:expr),*) => {
-        fn main() {
-            $crate::depend_on_messages(&[
-            $(
-                $msg,
-            )*
-            ], "::rosrust::");
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! rosmsg_main_no_prefix {
-    ($($msg:expr),*) => {
-        fn main() {
-            $crate::depend_on_messages(&[
-            $(
-                $msg,
-            )*
-            ], "::");
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! rosmsg_include {
-    ($msgs:expr) => {
-        mod __rosrust_rosmsg_include {
-            #[derive(RosmsgInclude)]
-            #[rosmsg_includes=$msgs]
-            struct _RosmsgIncludeDummy;
-        }
-        pub use self::__rosrust_rosmsg_include::*;
-    }
-}
-*/
 
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(RosmsgInclude, attributes(rosmsg_includes))]
+#[proc_macro_derive(RosmsgInclude, attributes(rosmsg_includes, rosrust_internal))]
 pub fn rosmsg_include(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     rosmsg_include::implement(&ast)

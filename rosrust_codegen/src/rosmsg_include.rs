@@ -1,19 +1,16 @@
 use genmsg;
 use proc_macro::TokenStream;
-use quote;
 use std::env;
-use std::fs::File;
-use std::io::Write;
 use std::path::Path;
 use syn;
 
-fn read_rosmsg_includes_attribute(attrs: &Vec<syn::Attribute>) -> String {
+fn read_rosmsg_includes_attribute(attrs: &[syn::Attribute]) -> String {
     for attr in attrs {
         if attr.is_sugared_doc {
             continue;
         }
         if let Some(syn::Meta::NameValue(data)) = attr.interpret_meta() {
-            if format!("{}", data.ident) != "rosmsg_includes" {
+            if data.ident != "rosmsg_includes" {
                 continue;
             }
             match data.lit {
@@ -25,18 +22,30 @@ fn read_rosmsg_includes_attribute(attrs: &Vec<syn::Attribute>) -> String {
     panic!("rosmsg_includes attribute is not provided");
 }
 
+fn is_internal(attrs: &[syn::Attribute]) -> bool {
+    for attr in attrs {
+        if attr.is_sugared_doc {
+            continue;
+        }
+        if let Some(syn::Meta::Word(data)) = attr.interpret_meta() {
+            if data == "rosrust_internal" {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn implement(ast: &syn::DeriveInput) -> TokenStream {
     let message_string = read_rosmsg_includes_attribute(&ast.attrs);
     let messages = message_string
         .split(',')
         .map(|v| v.trim())
         .collect::<Vec<&str>>();
-    depend_on_messages(&messages, "::rosrust::");
-    let output = quote!{};
-    output.into()
+    depend_on_messages(&messages, is_internal(&ast.attrs))
 }
 
-fn depend_on_messages(messages: &[&str], crate_prefix: &str) {
+fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
     let cmake_paths = env::var("CMAKE_PREFIX_PATH")
         .unwrap_or_default()
         .split(':')
@@ -58,8 +67,14 @@ fn depend_on_messages(messages: &[&str], crate_prefix: &str) {
         .chain(extra_paths.iter())
         .map(|v| v.as_str())
         .collect::<Vec<&str>>();
-    let output = genmsg::depend_on_messages(paths.as_slice(), messages, crate_prefix).unwrap();
-    panic!(output);
+    let output = genmsg::depend_on_messages(paths.as_slice(), messages)
+        .unwrap()
+        .token_stream(&if internal {
+            quote!{ :: }
+        } else {
+            quote!{ ::rosrust:: }
+        });
+    (quote!{#output}).into()
 }
 
 fn append_share_folder(path: &str) -> Option<String> {

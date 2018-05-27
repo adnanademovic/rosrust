@@ -23,6 +23,3 @@ path = "src/publisher_latch_demo.rs"
 [[bin]]
 name = "subscriber"
 path = "src/subscriber.rs"
-
-[build-dependencies]
-rosrust_codegen = {path="../../rosrust_codegen"}
