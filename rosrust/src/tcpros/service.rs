@@ -82,10 +82,13 @@ where
     for mut stream in connections {
         // Service request starts by exchanging connection headers
         if let Err(err) = exchange_headers::<T, _>(&mut stream, service, node_name) {
-            error!(
-                "Failed to exchange headers for service '{}': {}",
-                service, err
-            );
+            // Cconnection can be closed when a client checks for a service.
+            if !err.is_closed_connection() {
+                error!(
+                    "Failed to exchange headers for service '{}': {}",
+                    service, err
+                );
+            }
             continue;
         }
 
