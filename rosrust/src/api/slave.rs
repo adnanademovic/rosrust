@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tcpros::{Message, Publisher, PublisherStream, Service, ServicePair, ServiceResult, Subscriber};
+use tcpros::{
+    Message, Publisher, PublisherStream, Service, ServicePair, ServiceResult, Subscriber,
+};
 
 pub struct Slave {
     name: String,

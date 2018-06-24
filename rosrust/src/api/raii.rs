@@ -3,8 +3,8 @@ use super::error::Result;
 use super::master::Master;
 use super::slave::Slave;
 use rosxmlrpc::Response;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
 
 #[derive(Clone)]

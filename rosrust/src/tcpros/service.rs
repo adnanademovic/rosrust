@@ -34,12 +34,7 @@ impl Service {
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
         let (raii, listener) = tcpconnection::iterate(listener, format!("service '{}'", service));
         Ok(Service::wrap_stream::<T, _, _, _>(
-            service,
-            node_name,
-            handler,
-            raii,
-            listener,
-            &api,
+            service, node_name, handler, raii, listener, &api,
         ))
     }
 

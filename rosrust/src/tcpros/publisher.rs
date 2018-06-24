@@ -1,8 +1,8 @@
-use super::Message;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
+use super::Message;
 use serde_rosmsg::to_vec;
 use std;
 use std::collections::HashMap;

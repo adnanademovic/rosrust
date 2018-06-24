@@ -20,6 +20,7 @@ extern crate xml_rpc;
 extern crate yaml_rust;
 
 pub use api::{error, Clock, Parameter};
+pub use rosmsg::RosMsg;
 pub use singleton::*;
 pub use tcpros::{Client, Message, PublisherStream, ServicePair as Service};
 pub use time::{Duration, Time};
@@ -27,6 +28,7 @@ pub use time::{Duration, Time};
 pub mod api;
 mod log_macros;
 pub mod msg;
+pub mod rosmsg;
 mod rosxmlrpc;
 pub mod singleton;
 mod tcpros;

@@ -6,9 +6,9 @@ pub use self::subscriber::Subscriber;
 use serde::de::Deserialize;
 use serde::ser::Serialize;
 
-use Clock;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use Clock;
 
 mod client;
 pub mod error;

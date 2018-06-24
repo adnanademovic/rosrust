@@ -1,6 +1,6 @@
-use super::Message;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
+use super::Message;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use serde_rosmsg::from_slice;
 use std;

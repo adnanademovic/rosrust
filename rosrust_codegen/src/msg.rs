@@ -50,6 +50,29 @@ impl Msg {
         }
     }
 
+    pub fn token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let fields = self.fields
+            .iter()
+            .map(|v| v.field_token_stream_encode(crate_prefix))
+            .collect::<Vec<_>>();
+        quote!{
+            #(#fields)*
+            Ok(())
+        }
+    }
+
+    pub fn token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let fields = self.fields
+            .iter()
+            .map(|v| v.field_token_stream_decode(crate_prefix))
+            .collect::<Vec<_>>();
+        quote!{
+            Ok(Self {
+                #(#fields)*
+            })
+        }
+    }
+
     pub fn get_type(&self) -> String {
         format!("{}/{}", self.package, self.name)
     }
@@ -336,6 +359,30 @@ impl FieldInfo {
         }
     }
 
+    pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let name = Ident::new(&self.name, Span::call_site());
+        match self.case {
+            FieldCase::Unit => quote!{ self.#name.encode(w)?; },
+            FieldCase::Vector => {
+                quote!{ #crate_prefix rosmsg::encode_variable_slice(&self.#name, w)?; }
+            }
+            FieldCase::Array(_l) => {
+                quote!{ #crate_prefix rosmsg::encode_fixed_slice(&self.#name, w)?; }
+            }
+            FieldCase::Const(_) => quote!{},
+        }
+    }
+
+    pub fn field_token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
+        let name = Ident::new(&self.name, Span::call_site());
+        match self.case {
+            FieldCase::Unit => quote!{ #name: #crate_prefix rosmsg::RosMsg::decode(r)?, },
+            FieldCase::Vector => quote!{ #name: #crate_prefix rosmsg::decode_variable_vec(r)?, },
+            FieldCase::Array(l) => quote!{ #name: #crate_prefix rosmsg::decode_fixed_vec(#l, r)?, },
+            FieldCase::Const(_) => quote!{},
+        }
+    }
+
     pub fn const_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let value = match self.case {
             FieldCase::Const(ref value) => value,
@@ -419,7 +466,8 @@ impl FieldInfo {
     }
 
     fn is_header(&self) -> bool {
-        self.case == FieldCase::Unit && self.name == "header"
+        self.case == FieldCase::Unit
+            && self.name == "header"
             && self.datatype == DataType::RemoteStruct("std_msgs".into(), "Header".into())
     }
 

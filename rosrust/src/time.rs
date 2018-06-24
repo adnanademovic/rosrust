@@ -6,8 +6,8 @@ const BILLION: i64 = 1_000_000_000;
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Time {
-    pub sec: i32,
-    pub nsec: i32,
+    pub sec: u32,
+    pub nsec: u32,
 }
 
 impl Time {
@@ -19,8 +19,8 @@ impl Time {
     #[inline]
     pub fn from_nanos(t: i64) -> Time {
         Time {
-            sec: (t / BILLION) as i32,
-            nsec: (t % BILLION) as i32,
+            sec: (t / BILLION) as u32,
+            nsec: (t % BILLION) as u32,
         }
     }
 

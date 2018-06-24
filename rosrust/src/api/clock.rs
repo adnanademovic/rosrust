@@ -47,8 +47,8 @@ impl Clock for RealClock {
             .duration_since(UNIX_EPOCH)
             .expect(BEFORE_EPOCH);
         Time {
-            sec: time.as_secs() as i32,
-            nsec: time.subsec_nanos() as i32,
+            sec: time.as_secs() as u32,
+            nsec: time.subsec_nanos() as u32,
         }
     }
 

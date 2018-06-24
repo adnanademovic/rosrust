@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::io::Write;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 
 pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {

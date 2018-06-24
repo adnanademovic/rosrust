@@ -61,6 +61,8 @@ impl Message {
             msg_type,
         } = self;
         let base_message = message.token_stream(crate_prefix);
+        let encode_message = message.token_stream_encode(crate_prefix);
+        let decode_message = message.token_stream_decode(crate_prefix);
         let name = message.name_ident();
         let header_tokens = message.header_token_stream(crate_prefix);
         quote!{
@@ -85,6 +87,15 @@ impl Message {
                 #header_tokens
             }
 
+            impl #crate_prefix rosmsg::RosMsg for #name {
+                fn encode<W: ::std::io::Write>(&self, w: &mut W) -> ::std::io::Result<()> {
+                    #encode_message
+                }
+
+                fn decode<R: ::std::io::Read>(r: &mut R) -> ::std::io::Result<Self> {
+                    #decode_message
+                }
+            }
         }
     }
 }
