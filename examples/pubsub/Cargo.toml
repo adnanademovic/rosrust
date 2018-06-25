@@ -9,8 +9,6 @@ version = "0.0.1"
 env_logger = "0.5"
 rosrust = {path="../../rosrust"}
 rosrust_codegen = {path="../../rosrust_codegen"}
-serde = "1.0.25"
-serde_derive = "1.0.25"
 
 [[bin]]
 name = "publisher"

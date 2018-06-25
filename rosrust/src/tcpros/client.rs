@@ -2,7 +2,8 @@ use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
 use byteorder::ReadBytesExt;
-use serde_rosmsg::{from_reader, to_writer};
+use rosmsg::RosMsg;
+use serde_rosmsg::to_writer;
 use std;
 use std::collections::HashMap;
 use std::net::TcpStream;
@@ -85,17 +86,17 @@ impl<T: ServicePair> Client<T> {
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
         // Send request to service
-        to_writer(&mut stream, &args)?;
+        args.encode(&mut stream)?;
 
         // Service responds with a boolean byte, signalling success
         let success = read_verification_byte(&mut stream)
             .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
             // Decode response as response type upon success
-            Ok(from_reader(&mut stream)?)
+            Ok(RosMsg::decode(&mut stream)?)
         } else {
             // Decode response as string upon failure
-            Err(from_reader(&mut stream)?)
+            Err(RosMsg::decode(&mut stream)?)
         })
     }
 }

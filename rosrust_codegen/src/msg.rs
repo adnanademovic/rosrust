@@ -40,7 +40,7 @@ impl Msg {
             .collect::<Vec<_>>();
         quote!{
             #[allow(dead_code, non_camel_case_types, non_snake_case)]
-            #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+            #[derive(Clone, Debug, Default)]
             pub struct #name {
                 #(#fields)*
             }

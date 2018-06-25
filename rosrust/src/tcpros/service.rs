@@ -3,7 +3,7 @@ use super::header;
 use super::util::tcpconnection;
 use super::{ServicePair, ServiceResult};
 use byteorder::WriteBytesExt;
-use serde_rosmsg::{from_reader, to_writer};
+use rosmsg::{encode_str, RosMsg};
 use std;
 use std::collections::HashMap;
 use std::net::TcpListener;
@@ -150,18 +150,18 @@ where
 {
     // Receive request from client
     // Break out of loop in case of failure to read request
-    while let Ok(req) = from_reader(&mut stream) {
+    while let Ok(req) = RosMsg::decode(&mut stream) {
         // Call function that handles request and returns response
         match handler(req) {
             Ok(res) => {
                 // Send True flag and response in case of success
                 stream.write_u8(1)?;
-                to_writer(&mut stream, &res)?;
+                RosMsg::encode(&res, &mut stream)?;
             }
             Err(message) => {
                 // Send False flag and error message string in case of failure
                 stream.write_u8(0)?;
-                to_writer(&mut stream, &message)?;
+                RosMsg::encode(&message, &mut stream)?;
             }
         };
     }
@@ -169,6 +169,6 @@ where
     // Upon failure to read request, send client failure message
     // This can be caused by actual issues or by the client stopping the connection
     stream.write_u8(0)?;
-    to_writer(&mut stream, &"Failed to parse passed arguments")?;
+    encode_str("Failed to parse passed arguments", &mut stream)?;
     Ok(())
 }

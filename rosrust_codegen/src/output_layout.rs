@@ -119,7 +119,7 @@ impl Service {
 
         quote! {
             #[allow(dead_code,non_camel_case_types,non_snake_case)]
-            #[derive(Serialize,Deserialize,Debug)]
+            #[derive(Debug)]
             pub struct #name_ident;
 
             impl #crate_prefix Message for #name_ident {
@@ -136,6 +136,16 @@ impl Service {
                 #[inline]
                 fn msg_type() -> ::std::string::String {
                     #msg_type.into()
+                }
+            }
+
+            impl #crate_prefix rosmsg::RosMsg for #name_ident {
+                fn encode<W: ::std::io::Write>(&self, _w: &mut W) -> ::std::io::Result<()> {
+                    Ok(())
+                }
+
+                fn decode<R: ::std::io::Read>(_r: &mut R) -> ::std::io::Result<Self> {
+                    Ok(Self {})
                 }
             }
 

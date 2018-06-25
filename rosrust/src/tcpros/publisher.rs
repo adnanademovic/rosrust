@@ -3,7 +3,6 @@ use super::header;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
 use super::Message;
-use serde_rosmsg::to_vec;
 use std;
 use std::collections::HashMap;
 use std::net::{TcpListener, ToSocketAddrs};
@@ -174,7 +173,7 @@ impl<T: Message> PublisherStream<T> {
     }
 
     pub fn send(&mut self, message: &T) -> Result<()> {
-        let bytes = Arc::new(to_vec(message)?);
+        let bytes = Arc::new(message.encode_vec()?);
 
         if self.latching {
             *self.last_message.lock().unwrap() = Arc::clone(&bytes);

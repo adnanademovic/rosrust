@@ -21,6 +21,8 @@ extern crate yaml_rust;
 
 pub use api::{error, Clock, Parameter};
 pub use rosmsg::RosMsg;
+#[doc(hidden)]
+pub use rosrust_codegen::*;
 pub use singleton::*;
 pub use tcpros::{Client, Message, PublisherStream, ServicePair as Service};
 pub use time::{Duration, Time};

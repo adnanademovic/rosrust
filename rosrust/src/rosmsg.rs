@@ -6,6 +6,18 @@ use time::{Duration, Time};
 pub trait RosMsg: std::marker::Sized {
     fn encode<W: io::Write>(&self, w: &mut W) -> io::Result<()>;
     fn decode<R: io::Read>(r: &mut R) -> io::Result<Self>;
+
+    #[inline]
+    fn encode_vec(&self) -> io::Result<Vec<u8>> {
+        let mut writer = Vec::with_capacity(128);
+        self.encode(&mut writer)?;
+        Ok(writer)
+    }
+
+    #[inline]
+    fn decode_slice(bytes: &[u8]) -> io::Result<Self> {
+        Self::decode(&mut io::Cursor::new(bytes))
+    }
 }
 
 impl RosMsg for u8 {
@@ -149,10 +161,15 @@ pub fn decode_variable_vec<R: io::Read, T: RosMsg>(r: &mut R) -> io::Result<Vec<
     decode_fixed_vec(u32::decode(r)?, r)
 }
 
+#[inline]
+pub fn encode_str<W: io::Write>(value: &str, w: &mut W) -> io::Result<()> {
+    encode_variable_slice(value.as_bytes(), w)
+}
+
 impl RosMsg for String {
     #[inline]
     fn encode<W: io::Write>(&self, w: &mut W) -> io::Result<()> {
-        encode_variable_slice(self.as_bytes(), w)
+        encode_str(self, w)
     }
 
     #[inline]
