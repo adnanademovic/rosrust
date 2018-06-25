@@ -8,21 +8,19 @@
 
 ## Usage
 
-The crate heavily uses `serde` for message generation macros, so adding it to the project is advised.
-The following set of dependencies is needed for the full set of features:
+The following dependency is needed to use the crate:
 
 ```toml
 [dependencies]
 rosrust = "0.6.5"
-rosrust_codegen = "0.6.5"
-serde = "1.0.25"
-serde_derive = "1.0.25"
-
-[build-dependencies]
-rosrust_codegen = "0.6.5"
 ```
 
-The build dependency is used for message generation.
+Then just depend on the library with macro usage, using:
+
+```rust
+#[macro_use]
+extern crate rosrust;
+```
 
 ## Implementation
 
@@ -46,31 +44,19 @@ There are multiple examples in the [examples folder](https://github.com/adnanade
 
 Message generation is done at build time. If you have ROS installed and sourced in your shell session, you will not need to do any extra setup for this to work.
 
-To generate messages, create a `build.rs` script in the same folder as your `Cargo.toml` file with the following content:
+To generate messages, create a module for messages. Using something like a `msg.rs` file in your project root, like in the `pubsub` and `serviceclient` examples, results in importing similar to `roscpp` and `rospy`. The file only needs one line:
 
 ```rust
-#[macro_use]
-extern crate rosrust_codegen;
-
 // If you wanted
 // * messages: std_msgs/String, sensor_msgs/Imu
 // * services: roscpp_tutorials/TwoInts
 // * and all the message types used by them, like geometry_msgs/Vector3
-rosmsg_main!("std_msgs/String", "sensor_msgs/Imu", "roscpp_tutorials/TwoInts");
+rosmsg_include!("std_msgs/String,sensor_msgs/Imu,roscpp_tutorials/TwoInts");
 ```
 
-In your main file all you need to add at the top is:
+Just add this file to your project and you're done.
 
-```rust
-#[macro_use]
-extern crate rosrust;
-#[macro_use]
-extern crate rosrust_codegen;
-
-rosmsg_include!();
-```
-
-This will include all the generated structures, and add them to the `msg` namespace. Thus, to create a new `sensor_msgs/Imu`, you call `msg::sensor_msgs::Imu::default()`. All fields are always public, so you can initialize structures as literals.
+If you have put this in a `src/msg.rs` file, this will include all the generated structures, and add them to the `msg` namespace. Thus, to create a new `sensor_msgs/Imu`, you call `msg::sensor_msgs::Imu::default()`. All fields are always public, so you can initialize structures as literals.
 
 All of the structures implement debug writing, so you can easily inspect their contents.
 
@@ -81,10 +67,10 @@ If we wanted to publish a defined message (let's use `std_msgs/String`) to topic
 ```rust
 #[macro_use]
 extern crate rosrust;
-#[macro_use]
-extern crate rosrust_codegen;
 
-rosmsg_include!();
+mod msg {
+    rosmsg_include!("std_msgs/String");
+}
 
 fn main() {
     // Initialize node
@@ -125,10 +111,10 @@ Upon the destruction of this object, the topic is unsubscribed as well.
 ```rust
 #[macro_use]
 extern crate rosrust;
-#[macro_use]
-extern crate rosrust_codegen;
 
-rosmsg_include!();
+mod msg {
+    rosmsg_include!("std_msgs/UInt64");
+}
 
 fn main() {
     // Initialize node
@@ -153,10 +139,10 @@ Creating a service is the easiest out of all the options. Just define a callback
 ```rust
 #[macro_use]
 extern crate rosrust;
-#[macro_use]
-extern crate rosrust_codegen;
 
-rosmsg_include!();
+mod msg {
+    rosmsg_include!("roscpp_tutorials/AddTwoInts");
+}
 
 fn main() {
     // Initialize node
@@ -191,8 +177,10 @@ The numbers shall be provided as command line arguments.
 ```rust
 #[macro_use]
 extern crate rosrust;
-#[macro_use]
-extern crate rosrust_codegen;
+
+mod msg {
+    rosmsg_include!("roscpp_tutorials/AddTwoInts");
+}
 
 use std::{env, time};
 
@@ -245,8 +233,6 @@ There are a lot of methods provided, so we'll just give a taste of all of them h
 ```rust
 #[macro_use]
 extern crate rosrust;
-#[macro_use]
-extern crate serde_derive;
 
 fn main() {
     env_logger::init();
