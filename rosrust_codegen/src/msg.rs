@@ -362,12 +362,12 @@ impl FieldInfo {
     pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
-            FieldCase::Unit => quote!{ self.#name.encode(w)?; },
+            FieldCase::Unit => quote!{ self.#name.encode(w.by_ref())?; },
             FieldCase::Vector => {
-                quote!{ #crate_prefix rosmsg::encode_variable_slice(&self.#name, w)?; }
+                quote!{ #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
             }
             FieldCase::Array(_l) => {
-                quote!{ #crate_prefix rosmsg::encode_fixed_slice(&self.#name, w)?; }
+                quote!{ #crate_prefix rosmsg::encode_fixed_slice(&self.#name, w.by_ref())?; }
             }
             FieldCase::Const(_) => quote!{},
         }
@@ -376,9 +376,13 @@ impl FieldInfo {
     pub fn field_token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
-            FieldCase::Unit => quote!{ #name: #crate_prefix rosmsg::RosMsg::decode(r)?, },
-            FieldCase::Vector => quote!{ #name: #crate_prefix rosmsg::decode_variable_vec(r)?, },
-            FieldCase::Array(l) => quote!{ #name: #crate_prefix rosmsg::decode_fixed_vec(#l, r)?, },
+            FieldCase::Unit => quote!{ #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
+            FieldCase::Vector => {
+                quote!{ #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
+            }
+            FieldCase::Array(l) => {
+                quote!{ #name: #crate_prefix rosmsg::decode_fixed_vec(#l, r.by_ref())?, }
+            }
             FieldCase::Const(_) => quote!{},
         }
     }

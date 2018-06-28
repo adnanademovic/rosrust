@@ -15,7 +15,6 @@ extern crate rosrust_codegen;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_rosmsg;
 extern crate xml_rpc;
 extern crate yaml_rust;
 

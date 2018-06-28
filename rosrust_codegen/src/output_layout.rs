@@ -88,11 +88,11 @@ impl Message {
             }
 
             impl #crate_prefix rosmsg::RosMsg for #name {
-                fn encode<W: ::std::io::Write>(&self, w: &mut W) -> ::std::io::Result<()> {
+                fn encode<W: ::std::io::Write>(&self, mut w: W) -> ::std::io::Result<()> {
                     #encode_message
                 }
 
-                fn decode<R: ::std::io::Read>(r: &mut R) -> ::std::io::Result<Self> {
+                fn decode<R: ::std::io::Read>(mut r: R) -> ::std::io::Result<Self> {
                     #decode_message
                 }
             }
@@ -140,11 +140,11 @@ impl Service {
             }
 
             impl #crate_prefix rosmsg::RosMsg for #name_ident {
-                fn encode<W: ::std::io::Write>(&self, _w: &mut W) -> ::std::io::Result<()> {
+                fn encode<W: ::std::io::Write>(&self, _w: W) -> ::std::io::Result<()> {
                     Ok(())
                 }
 
-                fn decode<R: ::std::io::Read>(_r: &mut R) -> ::std::io::Result<Self> {
+                fn decode<R: ::std::io::Read>(_r: R) -> ::std::io::Result<Self> {
                     Ok(Self {})
                 }
             }

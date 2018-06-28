@@ -3,7 +3,6 @@ use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
 use byteorder::ReadBytesExt;
 use rosmsg::RosMsg;
-use serde_rosmsg::to_writer;
 use std;
 use std::collections::HashMap;
 use std::net::TcpStream;
