@@ -253,10 +253,10 @@ impl RosMsg for Duration {
 
 #[inline]
 fn read_data_size<R: io::Read>(r: R) -> io::Result<u32> {
-    u32::decode(r).map(|v| v - 4)
+    u32::decode(r)
 }
 
 #[inline]
 fn write_data_size<W: io::Write>(value: u32, w: W) -> io::Result<()> {
-    (value + 4).encode(w)
+    value.encode(w)
 }
