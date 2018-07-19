@@ -10,9 +10,17 @@ pub trait RosMsg: std::marker::Sized {
 
     #[inline]
     fn encode_vec(&self) -> io::Result<Vec<u8>> {
-        let mut writer = Vec::with_capacity(128);
+        let mut writer = io::Cursor::new(Vec::with_capacity(128));
+        // skip the first 4 bytes that will contain the message length
+        writer.set_position(4);
+
         self.encode(&mut writer)?;
-        Ok(writer)
+
+        // write the message length to the start of the header
+        let message_length = (writer.position() - 4) as u32;
+        writer.set_position(0);
+        message_length.encode(&mut writer)?;
+        Ok(writer.into_inner())
     }
 
     #[inline]
