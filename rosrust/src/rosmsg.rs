@@ -25,7 +25,10 @@ pub trait RosMsg: std::marker::Sized {
 
     #[inline]
     fn decode_slice(bytes: &[u8]) -> io::Result<Self> {
-        Self::decode(&mut io::Cursor::new(bytes))
+        let mut reader = io::Cursor::new(bytes);
+        // skip the first 4 bytes that contain the message length
+        reader.set_position(4);
+        Self::decode(&mut reader)
     }
 }
 
