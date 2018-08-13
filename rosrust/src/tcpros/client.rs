@@ -1,13 +1,15 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
-use byteorder::ReadBytesExt;
+use byteorder::{LittleEndian, ReadBytesExt};
 use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::thread;
+use std::io;
+use std::io::Write;
 
 pub struct ClientResponse<T> {
     handle: thread::JoinHandle<Result<ServiceResult<T>>>,
@@ -84,14 +86,29 @@ impl<T: ServicePair> Client<T> {
         // Service request starts by exchanging connection headers
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
 
+        let mut writer = io::Cursor::new(Vec::with_capacity(128));
+        // skip the first 4 bytes that will contain the message length
+        writer.set_position(4);
+
+        args.encode(&mut writer)?;
+
+        // write the message length to the start of the header
+        let message_length = (writer.position() - 4) as u32;
+        writer.set_position(0);
+        message_length.encode(&mut writer)?;
+
         // Send request to service
-        args.encode(&mut stream)?;
+        stream.write(&writer.into_inner())?;
 
         // Service responds with a boolean byte, signalling success
         let success = read_verification_byte(&mut stream)
             .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
             // Decode response as response type upon success
+            
+            // TODO: validate response length
+            let _length = stream.read_u32::<LittleEndian>();
+
             Ok(RosMsg::decode(&mut stream)?)
         } else {
             // Decode response as string upon failure
