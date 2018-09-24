@@ -2,13 +2,14 @@ use super::error::{ErrorKind, Result};
 use super::header;
 use super::util::tcpconnection;
 use super::{ServicePair, ServiceResult};
-use byteorder::WriteBytesExt;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use rosmsg::{encode_str, RosMsg};
 use std;
 use std::collections::HashMap;
 use std::net::TcpListener;
 use std::sync::Arc;
 use std::thread;
+use std::io;
 
 pub struct Service {
     pub api: String,
@@ -149,6 +150,8 @@ where
     F: Fn(T::Request) -> ServiceResult<T::Response>,
 {
     // Receive request from client
+    // TODO: validate message length
+    let _length = stream.read_u32::<LittleEndian>();
     // Break out of loop in case of failure to read request
     while let Ok(req) = RosMsg::decode(&mut stream) {
         // Call function that handles request and returns response
@@ -156,7 +159,18 @@ where
             Ok(res) => {
                 // Send True flag and response in case of success
                 stream.write_u8(1)?;
-                RosMsg::encode(&res, &mut stream)?;
+                let mut writer = io::Cursor::new(Vec::with_capacity(128));
+                // skip the first 4 bytes that will contain the message length
+                writer.set_position(4);
+
+                res.encode(&mut writer)?;
+
+                // write the message length to the start of the header
+                let message_length = (writer.position() - 4) as u32;
+                writer.set_position(0);
+                message_length.encode(&mut writer)?;
+
+                stream.write(&writer.into_inner())?;
             }
             Err(message) => {
                 // Send False flag and error message string in case of failure
