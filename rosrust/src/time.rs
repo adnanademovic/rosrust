@@ -180,11 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn works_with_negative() {
-        let time = Time::from_nanos(-123456789987654321);
-        assert_eq!(time.sec, -123456789);
-        assert_eq!(time.nsec, -987654321);
-        assert_eq!(time.nanos(), -123456789987654321);
+    fn duration_works_with_negative() {
         let time = Duration::from_nanos(-123456789987654321);
         assert_eq!(time.sec, -123456789);
         assert_eq!(time.nsec, -987654321);
