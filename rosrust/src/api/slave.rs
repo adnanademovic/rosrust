@@ -101,7 +101,8 @@ impl Slave {
         F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
         use std::collections::hash_map::Entry;
-        match self.services
+        match self
+            .services
             .lock()
             .expect(FAILED_TO_LOCK)
             .entry(String::from(service))
@@ -132,7 +133,8 @@ impl Slave {
         T: Message,
     {
         use std::collections::hash_map::Entry;
-        match self.publications
+        match self
+            .publications
             .lock()
             .expect(FAILED_TO_LOCK)
             .entry(String::from(topic))
@@ -158,7 +160,8 @@ impl Slave {
         F: Fn(T) -> () + Send + 'static,
     {
         use std::collections::hash_map::Entry;
-        match self.subscriptions
+        match self
+            .subscriptions
             .lock()
             .expect(FAILED_TO_LOCK)
             .entry(String::from(topic))

@@ -9,7 +9,8 @@ pub struct Layout {
 
 impl Layout {
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let packages = self.packages
+        let packages = self
+            .packages
             .iter()
             .map(|v| v.token_stream(crate_prefix))
             .collect::<Vec<_>>();
@@ -28,11 +29,13 @@ pub struct Package {
 impl Package {
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
-        let messages = self.messages
+        let messages = self
+            .messages
             .iter()
             .map(|v| v.token_stream(crate_prefix))
             .collect::<Vec<_>>();
-        let services = self.services
+        let services = self
+            .services
             .iter()
             .map(|v| v.token_stream(crate_prefix))
             .collect::<Vec<_>>();

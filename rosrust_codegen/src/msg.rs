@@ -30,11 +30,13 @@ impl Msg {
 
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = self.name_ident();
-        let fields = self.fields
+        let fields = self
+            .fields
             .iter()
             .map(|v| v.field_token_stream(crate_prefix))
             .collect::<Vec<_>>();
-        let const_fields = self.fields
+        let const_fields = self
+            .fields
             .iter()
             .map(|v| v.const_token_stream(crate_prefix))
             .collect::<Vec<_>>();
@@ -51,7 +53,8 @@ impl Msg {
     }
 
     pub fn token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let fields = self.fields
+        let fields = self
+            .fields
             .iter()
             .map(|v| v.field_token_stream_encode(crate_prefix))
             .collect::<Vec<_>>();
@@ -62,7 +65,8 @@ impl Msg {
     }
 
     pub fn token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let fields = self.fields
+        let fields = self
+            .fields
             .iter()
             .map(|v| v.field_token_stream_decode(crate_prefix))
             .collect::<Vec<_>>();
@@ -84,8 +88,7 @@ impl Msg {
                 DataType::LocalStruct(ref name) => Some((self.package.clone(), name.clone())),
                 DataType::RemoteStruct(ref pkg, ref name) => Some((pkg.clone(), name.clone())),
                 _ => None,
-            })
-            .collect()
+            }).collect()
     }
 
     #[cfg(test)]
@@ -104,12 +107,14 @@ impl Msg {
         &self,
         hashes: &HashMap<(String, String), String>,
     ) -> ::std::result::Result<String, ()> {
-        let constants = self.fields
+        let constants = self
+            .fields
             .iter()
             .filter(|v| v.is_constant())
             .map(|v| v.md5_string(&self.package, hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
-        let fields = self.fields
+        let fields = self
+            .fields
             .iter()
             .filter(|v| !v.is_constant())
             .map(|v| v.md5_string(&self.package, hashes))
@@ -300,15 +305,15 @@ fn match_line(data: &str) -> Option<Result<FieldInfo>> {
 
 #[inline]
 fn strip_useless(data: &str) -> Result<&str> {
-    Ok(data.splitn(2, '#')
+    Ok(data
+        .splitn(2, '#')
         .next()
         .ok_or_else(|| {
             format!(
                 "Somehow splitting a line resulted in 0 parts?! Happened here: {}",
                 data
             )
-        })?
-        .trim())
+        })?.trim())
 }
 
 #[inline]
@@ -736,8 +741,8 @@ mod tests {
                 "Point",
                 include_str!("msg_examples/geometry_msgs/msg/Point.msg"),
             ).unwrap()
-                .calculate_md5(&HashMap::new())
-                .unwrap(),
+            .calculate_md5(&HashMap::new())
+            .unwrap(),
             "4a842b65f413084dc2b10fb484ea7f17".to_owned()
         );
         assert_eq!(
@@ -746,8 +751,8 @@ mod tests {
                 "Quaternion",
                 include_str!("msg_examples/geometry_msgs/msg/Quaternion.msg"),
             ).unwrap()
-                .calculate_md5(&HashMap::new())
-                .unwrap(),
+            .calculate_md5(&HashMap::new())
+            .unwrap(),
             "a779879fadf0160734f906b8c19c7004".to_owned()
         );
         let mut hashes = HashMap::new();
@@ -765,8 +770,8 @@ mod tests {
                 "Pose",
                 include_str!("msg_examples/geometry_msgs/msg/Pose.msg"),
             ).unwrap()
-                .calculate_md5(&hashes)
-                .unwrap(),
+            .calculate_md5(&hashes)
+            .unwrap(),
             "e45d45a5a1ce597b249e23fb30fc871f".to_owned()
         );
     }

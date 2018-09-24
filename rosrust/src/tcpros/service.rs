@@ -6,10 +6,10 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use rosmsg::{encode_str, RosMsg};
 use std;
 use std::collections::HashMap;
+use std::io;
 use std::net::TcpListener;
 use std::sync::Arc;
 use std::thread;
-use std::io;
 
 pub struct Service {
     pub api: String,
@@ -133,7 +133,8 @@ where
     thread::spawn(move || {
         if let Err(err) = handle_request_loop::<T, U, F>(stream, &handler) {
             if !err.is_closed_connection() {
-                let info = err.iter()
+                let info = err
+                    .iter()
                     .map(|v| format!("{}", v))
                     .collect::<Vec<_>>()
                     .join("\nCaused by:");

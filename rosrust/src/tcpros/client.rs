@@ -5,11 +5,11 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
+use std::io;
+use std::io::Write;
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::thread;
-use std::io;
-use std::io::Write;
 
 pub struct ClientResponse<T> {
     handle: thread::JoinHandle<Result<ServiceResult<T>>>,
@@ -80,8 +80,8 @@ impl<T: ServicePair> Client<T> {
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
         let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
-        let mut stream =
-            connection.chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
+        let mut stream = connection
+            .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
 
         // Service request starts by exchanging connection headers
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
@@ -105,7 +105,7 @@ impl<T: ServicePair> Client<T> {
             .chain_err(|| ErrorKind::ServiceResponseInterruption)?;
         Ok(if success {
             // Decode response as response type upon success
-            
+
             // TODO: validate response length
             let _length = stream.read_u32::<LittleEndian>();
 

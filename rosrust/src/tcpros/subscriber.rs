@@ -92,7 +92,8 @@ fn join_connections<T>(
         let result = join_connection::<T>(data_stream, &publisher, caller_id, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info = err.iter()
+            let info = err
+                .iter()
                 .map(|v| format!("{}", v))
                 .collect::<Vec<_>>()
                 .join("\nCaused by:");

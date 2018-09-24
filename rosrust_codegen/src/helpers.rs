@@ -232,7 +232,7 @@ mod tests {
                 ("rosgraph_msgs", "Log"),
             ],
         ).unwrap()
-            .messages;
+        .messages;
         assert_eq!(message_map.len(), 9);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Vector3".into()),));
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Point".into()),));

@@ -61,7 +61,8 @@ fn listen_for_subscribers<T, U, V>(
         let result = exchange_headers::<T, _>(&mut stream, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info = err.iter()
+            let info = err
+                .iter()
                 .map(|v| format!("{}", v))
                 .collect::<Vec<_>>()
                 .join("\nCaused by:");

@@ -195,7 +195,8 @@ impl RosMsg for String {
 impl RosMsg for HashMap<String, String> {
     #[inline]
     fn encode<W: io::Write>(&self, mut w: W) -> io::Result<()> {
-        let rows = self.iter()
+        let rows = self
+            .iter()
             .map(|(key, value)| format!("{}={}", key, value))
             .collect::<Vec<String>>();
         let data_size: usize = rows.iter().map(|item| item.len() + 4).sum();

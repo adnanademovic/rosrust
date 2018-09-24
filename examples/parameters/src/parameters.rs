@@ -82,8 +82,7 @@ fn main() {
             foo: "x".into(),
             bar: 42,
             baz: false,
-        })
-        .unwrap();
+        }).unwrap();
     ros_info!(
         "Get raw: {:?}",
         rosrust::param("/qux").unwrap().get_raw().unwrap()
