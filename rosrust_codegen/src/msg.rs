@@ -35,6 +35,11 @@ impl Msg {
             .iter()
             .map(|v| v.field_token_stream(crate_prefix))
             .collect::<Vec<_>>();
+        let field_defaults = self
+            .fields
+            .iter()
+            .map(|v| v.field_default_token_stream(crate_prefix))
+            .collect::<Vec<_>>();
         let const_fields = self
             .fields
             .iter()
@@ -42,12 +47,20 @@ impl Msg {
             .collect::<Vec<_>>();
         quote!{
             #[allow(dead_code, non_camel_case_types, non_snake_case)]
-            #[derive(Clone, Debug, Default)]
+            #[derive(Clone)]
             pub struct #name {
                 #(#fields)*
             }
             impl #name {
                 #(#const_fields)*
+            }
+
+            impl Default for #name {
+                fn default() -> Self {
+                    Self {
+                        #(#field_defaults)*
+                    }
+                }
             }
         }
     }
@@ -364,6 +377,15 @@ impl FieldInfo {
         }
     }
 
+    pub fn field_default_token_stream<T: ToTokens>(&self, _crate_prefix: &T) -> impl ToTokens {
+        let name = Ident::new(&self.name, Span::call_site());
+        match self.case {
+            FieldCase::Unit | FieldCase::Vector => quote!{ #name: Default::default(), },
+            FieldCase::Array(l) => quote!{ #name: [Default::default(); #l], },
+            FieldCase::Const(_) => quote!{},
+        }
+    }
+
     pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
@@ -386,7 +408,9 @@ impl FieldInfo {
                 quote!{ #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
             }
             FieldCase::Array(l) => {
-                quote!{ #name: #crate_prefix rosmsg::decode_fixed_vec(#l, r.by_ref())?, }
+                let lines =
+                    (0..l).map(|_| quote!{ #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, });
+                quote!{ #name: [#(#lines)*], }
             }
             FieldCase::Const(_) => quote!{},
         }
