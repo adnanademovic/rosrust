@@ -58,8 +58,6 @@ Just add this file to your project and you're done.
 
 If you have put this in a `src/msg.rs` file, this will include all the generated structures, and add them to the `msg` namespace. Thus, to create a new `sensor_msgs/Imu`, you call `msg::sensor_msgs::Imu::default()`. All fields are always public, so you can initialize structures as literals.
 
-All of the structures implement debug writing, so you can easily inspect their contents.
-
 ### Publishing to Topic
 
 If we wanted to publish a defined message (let's use `std_msgs/String`) to topic `chatter` ten times a second, we can do it in the following way.
