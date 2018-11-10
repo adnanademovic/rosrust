@@ -24,9 +24,10 @@ fn main() {
             let duration = now.elapsed();
             *now = Instant::now();
             ros_info!(
-                "Took {}ms to receive image with data amount: {}",
+                "Took {}ms to receive image with data amount {} at {:?}",
                 duration.as_secs() * 1000 + (duration.subsec_millis() as u64),
-                v.data.len()
+                v.data.len(),
+                v.header.stamp,
             );
         }).unwrap();
 
