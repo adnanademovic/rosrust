@@ -2,50 +2,8 @@ use genmsg;
 use proc_macro::TokenStream;
 use std::env;
 use std::path::Path;
-use syn;
 
-fn read_rosmsg_includes_attribute(attrs: &[syn::Attribute]) -> String {
-    for attr in attrs {
-        if attr.is_sugared_doc {
-            continue;
-        }
-        if let Some(syn::Meta::NameValue(data)) = attr.interpret_meta() {
-            if data.ident != "rosmsg_includes" {
-                continue;
-            }
-            match data.lit {
-                syn::Lit::Str(msgs) => return msgs.value(),
-                _ => panic!("rosmsg_includes attribute needs to be a string"),
-            }
-        }
-    }
-    panic!("rosmsg_includes attribute is not provided");
-}
-
-fn is_internal(attrs: &[syn::Attribute]) -> bool {
-    for attr in attrs {
-        if attr.is_sugared_doc {
-            continue;
-        }
-        if let Some(syn::Meta::Word(data)) = attr.interpret_meta() {
-            if data == "rosrust_internal" {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-pub fn implement(ast: &syn::DeriveInput) -> TokenStream {
-    let message_string = read_rosmsg_includes_attribute(&ast.attrs);
-    let messages = message_string
-        .split(',')
-        .map(|v| v.trim())
-        .collect::<Vec<&str>>();
-    depend_on_messages(&messages, is_internal(&ast.attrs))
-}
-
-fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
+pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
     let cmake_paths = env::var("CMAKE_PREFIX_PATH")
         .unwrap_or_default()
         .split(':')

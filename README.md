@@ -51,7 +51,7 @@ To generate messages, create a module for messages. Using something like a `msg.
 // * messages: std_msgs/String, sensor_msgs/Imu
 // * services: roscpp_tutorials/TwoInts
 // * and all the message types used by them, like geometry_msgs/Vector3
-rosmsg_include!("std_msgs/String,sensor_msgs/Imu,roscpp_tutorials/TwoInts");
+rosmsg_include!(std_msgs/String,sensor_msgs/Imu,roscpp_tutorials/TwoInts);
 ```
 
 Just add this file to your project and you're done.
@@ -69,7 +69,7 @@ If we wanted to publish a defined message (let's use `std_msgs/String`) to topic
 extern crate rosrust;
 
 mod msg {
-    rosmsg_include!("std_msgs/String");
+    rosmsg_include!(std_msgs/String);
 }
 
 fn main() {
@@ -113,7 +113,7 @@ Upon the destruction of this object, the topic is unsubscribed as well.
 extern crate rosrust;
 
 mod msg {
-    rosmsg_include!("std_msgs/UInt64");
+    rosmsg_include!(std_msgs/UInt64);
 }
 
 fn main() {
@@ -141,7 +141,7 @@ Creating a service is the easiest out of all the options. Just define a callback
 extern crate rosrust;
 
 mod msg {
-    rosmsg_include!("roscpp_tutorials/AddTwoInts");
+    rosmsg_include!(roscpp_tutorials/AddTwoInts);
 }
 
 fn main() {
@@ -179,7 +179,7 @@ The numbers shall be provided as command line arguments.
 extern crate rosrust;
 
 mod msg {
-    rosmsg_include!("roscpp_tutorials/AddTwoInts");
+    rosmsg_include!(roscpp_tutorials/AddTwoInts);
 }
 
 use std::{env, time};
