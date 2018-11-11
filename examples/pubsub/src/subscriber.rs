@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;

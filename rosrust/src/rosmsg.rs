@@ -192,7 +192,11 @@ impl RosMsg for String {
     }
 }
 
-impl RosMsg for HashMap<String, String> {
+impl<Hasher> RosMsg for HashMap<String, String, Hasher>
+where
+    Hasher: std::hash::BuildHasher,
+    HashMap<String, String, Hasher>: Default,
+{
     #[inline]
     fn encode<W: io::Write>(&self, mut w: W) -> io::Result<()> {
         let rows = self
@@ -207,16 +211,14 @@ impl RosMsg for HashMap<String, String> {
 
     #[inline]
     fn decode<R: io::Read>(mut r: R) -> io::Result<Self> {
-        let data_size = read_data_size(r.by_ref())? as u64;
+        let data_size = u64::from(read_data_size(r.by_ref())?);
         let mut limited_r = r.take(data_size);
-        let mut output = HashMap::<String, String>::default();
-        loop {
-            let item = match String::decode(&mut limited_r) {
-                Ok(val) => val,
-                Err(_err) => break, // TODO: ensure we break only on EOF
-            };
-            match item.splitn(2, "=").collect::<Vec<&str>>().as_slice() {
-                &[key, value] => output.insert(key.into(), value.into()),
+        let mut output = HashMap::<String, String, Hasher>::default();
+        // TODO: ensure we break only on EOF
+        while let Ok(item) = String::decode(&mut limited_r) {
+            let parts = item.splitn(2, '=').collect::<Vec<&str>>();
+            match *parts.as_slice() {
+                [key, value] => output.insert(key.into(), value.into()),
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,

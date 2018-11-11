@@ -98,7 +98,7 @@ impl<T: ServicePair> Client<T> {
         message_length.encode(&mut writer)?;
 
         // Send request to service
-        stream.write(&writer.into_inner())?;
+        stream.write_all(&writer.into_inner())?;
 
         // Service responds with a boolean byte, signalling success
         let success = read_verification_byte(&mut stream)
