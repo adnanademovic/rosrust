@@ -1,16 +1,17 @@
-use serde_rosmsg::{from_reader, to_writer, Error};
+use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
+use std::io::Error;
 
 pub fn decode<R: std::io::Read>(data: &mut R) -> Result<HashMap<String, String>, Error> {
-    from_reader(data)
+    RosMsg::decode(data)
 }
 
 pub fn encode<W: std::io::Write>(
     writer: &mut W,
     data: &HashMap<String, String>,
 ) -> Result<(), Error> {
-    to_writer(writer, data)
+    data.encode(writer)
 }
 
 pub fn match_field(

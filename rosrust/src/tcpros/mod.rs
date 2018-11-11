@@ -3,12 +3,11 @@ pub use self::error::Error;
 pub use self::publisher::{Publisher, PublisherStream};
 pub use self::service::Service;
 pub use self::subscriber::Subscriber;
-use serde::de::Deserialize;
-use serde::ser::Serialize;
+use rosmsg::RosMsg;
 
-use Clock;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use Clock;
 
 mod client;
 pub mod error;
@@ -20,7 +19,7 @@ mod util;
 
 pub type ServiceResult<T> = Result<T, String>;
 
-pub trait Message: Serialize + Deserialize<'static> + Send + 'static {
+pub trait Message: RosMsg + Send + 'static {
     fn msg_definition() -> String;
     fn md5sum() -> String;
     fn msg_type() -> String;
@@ -28,6 +27,6 @@ pub trait Message: Serialize + Deserialize<'static> + Send + 'static {
 }
 
 pub trait ServicePair: Message {
-    type Request: Serialize + Deserialize<'static> + Send + 'static;
-    type Response: Serialize + Deserialize<'static> + Send + 'static;
+    type Request: RosMsg + Send + 'static;
+    type Response: RosMsg + Send + 'static;
 }

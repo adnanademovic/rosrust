@@ -105,8 +105,7 @@ impl Master {
                     xml_rpc::Value::String(key.into()),
                     value,
                 ],
-            )
-            .and(Ok(()))
+            ).and(Ok(()))
     }
 
     pub fn get_param<'a, T: Deserialize<'a>>(&self, key: &str) -> Result<T> {

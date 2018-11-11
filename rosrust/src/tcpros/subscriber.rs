@@ -1,8 +1,8 @@
-use super::Message;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
+use super::Message;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use serde_rosmsg::from_slice;
+use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -72,7 +72,7 @@ where
             Some(v) => v,
             None => break, // Only the Subscriber destructor can send this signal
         };
-        match from_slice(&buffer) {
+        match RosMsg::decode_slice(&buffer) {
             Ok(value) => callback(value),
             Err(err) => error!("Failed to decode message: {}", err),
         }
@@ -92,7 +92,8 @@ fn join_connections<T>(
         let result = join_connection::<T>(data_stream, &publisher, caller_id, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info = err.iter()
+            let info = err
+                .iter()
                 .map(|v| format!("{}", v))
                 .collect::<Vec<_>>()
                 .join("\nCaused by:");

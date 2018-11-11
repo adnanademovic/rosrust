@@ -6,8 +6,8 @@ const BILLION: i64 = 1_000_000_000;
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Time {
-    pub sec: i32,
-    pub nsec: i32,
+    pub sec: u32,
+    pub nsec: u32,
 }
 
 impl Time {
@@ -19,8 +19,8 @@ impl Time {
     #[inline]
     pub fn from_nanos(t: i64) -> Time {
         Time {
-            sec: (t / BILLION) as i32,
-            nsec: (t % BILLION) as i32,
+            sec: (t / BILLION) as u32,
+            nsec: (t % BILLION) as u32,
         }
     }
 
@@ -180,11 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn works_with_negative() {
-        let time = Time::from_nanos(-123456789987654321);
-        assert_eq!(time.sec, -123456789);
-        assert_eq!(time.nsec, -987654321);
-        assert_eq!(time.nanos(), -123456789987654321);
+    fn duration_works_with_negative() {
         let time = Duration::from_nanos(-123456789987654321);
         assert_eq!(time.sec, -123456789);
         assert_eq!(time.nsec, -987654321);

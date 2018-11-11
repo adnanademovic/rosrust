@@ -48,18 +48,21 @@ impl Ros {
                 .into_iter()
                 .next()
                 .ok_or_else(|| format!("Failed to load YAML: {}", dest))?;
-            let param = ros.param(&src)
+            let param = ros
+                .param(&src)
                 .ok_or_else(|| format!("Failed to resolve name: {}", src))?;
             param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
 
-        if ros.param("/use_sim_time")
+        if ros
+            .param("/use_sim_time")
             .and_then(|v| v.get().ok())
             .unwrap_or(false)
         {
             let clock = Arc::new(SimulatedClock::default());
             let ros_clock = Arc::clone(&clock);
-            let sub = ros.subscribe::<ClockMsg, _>("/clock", move |v| clock.trigger(v.clock))
+            let sub = ros
+                .subscribe::<ClockMsg, _>("/clock", move |v| clock.trigger(v.clock))
                 .chain_err(|| "Failed to subscribe to simulated clock")?;
             ros.static_subs.push(sub);
             ros.clock = ros_clock;
@@ -260,7 +263,8 @@ impl Ros {
             Some(ref mut v) => v,
             None => return,
         };
-        let topics = self.slave
+        let topics = self
+            .slave
             .publications
             .lock()
             .expect("Failed to acquire lock on mutex")
@@ -331,9 +335,11 @@ fn yaml_to_xmlrpc(val: Yaml) -> Result<xml_rpc::Value> {
         Yaml::Array(v) => {
             xml_rpc::Value::Array(v.into_iter().map(yaml_to_xmlrpc).collect::<Result<_>>()?)
         }
-        Yaml::Hash(v) => xml_rpc::Value::Struct(v.into_iter()
-            .map(|(k, v)| Ok((yaml_to_string(k)?, yaml_to_xmlrpc(v)?)))
-            .collect::<Result<_>>()?),
+        Yaml::Hash(v) => xml_rpc::Value::Struct(
+            v.into_iter()
+                .map(|(k, v)| Ok((yaml_to_string(k)?, yaml_to_xmlrpc(v)?)))
+                .collect::<Result<_>>()?,
+        ),
         Yaml::Alias(_) => bail!("Alias is not supported"),
         Yaml::Null => bail!("Illegal null value"),
         Yaml::BadValue => bail!("Bad value provided"),

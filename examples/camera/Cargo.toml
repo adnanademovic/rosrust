@@ -1,7 +1,7 @@
 [package]
 authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
 license = "MIT"
-name = "pubsub"
+name = "camera"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.0.1"
 
@@ -9,14 +9,6 @@ version = "0.0.1"
 env_logger = "0.5"
 rosrust = {path="../../rosrust"}
 rosrust_codegen = {path="../../rosrust_codegen"}
-
-[[bin]]
-name = "publisher"
-path = "src/publisher.rs"
-
-[[bin]]
-name = "publisher_latch_demo"
-path = "src/publisher_latch_demo.rs"
 
 [[bin]]
 name = "subscriber"

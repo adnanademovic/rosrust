@@ -7,11 +7,8 @@ readme = "../README.md"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.6.5"
 
-[build-dependencies]
-rosrust_codegen = "0.6.5"
-
 [dependencies]
-byteorder = "1.2.1"
+byteorder = "1.2.3"
 ctrlc = "3.0.3"
 error-chain = "0.11.0"
 futures = "0.1.17"
@@ -21,6 +18,5 @@ nix = "0.9.0"
 rosrust_codegen = "0.6.5"
 serde = "1.0.25"
 serde_derive = "1.0.25"
-serde_rosmsg = "0.2.0"
 xml-rpc = "0.0.9"
 yaml-rust = "0.4.0"

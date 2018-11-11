@@ -2,10 +2,11 @@ use super::error::{ErrorKind, Result};
 use super::header;
 use super::util::tcpconnection;
 use super::{ServicePair, ServiceResult};
-use byteorder::WriteBytesExt;
-use serde_rosmsg::{from_reader, to_writer};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use rosmsg::{encode_str, RosMsg};
 use std;
 use std::collections::HashMap;
+use std::io;
 use std::net::TcpListener;
 use std::sync::Arc;
 use std::thread;
@@ -34,12 +35,7 @@ impl Service {
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
         let (raii, listener) = tcpconnection::iterate(listener, format!("service '{}'", service));
         Ok(Service::wrap_stream::<T, _, _, _>(
-            service,
-            node_name,
-            handler,
-            raii,
-            listener,
-            &api,
+            service, node_name, handler, raii, listener, &api,
         ))
     }
 
@@ -140,7 +136,8 @@ where
     thread::spawn(move || {
         if let Err(err) = handle_request_loop::<T, U, F>(stream, &handler) {
             if !err.is_closed_connection() {
-                let info = err.iter()
+                let info = err
+                    .iter()
                     .map(|v| format!("{}", v))
                     .collect::<Vec<_>>()
                     .join("\nCaused by:");
@@ -157,19 +154,32 @@ where
     F: Fn(T::Request) -> ServiceResult<T::Response>,
 {
     // Receive request from client
+    // TODO: validate message length
+    let _length = stream.read_u32::<LittleEndian>();
     // Break out of loop in case of failure to read request
-    while let Ok(req) = from_reader(&mut stream) {
+    while let Ok(req) = RosMsg::decode(&mut stream) {
         // Call function that handles request and returns response
         match handler(req) {
             Ok(res) => {
                 // Send True flag and response in case of success
                 stream.write_u8(1)?;
-                to_writer(&mut stream, &res)?;
+                let mut writer = io::Cursor::new(Vec::with_capacity(128));
+                // skip the first 4 bytes that will contain the message length
+                writer.set_position(4);
+
+                res.encode(&mut writer)?;
+
+                // write the message length to the start of the header
+                let message_length = (writer.position() - 4) as u32;
+                writer.set_position(0);
+                message_length.encode(&mut writer)?;
+
+                stream.write(&writer.into_inner())?;
             }
             Err(message) => {
                 // Send False flag and error message string in case of failure
                 stream.write_u8(0)?;
-                to_writer(&mut stream, &message)?;
+                RosMsg::encode(&message, &mut stream)?;
             }
         };
     }
@@ -177,6 +187,6 @@ where
     // Upon failure to read request, send client failure message
     // This can be caused by actual issues or by the client stopping the connection
     stream.write_u8(0)?;
-    to_writer(&mut stream, &"Failed to parse passed arguments")?;
+    encode_str("Failed to parse passed arguments", &mut stream)?;
     Ok(())
 }

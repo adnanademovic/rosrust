@@ -1,9 +1,8 @@
-use super::Message;
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
-use serde_rosmsg::to_vec;
+use super::Message;
 use std;
 use std::collections::HashMap;
 use std::net::{TcpListener, ToSocketAddrs};
@@ -62,7 +61,8 @@ fn listen_for_subscribers<T, U, V>(
         let result = exchange_headers::<T, _>(&mut stream, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
         if let Err(err) = result {
-            let info = err.iter()
+            let info = err
+                .iter()
                 .map(|v| format!("{}", v))
                 .collect::<Vec<_>>()
                 .join("\nCaused by:");
@@ -174,7 +174,7 @@ impl<T: Message> PublisherStream<T> {
     }
 
     pub fn send(&mut self, message: &T) -> Result<()> {
-        let bytes = Arc::new(to_vec(message)?);
+        let bytes = Arc::new(message.encode_vec()?);
 
         if self.latching {
             *self.last_message.lock().unwrap() = Arc::clone(&bytes);

@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::io::Write;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 
 pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
@@ -54,8 +54,7 @@ fn fork_thread<T: Write + Send + 'static>(
             .filter_map(|mut target| match target.write_all(&buffer) {
                 Ok(()) => Some(target),
                 Err(_) => None,
-            })
-            .collect()
+            }).collect()
     }
 }
 

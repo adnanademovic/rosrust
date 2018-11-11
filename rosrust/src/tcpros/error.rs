@@ -1,7 +1,6 @@
 error_chain! {
     foreign_links {
         Io(::std::io::Error);
-        SerdeRosmsg(::serde_rosmsg::error::Error);
     }
     errors {
         ServiceConnectionFail(service: String, uri: String) {
@@ -48,10 +47,6 @@ fn is_closed_connection(err: &::std::io::Error) -> bool {
 impl Error {
     pub fn is_closed_connection(&self) -> bool {
         match *self.kind() {
-            ErrorKind::SerdeRosmsg(ref serde_err) => match *serde_err.kind() {
-                ::serde_rosmsg::error::ErrorKind::Io(ref io_err) => is_closed_connection(io_err),
-                _ => false,
-            },
             ErrorKind::Io(ref io_err) => is_closed_connection(io_err),
             _ => false,
         }

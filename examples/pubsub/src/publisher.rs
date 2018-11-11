@@ -1,10 +1,8 @@
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
-#[macro_use]
-extern crate rosrust_codegen;
 
-rosmsg_include!();
+mod msg;
 
 fn main() {
     env_logger::init();

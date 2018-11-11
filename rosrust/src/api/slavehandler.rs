@@ -51,7 +51,8 @@ impl SlaveHandler {
 
         server.register_value("shutdown", "Shutdown", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next()
+            let _caller_id = args
+                .next()
                 .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
             let message = match args.next() {
                 Some(Value::String(message)) => message,
@@ -82,8 +83,7 @@ impl SlaveHandler {
                             Value::String(v.topic.clone()),
                             Value::String(v.msg_type.clone()),
                         ])
-                    })
-                    .collect(),
+                    }).collect(),
             ))
         });
 
@@ -100,8 +100,7 @@ impl SlaveHandler {
                             Value::String(v.topic.clone()),
                             Value::String(v.msg_type.clone()),
                         ])
-                    })
-                    .collect(),
+                    }).collect(),
             ))
         });
 
@@ -115,7 +114,8 @@ impl SlaveHandler {
 
         server.register_value("publisherUpdate", "Publishers updated", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next()
+            let _caller_id = args
+                .next()
                 .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
             let topic = match args.next() {
                 Some(Value::String(topic)) => topic,
@@ -136,8 +136,7 @@ impl SlaveHandler {
                     _ => Err(ResponseError::Client(
                         "Publishers need to be strings".into(),
                     )),
-                })
-                .collect::<Response<Vec<String>>>()?;
+                }).collect::<Response<Vec<String>>>()?;
 
             add_publishers_to_subscription(
                 &mut subs.lock().expect(FAILED_TO_LOCK),
@@ -153,7 +152,8 @@ impl SlaveHandler {
 
         server.register_value("requestTopic", "Chosen protocol", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
-            let _caller_id = args.next()
+            let _caller_id = args
+                .next()
                 .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
             let topic = match args.next() {
                 Some(Value::String(topic)) => topic,
@@ -222,7 +222,8 @@ where
     if let Some(mut subscription) = subscriptions.get_mut(topic) {
         for publisher in publishers {
             if let Err(err) = connect_to_publisher(&mut subscription, name, &publisher, topic) {
-                let info = err.iter()
+                let info = err
+                    .iter()
                     .map(|v| format!("{}", v))
                     .collect::<Vec<_>>()
                     .join("\nCaused by:");
@@ -263,8 +264,7 @@ fn request_topic(
             &publisher_uri.parse().unwrap(),
             "requestTopic",
             &(caller_id, topic, [["TCPROS"]]),
-        )
-        .unwrap()
+        ).unwrap()
         .unwrap();
     Ok(protocols)
 }

@@ -1,92 +1,43 @@
 #![recursion_limit = "1024"]
 
+extern crate proc_macro;
+extern crate proc_macro2;
+#[macro_use]
+extern crate quote;
 extern crate crypto;
+extern crate syn;
 #[macro_use]
 extern crate error_chain;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
 
-pub mod error;
-pub mod genmsg;
-pub mod helpers;
-pub mod msg;
+mod error;
+mod genmsg;
+mod helpers;
+mod msg;
+mod output_layout;
+mod rosmsg_include;
 
-use std::env;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+use proc_macro::TokenStream;
 
-#[macro_export]
-macro_rules! rosmsg_main {
-    ($($msg:expr),*) => {
-        fn main() {
-            $crate::depend_on_messages(&[
-            $(
-                $msg,
-            )*
-            ], "::rosrust::");
+#[proc_macro]
+pub fn rosmsg_include(input: TokenStream) -> TokenStream {
+    let mut messages = Vec::new();
+    let mut next_item = String::new();
+    for item in input {
+        match item.to_string().as_str() {
+            "," => {
+                messages.push(next_item);
+                next_item = String::new();
+            }
+            s => next_item += s,
         }
     }
-}
-
-#[macro_export]
-macro_rules! rosmsg_main_no_prefix {
-    ($($msg:expr),*) => {
-        fn main() {
-            $crate::depend_on_messages(&[
-            $(
-                $msg,
-            )*
-            ], "::");
-        }
+    let is_internal = next_item == "INTERNAL";
+    if !is_internal && next_item != "" {
+        messages.push(next_item);
     }
-}
-
-#[macro_export]
-macro_rules! rosmsg_include {
-    () => {
-        include!(concat!(env!("OUT_DIR"), "/msg.rs"));
-    };
-}
-
-pub fn depend_on_messages(messages: &[&str], crate_prefix: &str) {
-    let cmake_paths = env::var("CMAKE_PREFIX_PATH")
-        .unwrap_or_default()
-        .split(':')
-        .filter_map(append_share_folder)
-        .collect::<Vec<String>>();
-    let cmake_alt_paths = env::var("CMAKE_PREFIX_PATH")
-        .unwrap_or_default()
-        .split(':')
-        .filter_map(append_src_folder)
-        .collect::<Vec<String>>();
-    let extra_paths = env::var("ROSRUST_MSG_PATH")
-        .unwrap_or_default()
-        .split(':')
-        .map(String::from)
-        .collect::<Vec<String>>();
-    let paths = cmake_paths
-        .iter()
-        .chain(cmake_alt_paths.iter())
-        .chain(extra_paths.iter())
-        .map(|v| v.as_str())
-        .collect::<Vec<&str>>();
-    let output = genmsg::depend_on_messages(paths.as_slice(), messages, crate_prefix).unwrap();
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("msg.rs");
-    let mut f = File::create(&dest_path).unwrap();
-    write!(f, "{}", output).unwrap();
-}
-
-fn append_share_folder(path: &str) -> Option<String> {
-    Path::new(path).join("share").to_str().map(|v| v.to_owned())
-}
-
-fn append_src_folder(path: &str) -> Option<String> {
-    Path::new(path)
-        .join("..")
-        .join("src")
-        .to_str()
-        .map(|v| v.to_owned())
+    let message_refs = messages.iter().map(|v| v.as_str()).collect::<Vec<&str>>();
+    rosmsg_include::depend_on_messages(&message_refs, is_internal)
 }
