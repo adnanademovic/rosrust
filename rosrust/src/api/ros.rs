@@ -263,14 +263,7 @@ impl Ros {
             Some(ref mut v) => v,
             None => return,
         };
-        let topics = self
-            .slave
-            .publications
-            .lock()
-            .expect("Failed to acquire lock on mutex")
-            .keys()
-            .cloned()
-            .collect();
+        let topics = self.slave.publications.get_topic_names();
         let message = Log {
             header: Header::default(),
             level,

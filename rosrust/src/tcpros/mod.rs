@@ -30,3 +30,9 @@ pub trait ServicePair: Message {
     type Request: RosMsg + Send + 'static;
     type Response: RosMsg + Send + 'static;
 }
+
+#[derive(Clone, Debug)]
+pub struct Topic {
+    pub name: String,
+    pub msg_type: String,
+}
