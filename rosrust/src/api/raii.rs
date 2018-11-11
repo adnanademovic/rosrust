@@ -24,28 +24,27 @@ impl<T: Message> Publisher<T> {
         name: &str,
     ) -> Result<Self> {
         let stream = slave.add_publication::<T>(hostname, name)?;
-        let mut info = PublisherInfo {
+
+        let raii = Arc::new(InteractorRaii::new(PublisherInfo {
             master,
             slave,
             name: name.into(),
-        };
+        }));
 
-        match info.master.register_publisher(name, &T::msg_type()) {
-            Ok(_) => Ok(Self {
-                stream,
-                clock,
-                seq: Arc::new(AtomicUsize::new(0)),
-                _raii: Arc::new(InteractorRaii::new(info)),
-            }),
-            Err(error) => {
-                error!(
-                    "Failed to register publisher for topic '{}': {}",
-                    name, error
-                );
-                info.unregister()?;
-                Err(error.into())
-            }
-        }
+        raii.interactor
+            .master
+            .register_publisher(name, &T::msg_type())
+            .map_err(|err| {
+                error!("Failed to register publisher for topic '{}': {}", name, err);
+                err
+            })?;
+
+        Ok(Self {
+            stream,
+            clock,
+            seq: Arc::new(AtomicUsize::new(0)),
+            _raii: raii,
+        })
     }
 
     #[inline]
@@ -92,32 +91,29 @@ impl Subscriber {
     ) -> Result<Self> {
         slave.add_subscription::<T, F>(name, callback)?;
 
-        match master.register_subscriber(name, &T::msg_type()) {
-            Ok(publishers) => {
-                if let Err(err) = slave.add_publishers_to_subscription(name, publishers.into_iter())
-                {
-                    error!(
-                        "Failed to subscribe to all publishers of topic '{}': {}",
-                        name, err
-                    );
-                }
-                Ok(Self {
-                    _raii: Arc::new(InteractorRaii::new(SubscriberInfo {
-                        master,
-                        slave,
-                        name: name.into(),
-                    })),
-                })
-            }
-            Err(err) => {
-                SubscriberInfo {
-                    master,
-                    slave,
-                    name: name.into(),
-                }.unregister()?;
-                Err(err.into())
-            }
+        let raii = Arc::new(InteractorRaii::new(SubscriberInfo {
+            master,
+            slave,
+            name: name.into(),
+        }));
+
+        let publishers = raii
+            .interactor
+            .master
+            .register_subscriber(name, &T::msg_type())?;
+
+        if let Err(err) = raii
+            .interactor
+            .slave
+            .add_publishers_to_subscription(name, publishers.into_iter())
+        {
+            error!(
+                "Failed to subscribe to all publishers of topic '{}': {}",
+                name, err
+            );
         }
+
+        Ok(Self { _raii: raii })
     }
 }
 
@@ -153,21 +149,17 @@ impl Service {
     {
         let api = slave.add_service::<T, F>(hostname, name, handler)?;
 
-        let mut info = ServiceInfo {
+        let raii = Arc::new(InteractorRaii::new(ServiceInfo {
             master,
             slave,
             api,
             name: name.into(),
-        };
+        }));
 
-        if let Err(err) = info.master.register_service(name, &info.api) {
-            info.unregister()?;
-            Err(err.into())
-        } else {
-            Ok(Self {
-                _raii: Arc::new(InteractorRaii::new(info)),
-            })
-        }
+        raii.interactor
+            .master
+            .register_service(name, &raii.interactor.api)?;
+        Ok(Self { _raii: raii })
     }
 }
 
@@ -192,7 +184,7 @@ trait Interactor {
 }
 
 struct InteractorRaii<I: Interactor> {
-    interactor: I,
+    pub interactor: I,
 }
 
 impl<I: Interactor> InteractorRaii<I> {
