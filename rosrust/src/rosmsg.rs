@@ -32,6 +32,18 @@ pub trait RosMsg: std::marker::Sized {
     }
 }
 
+impl RosMsg for bool {
+    #[inline]
+    fn encode<W: io::Write>(&self, mut w: W) -> io::Result<()> {
+        w.write_u8(*self as u8)
+    }
+
+    #[inline]
+    fn decode<R: io::Read>(mut r: R) -> io::Result<Self> {
+        r.read_u8().map(|u| u > 0)
+    }
+}
+
 impl RosMsg for u8 {
     #[inline]
     fn encode<W: io::Write>(&self, mut w: W) -> io::Result<()> {
