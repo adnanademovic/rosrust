@@ -166,6 +166,60 @@ impl Msg {
     }
 }
 
+static RESERVED_KEYWORDS: [&'static str; 52] = [
+    "as",
+    "break",
+    "const",
+    "continue",
+    "crate",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "fn",
+    "for",
+    "if",
+    "impl",
+    "in",
+    "let",
+    "loop",
+    "match",
+    "mod",
+    "move",
+    "mut",
+    "pub",
+    "ref",
+    "return",
+    "Self",
+    "self",
+    "static",
+    "struct",
+    "super",
+    "trait",
+    "true",
+    "type",
+    "unsafe",
+    "use",
+    "where",
+    "while",
+    "abstract",
+    "alignof",
+    "become",
+    "box",
+    "do",
+    "final",
+    "macro",
+    "offsetof",
+    "override",
+    "priv",
+    "proc",
+    "pure",
+    "sizeof",
+    "typeof",
+    "unsized",
+    "virtual",
+    "yield",
+];
 static IGNORE_WHITESPACE: &'static str = r"\s*";
 static ANY_WHITESPACE: &'static str = r"\s+";
 static FIELD_TYPE: &'static str = r"([a-zA-Z0-9_/]+)";
@@ -505,10 +559,16 @@ impl FieldInfo {
     }
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
+        let field_name = name.to_owned() +
+            if RESERVED_KEYWORDS.iter().any(|n| *n == name) {
+                "_"
+            } else {
+                ""
+            };
         Ok(FieldInfo {
             datatype: parse_datatype(datatype)
                 .ok_or_else(|| format!("Unsupported datatype: {}", datatype))?,
-            name: name.to_owned(),
+            name: field_name,
             case,
         })
     }
