@@ -408,7 +408,12 @@ pub enum FieldCase {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldInfo {
     pub datatype: DataType,
+
+    /// Name in .msg declaration
     pub name: String,
+
+    /// Name generated in Rust
+    pub generated_name: String,
     pub case: FieldCase,
 }
 
@@ -422,7 +427,7 @@ impl FieldInfo {
 
     pub fn field_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let datatype = self.datatype.token_stream(crate_prefix);
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = Ident::new(&self.generated_name, Span::call_site());
         match self.case {
             FieldCase::Unit => quote!{ pub #name: #datatype, },
             FieldCase::Vector => quote!{ pub #name: Vec<#datatype>, },
@@ -432,7 +437,7 @@ impl FieldInfo {
     }
 
     pub fn field_default_token_stream<T: ToTokens>(&self, _crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = Ident::new(&self.generated_name, Span::call_site());
         match self.case {
             FieldCase::Unit | FieldCase::Vector => quote!{ #name: Default::default(), },
             FieldCase::Array(l) => quote!{ #name: [Default::default(); #l], },
@@ -441,7 +446,7 @@ impl FieldInfo {
     }
 
     pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = Ident::new(&self.generated_name, Span::call_site());
         match self.case {
             FieldCase::Unit => quote!{ self.#name.encode(w.by_ref())?; },
             FieldCase::Vector => {
@@ -455,7 +460,7 @@ impl FieldInfo {
     }
 
     pub fn field_token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = Ident::new(&self.generated_name, Span::call_site());
         match self.case {
             FieldCase::Unit => quote!{ #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
             FieldCase::Vector => {
@@ -475,7 +480,7 @@ impl FieldInfo {
             FieldCase::Const(ref value) => value,
             _ => return quote!{},
         };
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = Ident::new(&self.generated_name, Span::call_site());
         let datatype = self.datatype.token_stream(crate_prefix);
         let insides = match self.datatype {
             DataType::Bool => {
@@ -559,7 +564,7 @@ impl FieldInfo {
     }
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
-        let field_name = name.to_owned() +
+        let generated_name = name.to_owned() +
             if RESERVED_KEYWORDS.iter().any(|n| *n == name) {
                 "_"
             } else {
@@ -568,7 +573,8 @@ impl FieldInfo {
         Ok(FieldInfo {
             datatype: parse_datatype(datatype)
                 .ok_or_else(|| format!("Unsupported datatype: {}", datatype))?,
-            name: field_name,
+            name: name.to_owned(),
+            generated_name: generated_name,
             case,
         })
     }
@@ -858,6 +864,30 @@ mod tests {
             .unwrap(),
             "e45d45a5a1ce597b249e23fb30fc871f".to_owned()
         );
+
+        let mut hashes = HashMap::new();
+        hashes.insert(
+            ("geometry_msgs".into(), "Point".into()),
+            "4a842b65f413084dc2b10fb484ea7f17".into(),
+        );
+        hashes.insert(
+            ("std_msgs".into(), "ColorRGBA".into()),
+            "a29a96539573343b1310c73607334b00".into(),
+        );
+        hashes.insert(
+            ("std_msgs".into(), "Header".into()),
+            "2176decaecbce78abc3b96ef049fabed".into(),
+        );
+        assert_eq!(
+            Msg::new(
+                "visualization_msgs",
+                "ImageMarker",
+                include_str!("msg_examples/visualization_msgs/msg/ImageMarker.msg"),
+            ).unwrap()
+                .calculate_md5(&hashes)
+                .unwrap(),
+            "1de93c67ec8858b831025a08fbf1b35c".to_owned()
+        );
     }
 
     #[test]
@@ -934,6 +964,7 @@ mod tests {
             FieldInfo {
                 datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
                 name: "myname".into(),
+                generated_name: "myname".into(),
                 case: FieldCase::Unit,
             },
             match_line("  geom_msgs/Twist   myname    # this clearly should succeed",)
@@ -945,6 +976,7 @@ mod tests {
             FieldInfo {
                 datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
                 name: "myname".into(),
+                generated_name: "myname".into(),
                 case: FieldCase::Vector,
             },
             match_line("  geom_msgs/Twist [  ]   myname  # ...")
@@ -956,6 +988,7 @@ mod tests {
             FieldInfo {
                 datatype: DataType::U8(false),
                 name: "myname".into(),
+                generated_name: "myname".into(),
                 case: FieldCase::Array(127),
             },
             match_line("  char   [   127 ]   myname# comment")
@@ -966,6 +999,7 @@ mod tests {
             FieldInfo {
                 datatype: DataType::String,
                 name: "myname".into(),
+                generated_name: "myname".into(),
                 case: FieldCase::Const("this is # data".into()),
             },
             match_line("  string  myname =   this is # data  ")
@@ -976,6 +1010,7 @@ mod tests {
             FieldInfo {
                 datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
                 name: "myname".into(),
+                generated_name: "myname".into(),
                 case: FieldCase::Const("-444".into()),
             },
             match_line("  geom_msgs/Twist  myname =   -444 # data  ")
@@ -995,11 +1030,13 @@ mod tests {
                 FieldInfo {
                     datatype: DataType::LocalStruct("Twist".into()),
                     name: "twist".into(),
+                    generated_name: "twist".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::F64,
                     name: "covariance".into(),
+                    generated_name: "covariance".into(),
                     case: FieldCase::Array(36),
                 },
             ],
@@ -1014,11 +1051,13 @@ mod tests {
                 FieldInfo {
                     datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
                     name: "header".into(),
+                    generated_name: "header".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::LocalStruct("Pose".into()),
                     name: "pose".into(),
+                    generated_name: "pose".into(),
                     case: FieldCase::Unit,
                 },
             ],
@@ -1045,11 +1084,13 @@ mod tests {
                 FieldInfo {
                     datatype: DataType::LocalStruct("Twist".into()),
                     name: "twist".into(),
+                    generated_name: "twist".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::F64,
                     name: "covariance".into(),
+                    generated_name: "covariance".into(),
                     case: FieldCase::Array(36),
                 },
             ]
@@ -1071,11 +1112,13 @@ mod tests {
                 FieldInfo {
                     datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
                     name: "header".into(),
+                    generated_name: "header".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::LocalStruct("Pose".into()),
                     name: "pose".into(),
+                    generated_name: "pose".into(),
                     case: FieldCase::Unit,
                 },
             ]
@@ -1098,36 +1141,43 @@ mod tests {
                 FieldInfo {
                     datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
                     name: "header".into(),
+                    generated_name: "header".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::RemoteStruct("geometry_msgs".into(), "Quaternion".into()),
                     name: "orientation".into(),
+                    generated_name: "orientation".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::F64,
                     name: "orientation_covariance".into(),
+                    generated_name: "orientation_covariance".into(),
                     case: FieldCase::Array(9),
                 },
                 FieldInfo {
                     datatype: DataType::RemoteStruct("geometry_msgs".into(), "Vector3".into()),
                     name: "angular_velocity".into(),
+                    generated_name: "angular_velocity".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::F64,
                     name: "angular_velocity_covariance".into(),
+                    generated_name: "angular_velocity_covariance".into(),
                     case: FieldCase::Array(9),
                 },
                 FieldInfo {
                     datatype: DataType::RemoteStruct("geometry_msgs".into(), "Vector3".into()),
                     name: "linear_acceleration".into(),
+                    generated_name: "linear_acceleration".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
                     datatype: DataType::F64,
                     name: "linear_acceleration_covariance".into(),
+                    generated_name: "linear_acceleration_covariance".into(),
                     case: FieldCase::Array(9),
                 },
             ]
