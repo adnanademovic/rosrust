@@ -109,11 +109,11 @@ impl Msg {
         &self,
         hashes: &HashMap<(String, String), String>,
     ) -> ::std::result::Result<String, ()> {
-        use crypto::digest::Digest;
-        use crypto::md5::Md5;
+        use md5::{Digest, Md5};
+
         let mut hasher = Md5::new();
-        hasher.input_str(&self.get_md5_representation(hashes)?);
-        Ok(hasher.result_str())
+        hasher.input(&self.get_md5_representation(hashes)?);
+        Ok(hex::encode(hasher.result().as_slice()))
     }
 
     pub fn get_md5_representation(

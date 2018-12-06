@@ -48,11 +48,10 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String
 }
 
 fn calculate_md5_from_representation(v: &str) -> String {
-    use crypto::digest::Digest;
-    use crypto::md5::Md5;
+    use md5::{Digest, Md5};
     let mut hasher = Md5::new();
-    hasher.input_str(v);
-    hasher.result_str()
+    hasher.input(v);
+    hex::encode(hasher.result())
 }
 
 pub fn generate_message_definition<S: std::hash::BuildHasher>(
