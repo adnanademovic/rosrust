@@ -18,12 +18,13 @@ extern crate serde_derive;
 extern crate xml_rpc;
 extern crate yaml_rust;
 
+pub use api::raii::Service;
 pub use api::{error, Clock, Parameter};
 pub use rosmsg::RosMsg;
 #[doc(hidden)]
 pub use rosrust_codegen::*;
 pub use singleton::*;
-pub use tcpros::{Client, Message, PublisherStream, ServicePair as Service};
+pub use tcpros::{Client, Message, PublisherStream, ServicePair};
 pub use time::{Duration, Time};
 
 pub mod api;
