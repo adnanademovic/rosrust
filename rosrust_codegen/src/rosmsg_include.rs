@@ -28,11 +28,11 @@ pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
     let output = genmsg::depend_on_messages(paths.as_slice(), messages)
         .unwrap()
         .token_stream(&if internal {
-            quote!{ :: }
+            quote! { :: }
         } else {
-            quote!{ ::rosrust:: }
+            quote! { ::rosrust:: }
         });
-    (quote!{#output}).into()
+    (quote! {#output}).into()
 }
 
 fn append_share_folder(path: &str) -> Option<String> {

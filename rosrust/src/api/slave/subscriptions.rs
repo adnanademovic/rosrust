@@ -101,7 +101,8 @@ fn request_topic(
             &publisher_uri.parse().unwrap(),
             "requestTopic",
             &(caller_id, topic, [["TCPROS"]]),
-        ).unwrap()
+        )
+        .unwrap()
         .unwrap();
     Ok(protocols)
 }

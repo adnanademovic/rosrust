@@ -29,7 +29,8 @@ pub fn try_init(name: &str) -> Result<()> {
         if shutdown_sender.send(()).is_err() {
             info!("ROS client is already down");
         }
-    }).chain_err(|| CTRLC_FAIL)?;
+    })
+    .chain_err(|| CTRLC_FAIL)?;
     *ros = Some(client);
     Ok(())
 }

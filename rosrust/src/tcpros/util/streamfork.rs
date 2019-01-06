@@ -54,7 +54,8 @@ fn fork_thread<T: Write + Send + 'static>(
             .filter_map(|mut target| match target.write_all(&buffer) {
                 Ok(()) => Some(target),
                 Err(_) => None,
-            }).collect()
+            })
+            .collect()
     }
 }
 

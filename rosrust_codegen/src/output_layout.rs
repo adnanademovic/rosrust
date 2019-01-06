@@ -14,7 +14,7 @@ impl Layout {
             .iter()
             .map(|v| v.token_stream(crate_prefix))
             .collect::<Vec<_>>();
-        quote!{
+        quote! {
             #(#packages)*
         }
     }
@@ -39,7 +39,7 @@ impl Package {
             .iter()
             .map(|v| v.token_stream(crate_prefix))
             .collect::<Vec<_>>();
-        quote!{
+        quote! {
             pub mod #name {
                 #(#messages)*
                 #(#services)*
@@ -68,7 +68,7 @@ impl Message {
         let decode_message = message.token_stream_decode(crate_prefix);
         let name = message.name_ident();
         let header_tokens = message.header_token_stream(crate_prefix);
-        quote!{
+        quote! {
             #base_message
 
             impl #crate_prefix Message for #name {

@@ -231,7 +231,8 @@ mod tests {
                 ("rosgraph_msgs", "Clock"),
                 ("rosgraph_msgs", "Log"),
             ],
-        ).unwrap()
+        )
+        .unwrap()
         .messages;
         assert_eq!(message_map.len(), 9);
         assert!(message_map.contains_key(&("geometry_msgs".into(), "Vector3".into()),));
@@ -255,7 +256,8 @@ mod tests {
                 ("rosgraph_msgs", "Clock"),
                 ("rosgraph_msgs", "Log"),
             ],
-        ).unwrap();
+        )
+        .unwrap();
         let hashes = calculate_md5(&message_map).unwrap();
         assert_eq!(hashes.len(), 9);
         assert_eq!(
@@ -318,7 +320,8 @@ mod tests {
             &message_map
                 .get(&("geometry_msgs".into(), "Vector3".into()))
                 .unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             definition,
             "# This represents a vector in free space. \n# It is only meant to represent \
@@ -336,7 +339,8 @@ mod tests {
             &message_map
                 .get(&("geometry_msgs".into(), "PoseStamped".into()))
                 .unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             definition,
             "# A Pose with reference coordinate frame and timestamp\n\
@@ -394,7 +398,8 @@ float64 w\n\
                 ("diagnostic_msgs", "AddDiagnostics"),
                 ("simple_srv", "Something"),
             ],
-        ).unwrap();
+        )
+        .unwrap();
         let hashes = calculate_md5(&message_map).unwrap();
         assert_eq!(hashes.len(), 11);
         assert_eq!(
@@ -420,6 +425,7 @@ float64 w\n\
                 ("empty_req_srv", "EmptyRequest"),
                 ("tricky_comment_srv", "TrickyComment"),
             ],
-        ).unwrap();
+        )
+        .unwrap();
     }
 }

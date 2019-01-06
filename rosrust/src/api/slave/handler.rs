@@ -83,7 +83,8 @@ impl SlaveHandler {
                             Value::String(topic.name),
                             Value::String(topic.msg_type),
                         ])
-                    }).collect(),
+                    })
+                    .collect(),
             ))
         });
 
@@ -99,7 +100,8 @@ impl SlaveHandler {
                             Value::String(topic.name),
                             Value::String(topic.msg_type),
                         ])
-                    }).collect(),
+                    })
+                    .collect(),
             ))
         });
 
@@ -135,7 +137,8 @@ impl SlaveHandler {
                     _ => Err(ResponseError::Client(
                         "Publishers need to be strings".into(),
                     )),
-                }).collect::<Response<Vec<String>>>()?;
+                })
+                .collect::<Response<Vec<String>>>()?;
 
             subs.add_publishers(&topic, &name_string, publishers.into_iter())
                 .map_err(|v| {

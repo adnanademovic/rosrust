@@ -17,12 +17,14 @@ impl Client {
         let mut response = xml_rpc::call_value(&self.master_uri.parse().unwrap(), name, params)
             .map_err(|err| {
                 ResponseError::Client(format!("Failed to perform call to server: {}", err))
-            })?.map_err(|fault| {
+            })?
+            .map_err(|fault| {
                 ResponseError::Client(format!(
                     "Unexpected fault #{} received from server: {}",
                     fault.code, fault.message
                 ))
-            })?.into_iter();
+            })?
+            .into_iter();
         let mut first_item = response.next();
         while let Some(Value::Array(v)) = first_item {
             response = v.into_iter();

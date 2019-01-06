@@ -31,7 +31,8 @@ fn main() {
                 v.data.len(),
                 v.header.stamp,
             );
-        }).unwrap();
+        })
+        .unwrap();
 
     // Block the thread until a shutdown signal is received
     rosrust::spin();
