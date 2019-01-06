@@ -5,7 +5,9 @@ extern crate proc_macro;
 extern crate proc_macro2;
 #[macro_use]
 extern crate quote;
-extern crate crypto;
+extern crate digest;
+extern crate hex;
+extern crate md5;
 extern crate syn;
 #[macro_use]
 extern crate error_chain;
