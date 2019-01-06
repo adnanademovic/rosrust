@@ -1,9 +1,11 @@
 pub use self::client::Client;
+use self::response_info::ResponseInfo;
 pub use self::server::Server;
 use std;
 
 pub mod client;
 pub mod error;
+mod response_info;
 pub mod server;
 
 pub type Response<T> = Result<T, ResponseError>;
