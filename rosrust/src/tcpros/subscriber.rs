@@ -1,6 +1,6 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
-use super::Message;
+use super::{Message, Topic};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use rosmsg::RosMsg;
 use std;
@@ -12,8 +12,7 @@ use std::thread;
 pub struct Subscriber {
     data_stream: Sender<Option<Vec<u8>>>,
     publishers_stream: Sender<SocketAddr>,
-    pub topic: String,
-    pub msg_type: String,
+    pub topic: Topic,
 }
 
 impl Subscriber {
@@ -29,11 +28,14 @@ impl Subscriber {
         let data_stream = data_tx.clone();
         thread::spawn(move || join_connections::<T>(&data_tx, pub_rx, &caller_id, &topic_name));
         thread::spawn(move || handle_data::<T, F>(data_rx, callback));
+        let topic = Topic {
+            name: String::from(topic),
+            msg_type: T::msg_type(),
+        };
         Subscriber {
             data_stream,
             publishers_stream: pub_tx,
-            topic: String::from(topic),
-            msg_type: T::msg_type(),
+            topic,
         }
     }
 
@@ -49,6 +51,10 @@ impl Subscriber {
         }
         Ok(())
     }
+
+    pub fn get_topic(&self) -> &Topic {
+        &self.topic
+    }
 }
 
 impl Drop for Subscriber {
@@ -56,7 +62,7 @@ impl Drop for Subscriber {
         if self.data_stream.send(None).is_err() {
             error!(
                 "Subscriber data stream to topic '{}' has already been killed",
-                self.topic
+                self.topic.name
             );
         }
     }

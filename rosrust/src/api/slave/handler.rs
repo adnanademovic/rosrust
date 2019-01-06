@@ -1,16 +1,17 @@
-use super::error::{self, ErrorKind, Result};
+use super::publications::PublicationsTracker;
+use super::subscriptions::SubscriptionsTracker;
 use futures::sync::mpsc::Sender;
 use nix::unistd::getpid;
 use rosxmlrpc::{Response, ResponseError, Server};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use tcpros::{Publisher, Service, Subscriber};
+use tcpros::Service;
 use xml_rpc::{self, Params, Value};
 
 pub struct SlaveHandler {
-    pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
-    pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
+    pub subscriptions: SubscriptionsTracker,
+    pub publications: PublicationsTracker,
     pub services: Arc<Mutex<HashMap<String, Service>>>,
     server: Server,
 }
@@ -70,37 +71,37 @@ impl SlaveHandler {
 
         server.register_value("getPid", "PID", |_args| Ok(Value::Int(getpid().into())));
 
-        let subscriptions = Arc::new(Mutex::new(HashMap::<String, Subscriber>::new()));
-        let subs = Arc::clone(&subscriptions);
+        let subscriptions = SubscriptionsTracker::default();
+        let subs = subscriptions.clone();
 
         server.register_value("getSubscriptions", "List of subscriptions", move |_args| {
             Ok(Value::Array(
-                subs.lock()
-                    .expect(FAILED_TO_LOCK)
-                    .values()
-                    .map(|v| {
+                subs.get_topics::<Vec<_>>()
+                    .into_iter()
+                    .map(|topic| {
                         Value::Array(vec![
-                            Value::String(v.topic.clone()),
-                            Value::String(v.msg_type.clone()),
+                            Value::String(topic.name),
+                            Value::String(topic.msg_type),
                         ])
-                    }).collect(),
+                    })
+                    .collect(),
             ))
         });
 
-        let publications = Arc::new(Mutex::new(HashMap::<String, Publisher>::new()));
-        let pubs = Arc::clone(&publications);
+        let publications = PublicationsTracker::default();
+        let pubs = publications.clone();
 
         server.register_value("getPublications", "List of publications", move |_args| {
             Ok(Value::Array(
-                pubs.lock()
-                    .expect(FAILED_TO_LOCK)
-                    .values()
-                    .map(|v| {
+                pubs.get_topics::<Vec<_>>()
+                    .into_iter()
+                    .map(|topic| {
                         Value::Array(vec![
-                            Value::String(v.topic.clone()),
-                            Value::String(v.msg_type.clone()),
+                            Value::String(topic.name),
+                            Value::String(topic.msg_type),
                         ])
-                    }).collect(),
+                    })
+                    .collect(),
             ))
         });
 
@@ -110,7 +111,7 @@ impl SlaveHandler {
         });
 
         let name_string = String::from(name);
-        let subs = Arc::clone(&subscriptions);
+        let subs = subscriptions.clone();
 
         server.register_value("publisherUpdate", "Publishers updated", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
@@ -136,19 +137,18 @@ impl SlaveHandler {
                     _ => Err(ResponseError::Client(
                         "Publishers need to be strings".into(),
                     )),
-                }).collect::<Response<Vec<String>>>()?;
+                })
+                .collect::<Response<Vec<String>>>()?;
 
-            add_publishers_to_subscription(
-                &mut subs.lock().expect(FAILED_TO_LOCK),
-                &name_string,
-                &topic,
-                publishers.into_iter(),
-            ).map_err(|v| ResponseError::Server(format!("Failed to handle publishers: {}", v)))?;
+            subs.add_publishers(&topic, &name_string, publishers.into_iter())
+                .map_err(|v| {
+                    ResponseError::Server(format!("Failed to handle publishers: {}", v))
+                })?;
             Ok(Value::Int(0))
         });
 
         let hostname_string = String::from(hostname);
-        let pubs = Arc::clone(&publications);
+        let pubs = publications.clone();
 
         server.register_value("requestTopic", "Chosen protocol", move |args| {
             let mut args = unwrap_array_case(args).into_iter();
@@ -168,14 +168,10 @@ impl SlaveHandler {
                 }
                 None => return Err(ResponseError::Client("Missing argument 'protocols'".into())),
             };
-            let (ip, port) = match pubs.lock().expect(FAILED_TO_LOCK).get(&topic) {
-                Some(publisher) => (hostname_string.clone(), i32::from(publisher.port)),
-                None => {
-                    return Err(ResponseError::Client(
-                        "Requested topic not published by node".into(),
-                    ));
-                }
-            };
+            let port = pubs.get_port(&topic).ok_or_else(|| {
+                ResponseError::Client("Requested topic not published by node".into())
+            })?;
+            let ip = hostname_string.clone();
             let mut has_tcpros = false;
             for protocol in protocols {
                 if let Value::Array(protocol) = protocol {
@@ -208,65 +204,6 @@ impl SlaveHandler {
     pub fn bind(self, addr: &SocketAddr) -> xml_rpc::error::Result<xml_rpc::server::BoundServer> {
         self.server.bind(addr)
     }
-}
-
-pub fn add_publishers_to_subscription<T>(
-    subscriptions: &mut HashMap<String, Subscriber>,
-    name: &str,
-    topic: &str,
-    publishers: T,
-) -> Result<()>
-where
-    T: Iterator<Item = String>,
-{
-    if let Some(mut subscription) = subscriptions.get_mut(topic) {
-        for publisher in publishers {
-            if let Err(err) = connect_to_publisher(&mut subscription, name, &publisher, topic) {
-                let info = err
-                    .iter()
-                    .map(|v| format!("{}", v))
-                    .collect::<Vec<_>>()
-                    .join("\nCaused by:");
-                error!("Failed to connect to publisher '{}': {}", publisher, info);
-                return Err(err);
-            }
-        }
-    }
-    Ok(())
-}
-
-fn connect_to_publisher(
-    subscriber: &mut Subscriber,
-    caller_id: &str,
-    publisher: &str,
-    topic: &str,
-) -> Result<()> {
-    let (protocol, hostname, port) = request_topic(publisher, caller_id, topic)?;
-    if protocol != "TCPROS" {
-        bail!(
-            "Publisher responded with a non-TCPROS protocol: {}",
-            protocol
-        )
-    }
-    subscriber
-        .connect_to((hostname.as_str(), port as u16))
-        .map_err(|err| ErrorKind::Io(err).into())
-}
-
-fn request_topic(
-    publisher_uri: &str,
-    caller_id: &str,
-    topic: &str,
-) -> error::rosxmlrpc::Result<(String, String, i32)> {
-    let (_code, _message, protocols): (i32, String, (String, String, i32)) = xml_rpc::Client::new()
-        .unwrap()
-        .call(
-            &publisher_uri.parse().unwrap(),
-            "requestTopic",
-            &(caller_id, topic, [["TCPROS"]]),
-        ).unwrap()
-        .unwrap();
-    Ok(protocols)
 }
 
 #[allow(dead_code)]
@@ -321,5 +258,3 @@ pub struct BusInfo {
     pub topic: String,
     pub connected: bool,
 }
-
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";

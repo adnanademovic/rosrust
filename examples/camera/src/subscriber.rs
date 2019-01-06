@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
@@ -25,11 +27,12 @@ fn main() {
             *now = Instant::now();
             ros_info!(
                 "Took {}ms to receive image with data amount {} at {:?}",
-                duration.as_secs() * 1000 + (duration.subsec_millis() as u64),
+                duration.as_secs() * 1000 + u64::from(duration.subsec_millis()),
                 v.data.len(),
                 v.header.stamp,
             );
-        }).unwrap();
+        })
+        .unwrap();
 
     // Block the thread until a shutdown signal is received
     rosrust::spin();

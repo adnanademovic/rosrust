@@ -2,7 +2,7 @@ use super::error::{ErrorKind, Result, ResultExt};
 use super::header;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
-use super::Message;
+use super::{Message, Topic};
 use std;
 use std::collections::HashMap;
 use std::net::{TcpListener, ToSocketAddrs};
@@ -12,8 +12,7 @@ use std::thread;
 pub struct Publisher {
     subscriptions: DataStream,
     pub port: u16,
-    pub msg_type: String,
-    pub topic: String,
+    pub topic: Topic,
     last_message: Arc<Mutex<Arc<Vec<u8>>>>,
     _raii: tcpconnection::Raii,
 }
@@ -119,11 +118,14 @@ impl Publisher {
         thread::spawn(move || {
             listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets, &last_msg_for_thread)
         });
+        let topic = Topic {
+            name: String::from(topic),
+            msg_type: T::msg_type(),
+        };
         Publisher {
             subscriptions: data,
             port,
-            msg_type: T::msg_type(),
-            topic: String::from(topic),
+            topic,
             last_message,
             _raii: raii,
         }
@@ -131,6 +133,10 @@ impl Publisher {
 
     pub fn stream<T: Message>(&self) -> Result<PublisherStream<T>> {
         PublisherStream::new(self)
+    }
+
+    pub fn get_topic(&self) -> &Topic {
+        &self.topic
     }
 }
 
@@ -149,9 +155,9 @@ pub struct PublisherStream<T: Message> {
 impl<T: Message> PublisherStream<T> {
     fn new(publisher: &Publisher) -> Result<PublisherStream<T>> {
         let msg_type = T::msg_type();
-        if publisher.msg_type != msg_type {
+        if publisher.topic.msg_type != msg_type {
             bail!(ErrorKind::MessageTypeMismatch(
-                publisher.msg_type.clone(),
+                publisher.topic.msg_type.clone(),
                 msg_type,
             ));
         }

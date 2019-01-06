@@ -1,19 +1,21 @@
+mod handler;
+mod publications;
+mod subscriptions;
+
+use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result, ResultExt};
-use super::slavehandler::{add_publishers_to_subscription, SlaveHandler};
 use futures::sync::mpsc::channel as futures_channel;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tcpros::{
-    Message, Publisher, PublisherStream, Service, ServicePair, ServiceResult, Subscriber,
-};
+use tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 
 pub struct Slave {
     name: String,
     uri: String,
-    pub publications: Arc<Mutex<HashMap<String, Publisher>>>,
-    pub subscriptions: Arc<Mutex<HashMap<String, Subscriber>>>,
+    pub publications: publications::PublicationsTracker,
+    pub subscriptions: subscriptions::SubscriptionsTracker,
     pub services: Arc<Mutex<HashMap<String, Service>>>,
 }
 
@@ -32,8 +34,8 @@ impl Slave {
 
         let (shutdown_tx, shutdown_rx) = futures_channel(1);
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
-        let pubs = Arc::clone(&handler.publications);
-        let subs = Arc::clone(&handler.subscriptions);
+        let publications = handler.publications.clone();
+        let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
         let (port_tx, port_rx) = channel();
         let socket_addr = match (hostname, port).to_socket_addrs()?.next() {
@@ -67,8 +69,8 @@ impl Slave {
         Ok(Slave {
             name: String::from(name),
             uri,
-            publications: pubs,
-            subscriptions: subs,
+            publications,
+            subscriptions,
             services,
         })
     }
@@ -82,12 +84,8 @@ impl Slave {
     where
         T: Iterator<Item = String>,
     {
-        add_publishers_to_subscription(
-            &mut self.subscriptions.lock().expect(FAILED_TO_LOCK),
-            &self.name,
-            topic,
-            publishers,
-        )
+        self.subscriptions
+            .add_publishers(topic, &self.name, publishers)
     }
 
     pub fn add_service<T, F>(
@@ -120,10 +118,12 @@ impl Slave {
         }
     }
 
+    #[inline]
     pub fn remove_service(&self, service: &str) {
         self.services.lock().expect(FAILED_TO_LOCK).remove(service);
     }
 
+    #[inline]
     pub fn add_publication<T>(
         &self,
         hostname: &str,
@@ -132,57 +132,26 @@ impl Slave {
     where
         T: Message,
     {
-        use std::collections::hash_map::Entry;
-        match self
-            .publications
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .entry(String::from(topic))
-        {
-            Entry::Occupied(publisher_entry) => publisher_entry.get().stream(),
-            Entry::Vacant(entry) => {
-                let publisher = Publisher::new::<T, _>(format!("{}:0", hostname).as_str(), topic)?;
-                entry.insert(publisher).stream()
-            }
-        }
+        self.publications.add(hostname, topic)
     }
 
+    #[inline]
     pub fn remove_publication(&self, topic: &str) {
-        self.publications
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .remove(topic);
+        self.publications.remove(topic)
     }
 
+    #[inline]
     pub fn add_subscription<T, F>(&self, topic: &str, callback: F) -> Result<()>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
-        use std::collections::hash_map::Entry;
-        match self
-            .subscriptions
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .entry(String::from(topic))
-        {
-            Entry::Occupied(..) => {
-                error!("Duplicate subscription to topic '{}' attempted", topic);
-                Err(ErrorKind::Duplicate("subscription".into()).into())
-            }
-            Entry::Vacant(entry) => {
-                let subscriber = Subscriber::new::<T, F>(&self.name, topic, callback);
-                entry.insert(subscriber);
-                Ok(())
-            }
-        }
+        self.subscriptions.add(&self.name, topic, callback)
     }
 
+    #[inline]
     pub fn remove_subscription(&self, topic: &str) {
-        self.subscriptions
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .remove(topic);
+        self.subscriptions.remove(topic)
     }
 }
 

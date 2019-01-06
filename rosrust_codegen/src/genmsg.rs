@@ -22,7 +22,8 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_
                 .services
                 .iter()
                 .map(|&(ref pack, ref _name)| pack.clone()),
-        ).collect::<HashSet<String>>();
+        )
+        .collect::<HashSet<String>>();
     for package in packages {
         let mut package_data = output_layout::Package {
             name: package.clone(),

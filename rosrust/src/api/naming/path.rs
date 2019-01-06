@@ -231,21 +231,18 @@ mod tests {
                     .expect(FAILED_TO_HANDLE)
             )
         );
-        assert!(
-            "/".parse::<Buffer>()
-                .expect(FAILED_TO_HANDLE)
-                .parent()
-                .is_err()
-        );
-        assert!(
-            "/foo"
-                .parse::<Buffer>()
-                .expect(FAILED_TO_HANDLE)
-                .parent()
-                .expect(FAILED_TO_HANDLE)
-                .parent()
-                .is_err()
-        );
+        assert!("/"
+            .parse::<Buffer>()
+            .expect(FAILED_TO_HANDLE)
+            .parent()
+            .is_err());
+        assert!("/foo"
+            .parse::<Buffer>()
+            .expect(FAILED_TO_HANDLE)
+            .parent()
+            .expect(FAILED_TO_HANDLE)
+            .parent()
+            .is_err());
     }
 
     #[test]

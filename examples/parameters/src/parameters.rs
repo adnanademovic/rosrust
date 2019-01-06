@@ -1,9 +1,12 @@
+#![deny(warnings)]
+
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
 fn main() {
     env_logger::init();
 
@@ -82,7 +85,8 @@ fn main() {
             foo: "x".into(),
             bar: 42,
             baz: false,
-        }).unwrap();
+        })
+        .unwrap();
     ros_info!(
         "Get raw: {:?}",
         rosrust::param("/qux").unwrap().get_raw().unwrap()

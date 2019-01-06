@@ -45,7 +45,7 @@ impl Msg {
             .iter()
             .map(|v| v.const_token_stream(crate_prefix))
             .collect::<Vec<_>>();
-        quote!{
+        quote! {
             #[allow(dead_code, non_camel_case_types, non_snake_case)]
             #[derive(Clone)]
             pub struct #name {
@@ -71,7 +71,7 @@ impl Msg {
             .iter()
             .map(|v| v.field_token_stream_encode(crate_prefix))
             .collect::<Vec<_>>();
-        quote!{
+        quote! {
             #(#fields)*
             Ok(())
         }
@@ -83,7 +83,7 @@ impl Msg {
             .iter()
             .map(|v| v.field_token_stream_decode(crate_prefix))
             .collect::<Vec<_>>();
-        quote!{
+        quote! {
             Ok(Self {
                 #(#fields)*
             })
@@ -101,7 +101,8 @@ impl Msg {
                 DataType::LocalStruct(ref name) => Some((self.package.clone(), name.clone())),
                 DataType::RemoteStruct(ref pkg, ref name) => Some((pkg.clone(), name.clone())),
                 _ => None,
-            }).collect()
+            })
+            .collect()
     }
 
     #[cfg(test)]
@@ -146,9 +147,9 @@ impl Msg {
 
     pub fn header_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         if !self.has_header() {
-            return quote!{};
+            return quote! {};
         }
-        quote!{
+        quote! {
             fn set_header(
                 &mut self,
                 clock: &::std::sync::Arc<#crate_prefix Clock>,
@@ -326,7 +327,8 @@ fn strip_useless(data: &str) -> Result<&str> {
                 "Somehow splitting a line resulted in 0 parts?! Happened here: {}",
                 data
             )
-        })?.trim())
+        })?
+        .trim())
 }
 
 #[inline]
@@ -370,115 +372,115 @@ impl FieldInfo {
         let datatype = self.datatype.token_stream(crate_prefix);
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
-            FieldCase::Unit => quote!{ pub #name: #datatype, },
-            FieldCase::Vector => quote!{ pub #name: Vec<#datatype>, },
-            FieldCase::Array(l) => quote!{ pub #name: [#datatype; #l], },
-            FieldCase::Const(_) => quote!{},
+            FieldCase::Unit => quote! { pub #name: #datatype, },
+            FieldCase::Vector => quote! { pub #name: Vec<#datatype>, },
+            FieldCase::Array(l) => quote! { pub #name: [#datatype; #l], },
+            FieldCase::Const(_) => quote! {},
         }
     }
 
     pub fn field_default_token_stream<T: ToTokens>(&self, _crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
-            FieldCase::Unit | FieldCase::Vector => quote!{ #name: Default::default(), },
-            FieldCase::Array(l) => quote!{ #name: [Default::default(); #l], },
-            FieldCase::Const(_) => quote!{},
+            FieldCase::Unit | FieldCase::Vector => quote! { #name: Default::default(), },
+            FieldCase::Array(l) => quote! { #name: [Default::default(); #l], },
+            FieldCase::Const(_) => quote! {},
         }
     }
 
     pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
-            FieldCase::Unit => quote!{ self.#name.encode(w.by_ref())?; },
+            FieldCase::Unit => quote! { self.#name.encode(w.by_ref())?; },
             FieldCase::Vector => {
-                quote!{ #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
+                quote! { #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
             }
             FieldCase::Array(_l) => {
-                quote!{ #crate_prefix rosmsg::encode_fixed_slice(&self.#name, w.by_ref())?; }
+                quote! { #crate_prefix rosmsg::encode_fixed_slice(&self.#name, w.by_ref())?; }
             }
-            FieldCase::Const(_) => quote!{},
+            FieldCase::Const(_) => quote! {},
         }
     }
 
     pub fn field_token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
-            FieldCase::Unit => quote!{ #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
+            FieldCase::Unit => quote! { #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
             FieldCase::Vector => {
-                quote!{ #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
+                quote! { #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
             }
             FieldCase::Array(l) => {
                 let lines =
-                    (0..l).map(|_| quote!{ #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, });
-                quote!{ #name: [#(#lines)*], }
+                    (0..l).map(|_| quote! { #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, });
+                quote! { #name: [#(#lines)*], }
             }
-            FieldCase::Const(_) => quote!{},
+            FieldCase::Const(_) => quote! {},
         }
     }
 
     pub fn const_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let value = match self.case {
             FieldCase::Const(ref value) => value,
-            _ => return quote!{},
+            _ => return quote! {},
         };
         let name = Ident::new(&self.name, Span::call_site());
         let datatype = self.datatype.token_stream(crate_prefix);
         let insides = match self.datatype {
             DataType::Bool => {
                 let bool_value = if value != "0" {
-                    quote!{ true }
+                    quote! { true }
                 } else {
-                    quote!{ false }
+                    quote! { false }
                 };
-                quote!{ #name; bool = #bool_value }
+                quote! { #name; bool = #bool_value }
             }
-            DataType::String => quote!{ #name: &'static str = #value },
+            DataType::String => quote! { #name: &'static str = #value },
             DataType::Time
             | DataType::Duration
             | DataType::LocalStruct(..)
-            | DataType::RemoteStruct(..) => return quote!{},
+            | DataType::RemoteStruct(..) => return quote! {},
             DataType::I8(_) => {
                 let numeric_value = syn::Lit::new(Literal::i8_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::I16 => {
                 let numeric_value = syn::Lit::new(Literal::i16_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::I32 => {
                 let numeric_value = syn::Lit::new(Literal::i32_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::I64 => {
                 let numeric_value = syn::Lit::new(Literal::i64_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U8(_) => {
                 let numeric_value = syn::Lit::new(Literal::u8_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U16 => {
                 let numeric_value = syn::Lit::new(Literal::u16_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U32 => {
                 let numeric_value = syn::Lit::new(Literal::u32_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U64 => {
                 let numeric_value = syn::Lit::new(Literal::u64_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::F32 => {
                 let numeric_value = syn::Lit::new(Literal::f32_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::F64 => {
                 let numeric_value = syn::Lit::new(Literal::f64_suffixed(value.parse().unwrap()));
-                quote!{ #name: #datatype = #numeric_value as #datatype }
+                quote! { #name: #datatype = #numeric_value as #datatype }
             }
         };
-        quote!{
+        quote! {
             #[allow(dead_code,non_upper_case_globals)]
             pub const #insides;
         }
@@ -537,28 +539,28 @@ pub enum DataType {
 impl DataType {
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         match *self {
-            DataType::Bool => quote!{ bool },
-            DataType::I8(_) => quote!{ i8 },
-            DataType::I16 => quote!{ i16 },
-            DataType::I32 => quote!{ i32 },
-            DataType::I64 => quote!{ i64 },
-            DataType::U8(_) => quote!{ u8 },
-            DataType::U16 => quote!{ u16 },
-            DataType::U32 => quote!{ u32 },
-            DataType::U64 => quote!{ u64 },
-            DataType::F32 => quote!{ f32 },
-            DataType::F64 => quote!{ f64 },
-            DataType::String => quote!{ ::std::string::String },
-            DataType::Time => quote!{ #crate_prefix Time },
-            DataType::Duration => quote!{ #crate_prefix Duration },
+            DataType::Bool => quote! { bool },
+            DataType::I8(_) => quote! { i8 },
+            DataType::I16 => quote! { i16 },
+            DataType::I32 => quote! { i32 },
+            DataType::I64 => quote! { i64 },
+            DataType::U8(_) => quote! { u8 },
+            DataType::U16 => quote! { u16 },
+            DataType::U32 => quote! { u32 },
+            DataType::U64 => quote! { u64 },
+            DataType::F32 => quote! { f32 },
+            DataType::F64 => quote! { f64 },
+            DataType::String => quote! { ::std::string::String },
+            DataType::Time => quote! { #crate_prefix Time },
+            DataType::Duration => quote! { #crate_prefix Duration },
             DataType::LocalStruct(ref name) => {
                 let name = Ident::new(&name, Span::call_site());
-                quote!{ #name }
+                quote! { #name }
             }
             DataType::RemoteStruct(ref pkg, ref name) => {
                 let name = Ident::new(&name, Span::call_site());
                 let pkg = Ident::new(&pkg, Span::call_site());
-                quote!{ super::#pkg::#name }
+                quote! { super::#pkg::#name }
             }
         }
     }
@@ -612,7 +614,8 @@ impl DataType {
             DataType::RemoteStruct(ref pkg, ref name) => {
                 hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
             }
-        }.into())
+        }
+        .into())
     }
 }
 
@@ -764,7 +767,8 @@ mod tests {
                 "geometry_msgs",
                 "Point",
                 include_str!("msg_examples/geometry_msgs/msg/Point.msg"),
-            ).unwrap()
+            )
+            .unwrap()
             .calculate_md5(&HashMap::new())
             .unwrap(),
             "4a842b65f413084dc2b10fb484ea7f17".to_owned()
@@ -774,7 +778,8 @@ mod tests {
                 "geometry_msgs",
                 "Quaternion",
                 include_str!("msg_examples/geometry_msgs/msg/Quaternion.msg"),
-            ).unwrap()
+            )
+            .unwrap()
             .calculate_md5(&HashMap::new())
             .unwrap(),
             "a779879fadf0160734f906b8c19c7004".to_owned()
@@ -793,7 +798,8 @@ mod tests {
                 "geometry_msgs",
                 "Pose",
                 include_str!("msg_examples/geometry_msgs/msg/Pose.msg"),
-            ).unwrap()
+            )
+            .unwrap()
             .calculate_md5(&hashes)
             .unwrap(),
             "e45d45a5a1ce597b249e23fb30fc871f".to_owned()
@@ -929,7 +935,8 @@ mod tests {
         let data = match_lines(include_str!(
             "msg_examples/geometry_msgs/msg/TwistWithCovariance.\
              msg"
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             vec![
                 FieldInfo {
@@ -948,7 +955,8 @@ mod tests {
 
         let data = match_lines(include_str!(
             "msg_examples/geometry_msgs/msg/PoseStamped.msg"
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             vec![
                 FieldInfo {
@@ -976,7 +984,8 @@ mod tests {
             "geometry_msgs",
             "TwistWithCovariance",
             include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(data.package, "geometry_msgs");
         assert_eq!(data.name, "TwistWithCovariance");
         assert_eq!(
@@ -1002,7 +1011,8 @@ mod tests {
             "geometry_msgs",
             "PoseStamped",
             include_str!("msg_examples/geometry_msgs/msg/PoseStamped.msg"),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(data.package, "geometry_msgs");
         assert_eq!(data.name, "PoseStamped");
         assert_eq!(
@@ -1029,7 +1039,8 @@ mod tests {
             "sensor_msgs",
             "Imu",
             include_str!("msg_examples/sensor_msgs/msg/Imu.msg"),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(data.package, "sensor_msgs");
         assert_eq!(data.name, "Imu");
         assert_eq!(

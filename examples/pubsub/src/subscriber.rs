@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
@@ -15,7 +17,8 @@ fn main() {
     let _subscriber_raii = rosrust::subscribe("chatter", |v: msg::std_msgs::String| {
         // Callback for handling received messages
         ros_info!("Received: {}", v.data);
-    }).unwrap();
+    })
+    .unwrap();
 
     // Block the thread until a shutdown signal is received
     rosrust::spin();

@@ -174,7 +174,7 @@ where
                 writer.set_position(0);
                 message_length.encode(&mut writer)?;
 
-                stream.write(&writer.into_inner())?;
+                stream.write_all(&writer.into_inner())?;
             }
             Err(message) => {
                 // Send False flag and error message string in case of failure

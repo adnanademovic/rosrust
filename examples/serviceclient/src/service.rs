@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
@@ -21,7 +23,8 @@ fn main() {
             ros_info!("{} + {} = {}", req.a, req.b, sum);
 
             Ok(msg::roscpp_tutorials::TwoIntsRes { sum })
-        }).unwrap();
+        })
+        .unwrap();
 
     // Block the thread until a shutdown signal is received
     rosrust::spin();

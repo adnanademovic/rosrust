@@ -10,4 +10,3 @@ pub mod raii;
 pub mod resolve;
 mod ros;
 mod slave;
-mod slavehandler;

@@ -46,7 +46,8 @@ pub fn mappings() -> Vec<(String, String)> {
                 v.next().expect(UNEXPECTED_EMPTY_ARRAY),
                 v.next().expect(UNEXPECTED_EMPTY_ARRAY),
             )
-        }).collect()
+        })
+        .collect()
 }
 
 pub fn params() -> Vec<(String, String)> {
@@ -64,7 +65,8 @@ pub fn params() -> Vec<(String, String)> {
                     .replacen('_', "~", 1),
                 v.next().expect(UNEXPECTED_EMPTY_ARRAY),
             )
-        }).collect()
+        })
+        .collect()
 }
 
 pub fn get_unused_args() -> Vec<String> {
@@ -76,7 +78,8 @@ pub fn get_unused_args() -> Vec<String> {
             } else {
                 None
             }
-        }).collect()
+        })
+        .collect()
 }
 
 fn find_with_prefix(prefix: &str) -> Option<String> {
