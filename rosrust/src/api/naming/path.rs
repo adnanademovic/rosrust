@@ -98,6 +98,15 @@ impl std::str::FromStr for Buffer {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim_right_matches('/');
+        match s.bytes().next() {
+            Some(first_char) => {
+                if !is_legal_first_char(first_char) {
+                    bail!(ErrorKind::IllegalFirstCharacter(s.into()));
+                }
+            }
+            None => bail!(ErrorKind::EmptyName),
+        };
+
         let mut word_iter = s.split('/');
         match word_iter.next() {
             Some("") => {}
@@ -112,13 +121,6 @@ impl std::str::FromStr for Buffer {
 
 fn process_name(name: &str) -> Result<String, Error> {
     let mut bytes = name.bytes();
-    let first_char = match bytes.next() {
-        Some(v) => v,
-        None => bail!(ErrorKind::EmptyName),
-    };
-    if !is_legal_first_char(first_char) {
-        bail!(ErrorKind::IllegalFirstCharacter(name.into()));
-    }
     if !bytes.all(is_legal_char) {
         bail!(ErrorKind::IllegalCharacter(name.into()));
     }
@@ -126,7 +128,7 @@ fn process_name(name: &str) -> Result<String, Error> {
 }
 
 fn is_legal_first_char(v: u8) -> bool {
-    v >= b'A' && v <= b'Z' || v >= b'a' && v <= b'z'
+    v >= b'A' && v <= b'Z' || v >= b'a' && v <= b'z' || v == b'/' || v == b'~'
 }
 
 fn is_legal_char(v: u8) -> bool {
