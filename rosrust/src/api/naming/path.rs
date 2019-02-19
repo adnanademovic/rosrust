@@ -97,29 +97,31 @@ impl std::str::FromStr for Buffer {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim_right_matches('/');
-        match s.bytes().next() {
-            Some(first_char) => {
-                if !is_legal_first_char(first_char) {
-                    bail!(ErrorKind::IllegalFirstCharacter(s.into()));
-                }
+        let s = s.trim_end_matches('/');
+        let words = if let Some(first_char) = s.bytes().next() {
+            if !is_legal_first_char(first_char) {
+                bail!(ErrorKind::IllegalFirstCharacter(s.into()));
             }
-            None => bail!(ErrorKind::EmptyName),
+            let mut word_iter = s.split('/');
+            match word_iter.next() {
+                Some("") => {}
+                Some(_) | None => bail!(ErrorKind::LeadingSlashMissing(s.into())),
+            }
+            word_iter
+                .map(process_name)
+                .collect::<Result<Vec<String>, Error>>()?
+        } else {
+            Vec::new()
         };
-
-        let mut word_iter = s.split('/');
-        match word_iter.next() {
-            Some("") => {}
-            Some(_) | None => bail!(ErrorKind::LeadingSlashMissing(s.into())),
-        }
-        let words = word_iter
-            .map(process_name)
-            .collect::<Result<Vec<String>, Error>>()?;
         Ok(Buffer { chain: words })
     }
 }
 
 fn process_name(name: &str) -> Result<String, Error> {
+    if name.is_empty() {
+        bail!(ErrorKind::EmptyName)
+    }
+
     let mut bytes = name.bytes();
     if !bytes.all(is_legal_char) {
         bail!(ErrorKind::IllegalCharacter(name.into()));
@@ -128,11 +130,15 @@ fn process_name(name: &str) -> Result<String, Error> {
 }
 
 fn is_legal_first_char(v: u8) -> bool {
-    v >= b'A' && v <= b'Z' || v >= b'a' && v <= b'z' || v == b'/' || v == b'~'
+    v >= b'A' && v <= b'Z'
+        || v >= b'a' && v <= b'z'
+        || v == b'/'
+        || v == b'~'
+        || v >= b'0' && v <= b'9'
 }
 
 fn is_legal_char(v: u8) -> bool {
-    is_legal_first_char(v) || v >= b'0' && v <= b'9' || v == b'_'
+    is_legal_first_char(v) || v == b'_'
 }
 
 #[cfg(test)]
@@ -149,10 +155,11 @@ mod tests {
         assert!("/asdf/".parse::<Buffer>().is_ok());
         assert!("/".parse::<Buffer>().is_ok());
         assert!("".parse::<Buffer>().is_ok());
+        assert!("/123/".parse::<Buffer>().is_ok());
+        assert!("/_e".parse::<Buffer>().is_ok());
+
         assert!("a".parse::<Buffer>().is_err());
-        assert!("/123/".parse::<Buffer>().is_err());
         assert!("/foo$".parse::<Buffer>().is_err());
-        assert!("/_e".parse::<Buffer>().is_err());
         assert!("/a//b".parse::<Buffer>().is_err());
     }
 
