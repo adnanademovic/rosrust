@@ -74,7 +74,7 @@ impl Ros {
     }
 
     fn new_raw(master_uri: &str, hostname: &str, namespace: &str, name: &str) -> Result<Ros> {
-        let namespace = namespace.trim_right_matches('/');
+        let namespace = namespace.trim_start_matches('/');
 
         if name.contains('/') {
             bail!(ErrorKind::Naming(
