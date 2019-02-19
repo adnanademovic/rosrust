@@ -1,6 +1,6 @@
+use crossbeam::channel::{unbounded, Sender};
 use std::cmp;
 use std::collections::BinaryHeap;
-use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
@@ -138,7 +138,7 @@ impl Clock for SimulatedClock {
 
     #[inline]
     fn wait_until(&self, timestamp: Time) {
-        let (tx, rx) = channel();
+        let (tx, rx) = unbounded();
         {
             self.data
                 .lock()

@@ -1,9 +1,9 @@
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 pub fn iterate(listener: TcpListener, tag: String) -> (Raii, TcpConnectionIterator) {
-    let (tx, rx) = channel();
+    let (tx, rx) = unbounded();
     let killer = Raii { killer: tx.clone() };
     thread::spawn(move || listener_thread(&listener, &tag, &tx));
     (killer, TcpConnectionIterator { listener: rx })

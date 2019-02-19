@@ -4,9 +4,9 @@ mod subscriptions;
 
 use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result, ResultExt};
+use crossbeam::channel::{unbounded, Sender};
 use futures::sync::mpsc::channel as futures_channel;
 use std::collections::HashMap;
-use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
@@ -37,7 +37,7 @@ impl Slave {
         let publications = handler.publications.clone();
         let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
-        let (port_tx, port_rx) = channel();
+        let (port_tx, port_rx) = unbounded();
         let socket_addr = match (hostname, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
             None => bail!("Bad address provided: {}:{}", hostname, port),
