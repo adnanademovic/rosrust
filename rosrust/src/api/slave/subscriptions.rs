@@ -42,7 +42,7 @@ impl SubscriptionsTracker {
             .collect()
     }
 
-    pub fn add<T, F>(&self, name: &str, topic: &str, callback: F) -> Result<()>
+    pub fn add<T, F>(&self, name: &str, topic: &str, queue_size: usize, callback: F) -> Result<()>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
@@ -59,7 +59,7 @@ impl SubscriptionsTracker {
                 Err(ErrorKind::Duplicate("subscription".into()).into())
             }
             Entry::Vacant(entry) => {
-                let subscriber = Subscriber::new::<T, F>(name, topic, callback);
+                let subscriber = Subscriber::new::<T, F>(name, topic, queue_size, callback);
                 entry.insert(subscriber);
                 Ok(())
             }

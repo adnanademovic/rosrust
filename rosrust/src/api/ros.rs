@@ -63,7 +63,7 @@ impl Ros {
             let clock = Arc::new(SimulatedClock::default());
             let ros_clock = Arc::clone(&clock);
             let sub = ros
-                .subscribe::<ClockMsg, _>("/clock", move |v| clock.trigger(v.clock))
+                .subscribe::<ClockMsg, _>("/clock", 1, move |v| clock.trigger(v.clock))
                 .chain_err(|| "Failed to subscribe to simulated clock")?;
             ros.static_subs.push(sub);
             ros.clock = ros_clock;
@@ -231,7 +231,12 @@ impl Ros {
         )
     }
 
-    pub fn subscribe<T, F>(&mut self, topic: &str, callback: F) -> Result<Subscriber>
+    pub fn subscribe<T, F>(
+        &mut self,
+        topic: &str,
+        queue_size: usize,
+        callback: F,
+    ) -> Result<Subscriber>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
@@ -241,6 +246,7 @@ impl Ros {
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
             &name,
+            queue_size,
             callback,
         )
     }

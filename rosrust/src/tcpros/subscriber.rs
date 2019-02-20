@@ -2,7 +2,7 @@ use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
 use super::{Message, Topic};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use crossbeam::channel::{unbounded, Receiver, Sender};
+use crossbeam::channel::{bounded, unbounded, Receiver, Sender, TrySendError};
 use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
@@ -16,12 +16,16 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub fn new<T, F>(caller_id: &str, topic: &str, callback: F) -> Subscriber
+    pub fn new<T, F>(caller_id: &str, topic: &str, queue_size: usize, callback: F) -> Subscriber
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
-        let (data_tx, data_rx) = unbounded();
+        let (data_tx, data_rx) = if queue_size == 0 {
+            unbounded()
+        } else {
+            bounded(queue_size)
+        };
         let (pub_tx, pub_rx) = unbounded();
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
@@ -122,7 +126,7 @@ where
     let target = data_stream.clone();
     thread::spawn(move || {
         while let Ok(buffer) = package_to_vector(&mut stream) {
-            if target.send(Some(buffer)).is_err() {
+            if let Err(TrySendError::Disconnected(_)) = target.try_send(Some(buffer)) {
                 // Data receiver has been destroyed after
                 // Subscriber destructor's kill signal
                 break;

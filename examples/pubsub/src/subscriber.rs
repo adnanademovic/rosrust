@@ -14,7 +14,7 @@ fn main() {
 
     // Create subscriber
     // The subscriber is stopped when the returned object is destroyed
-    let _subscriber_raii = rosrust::subscribe("chatter", |v: msg::std_msgs::String| {
+    let _subscriber_raii = rosrust::subscribe("chatter", 2, |v: msg::std_msgs::String| {
         // Callback for handling received messages
         ros_info!("Received: {}", v.data);
     })

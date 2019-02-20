@@ -127,12 +127,12 @@ where
 }
 
 #[inline]
-pub fn subscribe<T, F>(topic: &str, callback: F) -> Result<Subscriber>
+pub fn subscribe<T, F>(topic: &str, queue_size: usize, callback: F) -> Result<Subscriber>
 where
     T: Message,
     F: Fn(T) -> () + Send + 'static,
 {
-    ros!().subscribe::<T, F>(topic, callback)
+    ros!().subscribe::<T, F>(topic, queue_size, callback)
 }
 
 #[inline]

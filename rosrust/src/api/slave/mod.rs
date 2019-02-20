@@ -141,12 +141,13 @@ impl Slave {
     }
 
     #[inline]
-    pub fn add_subscription<T, F>(&self, topic: &str, callback: F) -> Result<()>
+    pub fn add_subscription<T, F>(&self, topic: &str, queue_size: usize, callback: F) -> Result<()>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
-        self.subscriptions.add(&self.name, topic, callback)
+        self.subscriptions
+            .add(&self.name, topic, queue_size, callback)
     }
 
     #[inline]
