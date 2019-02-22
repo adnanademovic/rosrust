@@ -165,17 +165,32 @@ where
 #[inline]
 fn package_to_vector<R: std::io::Read>(stream: &mut R) -> std::io::Result<Vec<u8>> {
     let length = stream.read_u32::<LittleEndian>()?;
-    let mut buffer = length_vector(length)?;
-    buffer.resize(length as usize + 4, 0);
-    stream.read_exact(&mut buffer[4..])?;
-    Ok(buffer)
-}
+    let u32_size = std::mem::size_of::<u32>();
+    let num_bytes = length as usize + u32_size;
 
-#[inline]
-fn length_vector(length: u32) -> std::io::Result<Vec<u8>> {
-    let mut cursor = std::io::Cursor::new(Vec::new());
-    cursor.write_u32::<LittleEndian>(length)?;
-    Ok(cursor.into_inner())
+    // Allocate memory of the proper size for the incoming message. We
+    // do not initialize the memory to zero here (as would be safe)
+    // because it is expensive and ultimately unnecessary. We know the
+    // length of the message and if the length is incorrect, the
+    // stream reading functions will bail with an Error rather than
+    // leaving memory uninitialized.
+    let mut out = Vec::<u8>::with_capacity(num_bytes);
+
+    let out_ptr = out.as_mut_ptr();
+    // Read length from stream.
+    std::io::Cursor::new(unsafe { std::slice::from_raw_parts_mut(out_ptr as *mut u8, u32_size) })
+        .write_u32::<LittleEndian>(length)?;
+
+    // Read data from stream.
+    let read_buf = unsafe { std::slice::from_raw_parts_mut(out_ptr as *mut u8, num_bytes) };
+    stream.read_exact(&mut read_buf[u32_size..])?;
+
+    // Don't drop the original Vec which has size==0 and instead use
+    // its memory to initialize a new Vec with size == capacity == num_bytes.
+    std::mem::forget(out);
+
+    // Return the new, now full and "safely" initialized.
+    Ok(unsafe { Vec::from_raw_parts(out_ptr, num_bytes, num_bytes) })
 }
 
 #[cfg(test)]
@@ -184,12 +199,6 @@ mod tests {
     use std;
 
     static FAILED_TO_READ_WRITE_VECTOR: &'static str = "Failed to read or write from vector";
-
-    #[test]
-    fn length_vector_properly_encodes() {
-        let data = length_vector(0x01234567).expect(FAILED_TO_READ_WRITE_VECTOR);
-        assert_eq!(data, [0x67, 0x45, 0x23, 0x01]);
-    }
 
     #[test]
     fn package_to_vector_creates_right_buffer_from_reader() {
