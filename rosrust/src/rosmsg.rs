@@ -185,6 +185,63 @@ pub fn decode_variable_vec<R: io::Read, T: RosMsg>(mut r: R) -> io::Result<Vec<T
     decode_fixed_vec(u32::decode(r.by_ref())?, r)
 }
 
+/// Fast vector encoding when platform endiannes matches wire
+/// endiannes (little).
+#[inline]
+#[cfg(target_endian = "little")]
+pub fn encode_variable_primitive_slice<W: io::Write, T: RosMsg>(
+    data: &[T],
+    mut w: W,
+) -> io::Result<()> {
+    (data.len() as u32).encode(w.by_ref())?;
+    let ptr = data.as_ptr() as *const u8;
+
+    // Because both wire and system are little endian, we simply copy
+    // the in-memory slice to the buffer directly.
+    w.write(unsafe { std::slice::from_raw_parts(ptr, data.len() * std::mem::size_of::<T>()) })
+        .map(|_| ())
+}
+
+#[inline]
+#[cfg(target_endian = "big")]
+pub fn encode_variable_primitive_slice<W: io::Write, T: RosMsg>(
+    data: &[T],
+    mut w: W,
+) -> io::Result<()> {
+    encode_variable_slice(data, w)
+}
+
+/// Fast vector decoding when platform endiannes matches wire
+/// endiannes (little).
+#[inline]
+#[cfg(target_endian = "little")]
+pub fn decode_variable_primitive_vec<R: io::Read, T: RosMsg>(mut r: R) -> io::Result<Vec<T>> {
+    let num_elements = u32::decode(r.by_ref())? as usize;
+    let num_bytes = num_elements * std::mem::size_of::<T>();
+
+    // Allocate the memory w/o initializing because we will later fill
+    // all the memory.
+    let mut buf = Vec::<T>::with_capacity(num_elements);
+
+    let buf_ptr = buf.as_mut_ptr();
+
+    // Fill the Vec to full capacity with the stream data.
+    let mut read_buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr as *mut u8, num_bytes) };
+    r.read_exact(&mut read_buf)?;
+
+    // Do not drop the memory
+    std::mem::forget(buf);
+
+    // Return a new, completely full Vec using the now initialized memory.
+    Ok(unsafe { Vec::from_raw_parts(buf_ptr, num_elements, num_elements) })
+}
+
+#[inline]
+#[cfg(target_endian = "big")]
+pub fn decode_variable_primitive_vec<R: io::Read, T: RosMsg>(mut r: R) -> io::Result<Vec<T>> {
+    decode_variable_vec(r)
+}
+
 #[inline]
 pub fn encode_str<W: io::Write>(value: &str, w: W) -> io::Result<()> {
     encode_variable_slice(value.as_bytes(), w)
@@ -235,7 +292,7 @@ where
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Map rows need to have a format of key=value",
-                    ))
+                    ));
                 }
             };
         }

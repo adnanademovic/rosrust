@@ -392,9 +392,18 @@ impl FieldInfo {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { self.#name.encode(w.by_ref())?; },
-            FieldCase::Vector => {
-                quote! { #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
-            }
+            FieldCase::Vector => match self.datatype {
+                DataType::String
+                | DataType::Time
+                | DataType::Duration
+                | DataType::LocalStruct(_)
+                | DataType::RemoteStruct(_, _) => {
+                    quote! { #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
+                }
+                _ => {
+                    quote! { #crate_prefix rosmsg::encode_variable_primitive_slice(&self.#name, w.by_ref())?; }
+                }
+            },
             FieldCase::Array(_l) => {
                 quote! { #crate_prefix rosmsg::encode_fixed_slice(&self.#name, w.by_ref())?; }
             }
@@ -406,9 +415,18 @@ impl FieldInfo {
         let name = Ident::new(&self.name, Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
-            FieldCase::Vector => {
-                quote! { #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
-            }
+            FieldCase::Vector => match self.datatype {
+                DataType::String
+                | DataType::Time
+                | DataType::Duration
+                | DataType::LocalStruct(_)
+                | DataType::RemoteStruct(_, _) => {
+                    quote! { #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
+                }
+                _ => {
+                    quote! { #name: #crate_prefix rosmsg::decode_variable_primitive_vec(r.by_ref())?, }
+                }
+            },
             FieldCase::Array(l) => {
                 let lines =
                     (0..l).map(|_| quote! { #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, });
