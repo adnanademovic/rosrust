@@ -86,7 +86,7 @@ fn find_with_prefix(prefix: &str) -> Option<String> {
     args()
         .skip(1)
         .find(|v| v.starts_with(prefix))
-        .map(|v| String::from(v.trim_left_matches(prefix)))
+        .map(|v| String::from(v.trim_start_matches(prefix)))
 }
 
 #[cfg(not(test))]

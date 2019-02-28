@@ -3,7 +3,7 @@ use proc_macro2::{Literal, Span};
 use quote::ToTokens;
 use regex::Regex;
 use std::collections::HashMap;
-use syn::{self, Ident};
+use syn::Ident;
 
 #[derive(Clone)]
 pub struct Msg {
@@ -440,43 +440,43 @@ impl FieldInfo {
             | DataType::LocalStruct(..)
             | DataType::RemoteStruct(..) => return quote! {},
             DataType::I8(_) => {
-                let numeric_value = syn::Lit::new(Literal::i8_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::i8_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::I16 => {
-                let numeric_value = syn::Lit::new(Literal::i16_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::i16_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::I32 => {
-                let numeric_value = syn::Lit::new(Literal::i32_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::i32_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::I64 => {
-                let numeric_value = syn::Lit::new(Literal::i64_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::i64_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U8(_) => {
-                let numeric_value = syn::Lit::new(Literal::u8_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::u8_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U16 => {
-                let numeric_value = syn::Lit::new(Literal::u16_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::u16_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U32 => {
-                let numeric_value = syn::Lit::new(Literal::u32_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::u32_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::U64 => {
-                let numeric_value = syn::Lit::new(Literal::u64_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::u64_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::F32 => {
-                let numeric_value = syn::Lit::new(Literal::f32_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::f32_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
             DataType::F64 => {
-                let numeric_value = syn::Lit::new(Literal::f64_suffixed(value.parse().unwrap()));
+                let numeric_value = Literal::f64_suffixed(value.parse().unwrap());
                 quote! { #name: #datatype = #numeric_value as #datatype }
             }
         };

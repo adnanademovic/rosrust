@@ -79,7 +79,7 @@ impl<T: ServicePair> Client<T> {
         caller_id: &str,
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
-        let connection = TcpStream::connect(uri.trim_left_matches("rosrpc://"));
+        let connection = TcpStream::connect(uri.trim_start_matches("rosrpc://"));
         let mut stream = connection
             .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
 
