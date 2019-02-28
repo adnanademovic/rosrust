@@ -88,6 +88,11 @@ pub fn spin() {
 }
 
 #[inline]
+pub fn shutdown() -> bool {
+    ros!().shutdown_sender().send(()).is_ok()
+}
+
+#[inline]
 pub fn param(name: &str) -> Option<Parameter> {
     ros!().param(name)
 }
