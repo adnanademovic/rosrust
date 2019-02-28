@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 error_chain! {
     errors {
         IllegalCharacter(name: String) {

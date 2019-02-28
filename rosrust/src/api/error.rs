@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 pub use api::naming::error as naming;
 pub use rosxmlrpc::error as rosxmlrpc;
 pub use rosxmlrpc::ResponseError;
@@ -25,6 +27,7 @@ error_chain! {
 }
 
 pub mod api {
+#![allow(deprecated)]
     error_chain! {
         errors {
             SystemFail(message: String) {

@@ -97,7 +97,7 @@ impl std::str::FromStr for Buffer {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim_right_matches('/');
+        let s = s.trim_end_matches('/');
         let mut word_iter = s.split('/');
         match word_iter.next() {
             Some("") => {}
