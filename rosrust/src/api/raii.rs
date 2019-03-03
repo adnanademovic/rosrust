@@ -87,9 +87,10 @@ impl Subscriber {
         master: Arc<Master>,
         slave: Arc<Slave>,
         name: &str,
+        queue_size: usize,
         callback: F,
     ) -> Result<Self> {
-        slave.add_subscription::<T, F>(name, callback)?;
+        slave.add_subscription::<T, F>(name, queue_size, callback)?;
 
         let raii = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,
