@@ -1,13 +1,13 @@
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use std::collections::VecDeque;
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
 
 pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
-    let (streams_sender, streams) = channel();
-    let (data_sender, data) = channel();
+    let (streams_sender, streams) = unbounded();
+    let (data_sender, data) = unbounded();
     let queue_size = Arc::new(AtomicUsize::new(usize::max_value()));
     let queue_size_for_thread = Arc::clone(&queue_size);
     thread::spawn(move || fork_thread::<T>(&streams, &data, &queue_size_for_thread));

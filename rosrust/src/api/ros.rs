@@ -6,10 +6,11 @@ use super::naming::{self, Resolver};
 use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
 use super::slave::Slave;
+use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
 use msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use msg::std_msgs::Header;
 use serde::{Deserialize, Serialize};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::time;
 use tcpros::{Client, Message, ServicePair, ServiceResult};
 use time::{Duration, Time};
@@ -26,8 +27,8 @@ pub struct Ros {
     clock: Arc<Clock>,
     static_subs: Vec<Subscriber>,
     logger: Option<Publisher<Log>>,
-    shutdown_tx: mpsc::Sender<()>,
-    shutdown_rx: Option<mpsc::Receiver<()>>,
+    shutdown_tx: Sender<()>,
+    shutdown_rx: Option<Receiver<()>>,
 }
 
 impl Ros {
@@ -94,7 +95,7 @@ impl Ros {
         let name = format!("{}/{}", namespace, name);
         let resolver = Resolver::new(&name)?;
 
-        let (shutdown_tx, shutdown_rx) = mpsc::channel();
+        let (shutdown_tx, shutdown_rx) = unbounded();
 
         let slave = Slave::new(
             master_uri,
@@ -157,7 +158,7 @@ impl Ros {
     }
 
     #[inline]
-    pub fn shutdown_sender(&self) -> mpsc::Sender<()> {
+    pub fn shutdown_sender(&self) -> Sender<()> {
         self.shutdown_tx.clone()
     }
 
@@ -170,7 +171,7 @@ impl Ros {
     #[inline]
     pub fn is_ok(&self) -> bool {
         if let Some(ref rx) = self.shutdown_rx {
-            rx.try_recv() == Err(mpsc::TryRecvError::Empty)
+            rx.try_recv() == Err(TryRecvError::Empty)
         } else {
             return false;
         }
@@ -372,7 +373,7 @@ fn yaml_to_string(val: Yaml) -> Result<String> {
 }
 
 pub struct Spinner {
-    shutdown_rx: Option<mpsc::Receiver<()>>,
+    shutdown_rx: Option<Receiver<()>>,
 }
 
 impl Drop for Spinner {

@@ -2,11 +2,11 @@ use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
 use super::{Message, Topic};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use crossbeam::channel::{unbounded, Receiver, Sender};
 use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
 pub struct Subscriber {
@@ -21,8 +21,8 @@ impl Subscriber {
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
-        let (data_tx, data_rx) = channel();
-        let (pub_tx, pub_rx) = channel();
+        let (data_tx, data_rx) = unbounded();
+        let (pub_tx, pub_rx) = unbounded();
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
         let data_stream = data_tx.clone();
