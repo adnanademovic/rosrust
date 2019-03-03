@@ -95,15 +95,18 @@ fn request_topic(
     caller_id: &str,
     topic: &str,
 ) -> error::rosxmlrpc::Result<(String, String, i32)> {
+    use rosxmlrpc::error::ResultExt;
     let (_code, _message, protocols): (i32, String, (String, String, i32)) = xml_rpc::Client::new()
-        .unwrap()
+        .map_err(|err| error::rosxmlrpc::ErrorKind::ForeignXmlRpc(err))?
         .call(
-            &publisher_uri.parse().unwrap(),
+            &publisher_uri
+                .parse()
+                .chain_err(|| format!("Could not parse URI: {:?}", publisher_uri))?,
             "requestTopic",
             &(caller_id, topic, [["TCPROS"]]),
         )
-        .unwrap()
-        .unwrap();
+        .chain_err(|| error::rosxmlrpc::ErrorKind::TopicConnectionError(topic.to_owned()))?
+        .map_err(|_| "error")?;
     Ok(protocols)
 }
 

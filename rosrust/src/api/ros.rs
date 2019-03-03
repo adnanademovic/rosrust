@@ -21,6 +21,7 @@ pub struct Ros {
     master: Arc<Master>,
     slave: Arc<Slave>,
     hostname: String,
+    bind_address: String,
     resolver: Resolver,
     name: String,
     clock: Arc<Clock>,
@@ -75,7 +76,7 @@ impl Ros {
     }
 
     fn new_raw(master_uri: &str, hostname: &str, namespace: &str, name: &str) -> Result<Ros> {
-        let namespace = namespace.trim_right_matches('/');
+        let namespace = namespace.trim_end_matches('/');
 
         if name.contains('/') {
             bail!(ErrorKind::Naming(
@@ -83,18 +84,34 @@ impl Ros {
             ));
         }
 
+        let bind_host = {
+            if hostname == "localhost" || hostname.starts_with("127.") {
+                hostname
+            } else {
+                "0.0.0.0"
+            }
+        };
+
         let name = format!("{}/{}", namespace, name);
         let resolver = Resolver::new(&name)?;
 
         let (shutdown_tx, shutdown_rx) = unbounded();
 
-        let slave = Slave::new(master_uri, hostname, 0, &name, shutdown_tx.clone())?;
+        let slave = Slave::new(
+            master_uri,
+            hostname,
+            bind_host,
+            0,
+            &name,
+            shutdown_tx.clone(),
+        )?;
         let master = Master::new(master_uri, &name, slave.uri());
 
         Ok(Ros {
             master: Arc::new(master),
             slave: Arc::new(slave),
             hostname: String::from(hostname),
+            bind_address: String::from(bind_host),
             resolver,
             name,
             clock: Arc::new(RealClock::default()),
@@ -122,6 +139,11 @@ impl Ros {
     #[inline]
     pub fn hostname(&self) -> &str {
         &self.hostname
+    }
+
+    #[inline]
+    pub fn bind_address(&self) -> &str {
+        &self.bind_address
     }
 
     #[inline]
@@ -225,7 +247,7 @@ impl Ros {
         Service::new::<T, F>(
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
-            &self.hostname,
+            &self.bind_address,
             &name,
             handler,
         )
@@ -254,7 +276,7 @@ impl Ros {
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
             Arc::clone(&self.clock),
-            &self.hostname,
+            &self.bind_address,
             &name,
         )
     }

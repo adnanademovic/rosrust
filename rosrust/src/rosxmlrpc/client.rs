@@ -51,7 +51,7 @@ impl Client {
 }
 
 fn remove_array_wrappers(mut data: &[Value]) -> &[Value] {
-    while let [Value::Array(ref children), _] = data[..] {
+    while let [Value::Array(ref children)] = data[..] {
         data = children;
     }
     data

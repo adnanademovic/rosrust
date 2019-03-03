@@ -152,7 +152,7 @@ impl Service {
                 }
             }
 
-            impl #crate_prefix Service for #name_ident {
+            impl #crate_prefix ServicePair for #name_ident {
                 type Request = #req_ident;
                 type Response = #res_ident;
             }

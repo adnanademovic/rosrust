@@ -25,6 +25,7 @@ impl Slave {
     pub fn new(
         master_uri: &str,
         hostname: &str,
+        bind_address: &str,
         port: u16,
         name: &str,
         outer_shutdown_tx: Sender<()>,
@@ -38,7 +39,7 @@ impl Slave {
         let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
         let (port_tx, port_rx) = unbounded();
-        let socket_addr = match (hostname, port).to_socket_addrs()?.next() {
+        let socket_addr = match (bind_address, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
             None => bail!("Bad address provided: {}:{}", hostname, port),
         };
