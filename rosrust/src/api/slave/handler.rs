@@ -127,7 +127,7 @@ impl SlaveHandler {
                 _ => {
                     return Err(ResponseError::Client(
                         "Missing argument 'publishers'".into(),
-                    ))
+                    ));
                 }
             };
             let publishers = publishers
@@ -164,7 +164,7 @@ impl SlaveHandler {
                 Some(_) => {
                     return Err(ResponseError::Client(
                         "Protocols need to be provided as [ [String, XmlRpcLegalValue] ]".into(),
-                    ))
+                    ));
                 }
                 None => return Err(ResponseError::Client("Missing argument 'protocols'".into())),
             };

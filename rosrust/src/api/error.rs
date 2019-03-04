@@ -27,7 +27,7 @@ error_chain! {
 }
 
 pub mod api {
-#![allow(deprecated)]
+    #![allow(deprecated)]
     error_chain! {
         errors {
             SystemFail(message: String) {
