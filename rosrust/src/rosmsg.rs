@@ -1,8 +1,8 @@
+use crate::time::{Duration, Time};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std;
 use std::collections::HashMap;
 use std::io;
-use time::{Duration, Time};
 
 pub trait RosMsg: std::marker::Sized {
     fn encode<W: io::Write>(&self, w: W) -> io::Result<()>;
@@ -166,7 +166,7 @@ impl RosMsg for f64 {
 
 #[inline]
 pub fn encode_fixed_slice<W: io::Write, T: RosMsg>(data: &[T], mut w: W) -> io::Result<()> {
-    data.into_iter().try_for_each(|v| v.encode(w.by_ref()))
+    data.iter().try_for_each(|v| v.encode(w.by_ref()))
 }
 
 #[inline]

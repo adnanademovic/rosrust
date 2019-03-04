@@ -1,8 +1,7 @@
 #![deny(warnings)]
 
-extern crate env_logger;
-#[macro_use]
-extern crate rosrust;
+use env_logger;
+use rosrust;
 
 mod msg;
 
@@ -16,7 +15,7 @@ fn main() {
     // The subscriber is stopped when the returned object is destroyed
     let _subscriber_raii = rosrust::subscribe("chatter", 2, |v: msg::std_msgs::String| {
         // Callback for handling received messages
-        ros_info!("Received: {}", v.data);
+        rosrust::ros_info!("Received: {}", v.data);
     })
     .unwrap();
 

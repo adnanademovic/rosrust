@@ -3,6 +3,7 @@ use super::header;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
 use super::{Message, Topic};
+use log::error;
 use std;
 use std::collections::HashMap;
 use std::net::{TcpListener, ToSocketAddrs};

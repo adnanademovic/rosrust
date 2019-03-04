@@ -1,4 +1,5 @@
 [package]
+edition = "2018"
 authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
 license = "MIT"
 name = "camera"
@@ -11,5 +12,5 @@ rosrust = {path="../../rosrust"}
 rosrust_codegen = {path="../../rosrust_codegen"}
 
 [[bin]]
-name = "subscriber"
+name = "subscriber_camera"
 path = "src/subscriber.rs"

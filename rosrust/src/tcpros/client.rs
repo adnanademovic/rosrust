@@ -1,8 +1,8 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
+use crate::rosmsg::RosMsg;
 use byteorder::{LittleEndian, ReadBytesExt};
-use rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
 use std::io;

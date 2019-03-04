@@ -1,7 +1,8 @@
 #![deny(warnings)]
 
-use env_logger;
-use rosrust;
+extern crate env_logger;
+#[macro_use]
+extern crate rosrust;
 
 mod msg;
 
@@ -19,7 +20,7 @@ fn main() {
             let sum = req.a + req.b;
 
             // Log each request
-            rosrust::ros_info!("{} + {} = {}", req.a, req.b, sum);
+            ros_info!("{} + {} = {}", req.a, req.b, sum);
 
             Ok(msg::roscpp_tutorials::TwoIntsRes { sum })
         })

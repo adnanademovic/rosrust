@@ -1,9 +1,9 @@
 #![allow(deprecated)]
 
-pub use api::naming::error as naming;
-pub use rosxmlrpc::error as rosxmlrpc;
-pub use rosxmlrpc::ResponseError;
-pub use tcpros::error as tcpros;
+pub use crate::api::naming::error as naming;
+pub use crate::rosxmlrpc::error as rosxmlrpc;
+pub use crate::rosxmlrpc::ResponseError;
+pub use crate::tcpros::error as tcpros;
 
 error_chain! {
     foreign_links {

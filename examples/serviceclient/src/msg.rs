@@ -1,1 +1,1 @@
-rosmsg_include!(roscpp_tutorials / TwoInts);
+rosrust::rosmsg_include!(roscpp_tutorials / TwoInts);

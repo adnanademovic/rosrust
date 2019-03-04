@@ -1,4 +1,4 @@
-use rosmsg::RosMsg;
+use crate::rosmsg::RosMsg;
 use std;
 use std::collections::HashMap;
 use std::io::Error;

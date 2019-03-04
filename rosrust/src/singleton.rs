@@ -1,13 +1,15 @@
-use api::raii::{Publisher, Service, Subscriber};
-use api::resolve::get_unused_args;
-use api::{Parameter, Rate, Ros, SystemState, Topic};
+use crate::api::raii::{Publisher, Service, Subscriber};
+use crate::api::resolve::get_unused_args;
+use crate::api::{Parameter, Rate, Ros, SystemState, Topic};
+use crate::error::{Result, ResultExt};
+use crate::rosxmlrpc::Response;
+use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
+use crate::time::{Duration, Time};
 use ctrlc;
-use error::{Result, ResultExt};
-use rosxmlrpc::Response;
+use lazy_static::lazy_static;
+use log::info;
 use std::sync::Mutex;
 use std::time;
-use tcpros::{Client, Message, ServicePair, ServiceResult};
-use time::{Duration, Time};
 
 lazy_static! {
     static ref ROS: Mutex<Option<Ros>> = Mutex::new(None);

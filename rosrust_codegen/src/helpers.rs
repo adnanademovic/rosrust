@@ -1,5 +1,5 @@
-use error::{Result, ResultExt};
-use msg::Msg;
+use crate::error::{Result, ResultExt};
+use crate::msg::Msg;
 use regex::RegexBuilder;
 use std;
 use std::collections::{HashMap, HashSet, LinkedList};
@@ -134,7 +134,7 @@ enum MessageCase {
     Service(String, Msg, Msg),
 }
 
-#[allow(unknown_lints, trivial_regex)]
+#[allow(clippy::trivial_regex)]
 fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
     use std::io::Read;
     for folder in folders {

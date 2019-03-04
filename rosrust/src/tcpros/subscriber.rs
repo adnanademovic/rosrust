@@ -1,9 +1,10 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
 use super::{Message, Topic};
+use crate::rosmsg::RosMsg;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use crossbeam::channel::{bounded, unbounded, Receiver, Sender, TrySendError};
-use rosmsg::RosMsg;
+use log::error;
 use std;
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};

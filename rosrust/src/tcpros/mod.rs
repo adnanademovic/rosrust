@@ -3,11 +3,11 @@ pub use self::error::Error;
 pub use self::publisher::{Publisher, PublisherStream};
 pub use self::service::Service;
 pub use self::subscriber::Subscriber;
-use rosmsg::RosMsg;
+use crate::rosmsg::RosMsg;
 
+use crate::Clock;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use Clock;
 
 mod client;
 pub mod error;

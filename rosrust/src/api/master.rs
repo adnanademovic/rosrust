@@ -158,9 +158,9 @@ pub struct SystemState {
     pub services: Vec<TopicData>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde_derive::Deserialize)]
 pub struct TopicDataTuple(String, Vec<String>);
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde_derive::Deserialize)]
 pub struct SystemStateTuple(
     Vec<TopicDataTuple>,
     Vec<TopicDataTuple>,
@@ -186,7 +186,7 @@ impl Into<TopicData> for TopicDataTuple {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde_derive::Deserialize)]
 pub struct TopicTuple(String, String);
 
 impl Into<Topic> for TopicTuple {

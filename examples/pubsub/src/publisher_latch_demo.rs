@@ -1,6 +1,5 @@
-extern crate env_logger;
-#[macro_use]
-extern crate rosrust;
+use env_logger;
+use rosrust::{self, ros_info};
 
 mod msg;
 

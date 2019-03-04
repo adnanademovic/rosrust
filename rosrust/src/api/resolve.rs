@@ -96,7 +96,7 @@ fn system_hostname() -> String {
     gethostname(&mut hostname)
         .expect("Hostname is either unavailable or too long to fit into buffer");
     let hostname = hostname
-        .into_iter()
+        .iter()
         .take_while(|&v| *v != 0u8)
         .cloned()
         .collect::<Vec<_>>();
@@ -124,6 +124,8 @@ static UNEXPECTED_EMPTY_ARRAY: &'static str = "Popping failure from this array i
 
 #[cfg(test)]
 mod tests {
+    use lazy_static::lazy_static;
+
     use super::*;
     use std::sync::Mutex;
     use std::{self, env};

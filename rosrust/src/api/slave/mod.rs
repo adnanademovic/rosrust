@@ -4,12 +4,13 @@ mod subscriptions;
 
 use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result, ResultExt};
+use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 use crossbeam::channel::{unbounded, Sender};
 use futures::sync::mpsc::channel as futures_channel;
+use log::{error, info};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 
 pub struct Slave {
     name: String,

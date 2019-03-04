@@ -1,4 +1,5 @@
 [package]
+edition = "2018"
 authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
 description = "Pure Rust implementation of a ROS client library"
 license = "MIT"
