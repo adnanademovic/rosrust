@@ -4,6 +4,7 @@ members = [
     "examples/parameters",
     "examples/pubsub",
     "examples/serviceclient",
+    "examples/oldedition",
     "rosrust",
     "rosrust_codegen",
 ]

@@ -1,0 +1,19 @@
+[package]
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+license = "MIT"
+name = "oldedition"
+repository = "https://github.com/adnanademovic/rosrust"
+version = "0.0.1"
+
+[dependencies]
+env_logger = "0.5"
+rosrust = {path="../../rosrust"}
+rosrust_codegen = {path="../../rosrust_codegen"}
+
+[[bin]]
+name = "client_old"
+path = "src/client.rs"
+
+[[bin]]
+name = "service_old"
+path = "src/service.rs"
