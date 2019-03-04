@@ -35,7 +35,7 @@ impl Server {
     }
 }
 
-#[allow(unknown_lints, needless_pass_by_value)]
+#[allow(clippy::needless_pass_by_value)]
 #[inline]
 fn on_missing(_params: xml_rpc::Params) -> xml_rpc::Response {
     let error_message = ResponseError::Client("Bad method requested".into());

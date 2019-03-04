@@ -4,7 +4,7 @@ use env_logger;
 use rosrust::{self, ros_info};
 use serde_derive::{Deserialize, Serialize};
 
-#[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
+#[allow(clippy::cyclomatic_complexity)]
 fn main() {
     env_logger::init();
 

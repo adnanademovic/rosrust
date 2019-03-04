@@ -97,7 +97,7 @@ fn request_topic(
 ) -> error::rosxmlrpc::Result<(String, String, i32)> {
     use crate::rosxmlrpc::error::ResultExt;
     let (_code, _message, protocols): (i32, String, (String, String, i32)) = xml_rpc::Client::new()
-        .map_err(|err| error::rosxmlrpc::ErrorKind::ForeignXmlRpc(err))?
+        .map_err(error::rosxmlrpc::ErrorKind::ForeignXmlRpc)?
         .call(
             &publisher_uri
                 .parse()

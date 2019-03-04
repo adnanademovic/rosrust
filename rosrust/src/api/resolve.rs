@@ -96,7 +96,7 @@ fn system_hostname() -> String {
     gethostname(&mut hostname)
         .expect("Hostname is either unavailable or too long to fit into buffer");
     let hostname = hostname
-        .into_iter()
+        .iter()
         .take_while(|&v| *v != 0u8)
         .cloned()
         .collect::<Vec<_>>();

@@ -21,7 +21,7 @@ impl ResponseInfo {
     pub fn from_array(parameters: &[Value]) -> Response<Self> {
         match *parameters {
             [Value::Int(code), Value::String(ref message), ref data] => Ok(Self::new(code, message.clone(), data.clone())),
-            _ => return Err(ResponseError::Server(format!(
+            _ => Err(ResponseError::Server(format!(
                 "Response with three parameters (int code, str msg, value) expected from server, received: {:?}",
                 parameters
             ))),

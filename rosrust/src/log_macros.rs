@@ -1,7 +1,6 @@
 #[macro_export]
 macro_rules! ros_log {
     ($level:expr, $($arg:tt)+) => {
-        #[allow(unknown_lints, useless_format)]
         let msg = format!($($arg)*);
         match $level {
             $crate::msg::rosgraph_msgs::Log::DEBUG => {

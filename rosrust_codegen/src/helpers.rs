@@ -134,7 +134,7 @@ enum MessageCase {
     Service(String, Msg, Msg),
 }
 
-#[allow(unknown_lints, trivial_regex)]
+#[allow(clippy::trivial_regex)]
 fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
     use std::io::Read;
     for folder in folders {
