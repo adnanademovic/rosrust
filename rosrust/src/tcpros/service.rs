@@ -4,6 +4,7 @@ use super::util::tcpconnection;
 use super::{ServicePair, ServiceResult};
 use crate::rosmsg::{encode_str, RosMsg};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use log::error;
 use std;
 use std::collections::HashMap;
 use std::io;

@@ -4,6 +4,7 @@ use super::master::Master;
 use super::slave::Slave;
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
+use log::error;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 

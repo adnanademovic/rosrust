@@ -3,12 +3,6 @@
 
 #[macro_use]
 extern crate error_chain;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
 
 pub use crate::api::raii::Service;
 pub use crate::api::{error, Clock, Parameter};

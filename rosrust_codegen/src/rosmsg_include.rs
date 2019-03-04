@@ -1,5 +1,6 @@
 use crate::genmsg;
 use proc_macro::TokenStream;
+use quote::quote;
 use std::env;
 use std::path::Path;
 

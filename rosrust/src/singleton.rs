@@ -6,6 +6,8 @@ use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
 use ctrlc;
+use lazy_static::lazy_static;
+use log::info;
 use std::sync::Mutex;
 use std::time;
 

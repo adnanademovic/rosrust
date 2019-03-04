@@ -1,6 +1,7 @@
 use crate::error::{Result, ResultExt};
+use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use regex::Regex;
 use std::collections::HashMap;
 use syn::Ident;

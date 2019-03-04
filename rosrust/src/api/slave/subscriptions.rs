@@ -1,6 +1,7 @@
 use crate::api::error::{self, ErrorKind, Result};
 use crate::tcpros::{Subscriber, Topic};
 use crate::Message;
+use log::error;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};

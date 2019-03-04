@@ -124,6 +124,8 @@ static UNEXPECTED_EMPTY_ARRAY: &'static str = "Popping failure from this array i
 
 #[cfg(test)]
 mod tests {
+    use lazy_static::lazy_static;
+
     use super::*;
     use std::sync::Mutex;
     use std::{self, env};

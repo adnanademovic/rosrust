@@ -11,6 +11,7 @@ use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
 use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
+use log::error;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time;

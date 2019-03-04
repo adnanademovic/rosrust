@@ -3,6 +3,7 @@ use super::subscriptions::SubscriptionsTracker;
 use crate::rosxmlrpc::{Response, ResponseError, Server};
 use crate::tcpros::Service;
 use futures::sync::mpsc::Sender;
+use log::{error, info};
 use nix::unistd::getpid;
 use std::collections::HashMap;
 use std::net::SocketAddr;

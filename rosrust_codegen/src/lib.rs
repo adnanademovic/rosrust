@@ -3,11 +3,7 @@
 
 extern crate proc_macro;
 #[macro_use]
-extern crate quote;
-#[macro_use]
 extern crate error_chain;
-#[macro_use]
-extern crate lazy_static;
 
 mod error;
 mod genmsg;
