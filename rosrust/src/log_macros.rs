@@ -30,34 +30,34 @@ macro_rules! ros_log {
 #[macro_export]
 macro_rules! ros_debug {
     ($($arg:tt)*) => {
-        ros_log!($crate::msg::rosgraph_msgs::Log::DEBUG, $($arg)*);
+        $crate::ros_log!($crate::msg::rosgraph_msgs::Log::DEBUG, $($arg)*);
     }
 }
 
 #[macro_export]
 macro_rules! ros_info {
     ($($arg:tt)*) => {
-        ros_log!($crate::msg::rosgraph_msgs::Log::INFO, $($arg)*);
+        $crate::ros_log!($crate::msg::rosgraph_msgs::Log::INFO, $($arg)*);
     }
 }
 
 #[macro_export]
 macro_rules! ros_warn {
     ($($arg:tt)*) => {
-        ros_log!($crate::msg::rosgraph_msgs::Log::WARN, $($arg)*);
+        $crate::ros_log!($crate::msg::rosgraph_msgs::Log::WARN, $($arg)*);
     }
 }
 
 #[macro_export]
 macro_rules! ros_err {
     ($($arg:tt)*) => {
-        ros_log!($crate::msg::rosgraph_msgs::Log::ERROR, $($arg)*);
+        $crate::ros_log!($crate::msg::rosgraph_msgs::Log::ERROR, $($arg)*);
     }
 }
 
 #[macro_export]
 macro_rules! ros_fatal {
     ($($arg:tt)*) => {
-        ros_log!($crate::msg::rosgraph_msgs::Log::FATAL, $($arg)*);
+        $crate::ros_log!($crate::msg::rosgraph_msgs::Log::FATAL, $($arg)*);
     }
 }

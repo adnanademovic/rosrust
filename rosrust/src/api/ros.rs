@@ -6,14 +6,14 @@ use super::naming::{self, Resolver};
 use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
 use super::slave::Slave;
+use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
+use crate::msg::std_msgs::Header;
+use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
+use crate::time::{Duration, Time};
 use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
-use msg::rosgraph_msgs::{Clock as ClockMsg, Log};
-use msg::std_msgs::Header;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time;
-use tcpros::{Client, Message, ServicePair, ServiceResult};
-use time::{Duration, Time};
 use xml_rpc;
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -212,7 +212,7 @@ impl Ros {
     }
 
     pub fn wait_for_service(&self, service: &str, timeout: Option<time::Duration>) -> Result<()> {
-        use rosxmlrpc::ResponseError;
+        use crate::rosxmlrpc::ResponseError;
         use std::thread::sleep;
 
         let name = self.resolver.translate(service)?;

@@ -2,10 +2,10 @@ use super::clock::Clock;
 use super::error::Result;
 use super::master::Master;
 use super::slave::Slave;
-use rosxmlrpc::Response;
+use crate::rosxmlrpc::Response;
+use crate::tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
 
 #[derive(Clone)]
 pub struct Publisher<T: Message> {

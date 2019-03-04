@@ -1,8 +1,8 @@
+use crate::time::{Duration, Time};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std;
 use std::collections::HashMap;
 use std::io;
-use time::{Duration, Time};
 
 pub trait RosMsg: std::marker::Sized {
     fn encode<W: io::Write>(&self, w: W) -> io::Result<()>;

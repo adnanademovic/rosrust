@@ -1,4 +1,4 @@
-use msg::Msg;
+use crate::msg::Msg;
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::Ident;

@@ -1,5 +1,5 @@
-use error::{Result, ResultExt};
-use msg::Msg;
+use crate::error::{Result, ResultExt};
+use crate::msg::Msg;
 use regex::RegexBuilder;
 use std;
 use std::collections::{HashMap, HashSet, LinkedList};

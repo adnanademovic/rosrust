@@ -1,10 +1,10 @@
-use api::error;
+use crate::api::error;
+use crate::tcpros::{Publisher, Topic};
+use crate::Message;
+use crate::PublisherStream;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
-use tcpros::{Publisher, Topic};
-use Message;
-use PublisherStream;
 
 #[derive(Clone, Default)]
 pub struct PublicationsTracker {

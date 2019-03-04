@@ -1,1 +1,1 @@
-rosmsg_include!(sensor_msgs / Image);
+rosrust::rosmsg_include!(sensor_msgs / Image);

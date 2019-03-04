@@ -1,4 +1,4 @@
-use genmsg;
+use crate::genmsg;
 use proc_macro::TokenStream;
 use std::env;
 use std::path::Path;
@@ -28,9 +28,9 @@ pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
     let output = genmsg::depend_on_messages(paths.as_slice(), messages)
         .unwrap()
         .token_stream(&if internal {
-            quote! { :: }
+            quote! { crate:: }
         } else {
-            quote! { ::rosrust:: }
+            quote! { rosrust:: }
         });
     (quote! {#output}).into()
 }

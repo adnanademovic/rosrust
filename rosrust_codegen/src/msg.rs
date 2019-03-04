@@ -1,4 +1,4 @@
-use error::{Result, ResultExt};
+use crate::error::{Result, ResultExt};
 use proc_macro2::{Literal, Span};
 use quote::ToTokens;
 use regex::Regex;

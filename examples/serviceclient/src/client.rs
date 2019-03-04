@@ -1,9 +1,7 @@
 #![deny(warnings)]
 
-extern crate env_logger;
-#[macro_use]
-extern crate rosrust;
-
+use env_logger;
+use rosrust;
 use std::time;
 
 mod msg;
@@ -32,7 +30,7 @@ fn main() {
     let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
 
     // Synchronous call that blocks the thread until a response is received
-    ros_info!(
+    rosrust::ros_info!(
         "{} + {} = {}",
         a,
         b,
@@ -45,5 +43,5 @@ fn main() {
 
     // Asynchronous call that can be resolved later on
     let retval = client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b });
-    ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
+    rosrust::ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
 }

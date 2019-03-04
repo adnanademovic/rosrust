@@ -1,9 +1,9 @@
-use api::error::{self, ErrorKind, Result};
+use crate::api::error::{self, ErrorKind, Result};
+use crate::tcpros::{Subscriber, Topic};
+use crate::Message;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
-use tcpros::{Subscriber, Topic};
-use Message;
 
 #[derive(Clone, Default)]
 pub struct SubscriptionsTracker {
@@ -95,7 +95,7 @@ fn request_topic(
     caller_id: &str,
     topic: &str,
 ) -> error::rosxmlrpc::Result<(String, String, i32)> {
-    use rosxmlrpc::error::ResultExt;
+    use crate::rosxmlrpc::error::ResultExt;
     let (_code, _message, protocols): (i32, String, (String, String, i32)) = xml_rpc::Client::new()
         .map_err(|err| error::rosxmlrpc::ErrorKind::ForeignXmlRpc(err))?
         .call(

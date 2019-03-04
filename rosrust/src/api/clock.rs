@@ -1,10 +1,10 @@
+use crate::time::{Duration, Time};
 use crossbeam::channel::{unbounded, Sender};
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
-use time::{Duration, Time};
 
 static BEFORE_EPOCH: &'static str = "Requested time is before UNIX epoch.";
 
