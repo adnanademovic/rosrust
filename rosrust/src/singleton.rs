@@ -143,11 +143,11 @@ where
 }
 
 #[inline]
-pub fn publish<T>(topic: &str) -> Result<Publisher<T>>
+pub fn publish<T>(topic: &str, queue_size: usize) -> Result<Publisher<T>>
 where
     T: Message,
 {
-    ros!().publish::<T>(topic)
+    ros!().publish::<T>(topic, queue_size)
 }
 
 #[inline]
