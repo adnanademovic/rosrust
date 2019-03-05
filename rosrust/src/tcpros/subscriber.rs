@@ -2,8 +2,9 @@ use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode, match_field};
 use super::{Message, Topic};
 use crate::rosmsg::RosMsg;
+use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use crossbeam::channel::{bounded, unbounded, Receiver, Sender, TrySendError};
+use crossbeam::channel::{unbounded, Receiver, Sender, TrySendError};
 use log::error;
 use std;
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::thread;
 
 pub struct Subscriber {
-    data_stream: Sender<Option<Vec<u8>>>,
+    data_stream: LossySender<Vec<u8>>,
     publishers_stream: Sender<SocketAddr>,
     pub topic: Topic,
 }
@@ -22,11 +23,7 @@ impl Subscriber {
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
-        let (data_tx, data_rx) = if queue_size == 0 {
-            unbounded()
-        } else {
-            bounded(queue_size)
-        };
+        let (data_tx, data_rx) = lossy_channel(queue_size);
         let (pub_tx, pub_rx) = unbounded();
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
@@ -64,7 +61,7 @@ impl Subscriber {
 
 impl Drop for Subscriber {
     fn drop(&mut self) {
-        if self.data_stream.send(None).is_err() {
+        if self.data_stream.close().is_err() {
             error!(
                 "Subscriber data stream to topic '{}' has already been killed",
                 self.topic.name
@@ -73,7 +70,7 @@ impl Drop for Subscriber {
     }
 }
 
-fn handle_data<T, F>(data: Receiver<Option<Vec<u8>>>, callback: F)
+fn handle_data<T, F>(data: LossyReceiver<Vec<u8>>, callback: F)
 where
     T: Message,
     F: Fn(T) -> (),
@@ -91,7 +88,7 @@ where
 }
 
 fn join_connections<T>(
-    data_stream: &Sender<Option<Vec<u8>>>,
+    data_stream: &LossySender<Vec<u8>>,
     publishers: Receiver<SocketAddr>,
     caller_id: &str,
     topic: &str,
@@ -114,7 +111,7 @@ fn join_connections<T>(
 }
 
 fn join_connection<T>(
-    data_stream: &Sender<Option<Vec<u8>>>,
+    data_stream: &LossySender<Vec<u8>>,
     publisher: &SocketAddr,
     caller_id: &str,
     topic: &str,
@@ -127,7 +124,7 @@ where
     let target = data_stream.clone();
     thread::spawn(move || {
         while let Ok(buffer) = package_to_vector(&mut stream) {
-            if let Err(TrySendError::Disconnected(_)) = target.try_send(Some(buffer)) {
+            if let Err(TrySendError::Disconnected(_)) = target.try_send(buffer) {
                 // Data receiver has been destroyed after
                 // Subscriber destructor's kill signal
                 break;
