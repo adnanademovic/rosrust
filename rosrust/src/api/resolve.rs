@@ -39,13 +39,9 @@ pub fn mappings() -> Vec<(String, String)> {
         .skip(1)
         .filter(|v| !v.starts_with('_'))
         .map(|v| v.split(":=").map(String::from).collect::<Vec<String>>())
-        .filter(|v| v.len() == 2)
-        .map(|v| v.into_iter())
-        .map(|mut v| {
-            (
-                v.next().expect(UNEXPECTED_EMPTY_ARRAY),
-                v.next().expect(UNEXPECTED_EMPTY_ARRAY),
-            )
+        .filter_map(|v| match &v[..] {
+            [key, value] => Some((key.clone(), value.clone())),
+            _ => None,
         })
         .collect()
 }
@@ -56,15 +52,9 @@ pub fn params() -> Vec<(String, String)> {
         .filter(|v| v.starts_with('_'))
         .filter(|v| !v.starts_with("__"))
         .map(|v| v.splitn(2, ":=").map(String::from).collect::<Vec<String>>())
-        .filter(|v| v.len() == 2)
-        .map(|v| v.into_iter())
-        .map(|mut v| {
-            (
-                v.next()
-                    .expect(UNEXPECTED_EMPTY_ARRAY)
-                    .replacen('_', "~", 1),
-                v.next().expect(UNEXPECTED_EMPTY_ARRAY),
-            )
+        .filter_map(|v| match &v[..] {
+            [key, value] => Some((key.replacen('_', "~", 1), value.clone())),
+            _ => None,
         })
         .collect()
 }
@@ -119,8 +109,6 @@ fn args() -> std::env::Args {
 fn args() -> std::vec::IntoIter<String> {
     tests::args_mock()
 }
-
-static UNEXPECTED_EMPTY_ARRAY: &'static str = "Popping failure from this array is impossible";
 
 #[cfg(test)]
 mod tests {
