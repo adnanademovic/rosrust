@@ -127,10 +127,9 @@ mod tests {
     use lazy_static::lazy_static;
 
     use super::*;
+    use crate::util::FAILED_TO_LOCK;
     use std::sync::Mutex;
     use std::{self, env};
-
-    static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
 
     lazy_static! {
         static ref DATA: Mutex<Vec<String>> = Mutex::new(Vec::new());

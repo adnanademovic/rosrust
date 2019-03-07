@@ -1,4 +1,5 @@
 use crate::time::{Duration, Time};
+use crate::util::FAILED_TO_LOCK;
 use crossbeam::channel::{unbounded, Sender};
 use log::warn;
 use std::cmp;
@@ -159,5 +160,4 @@ impl Clock for SimulatedClock {
     }
 }
 
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
 static SLEEPING_THREAD_MISSING: &'static str = "Failed to find sleeping thread";

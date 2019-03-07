@@ -3,6 +3,7 @@ use super::header;
 use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
 use super::{Message, Topic};
+use crate::util::FAILED_TO_LOCK;
 use log::error;
 use std;
 use std::collections::HashMap;
@@ -71,7 +72,7 @@ fn listen_for_subscribers<T, U, V>(
             continue;
         }
 
-        if let Err(err) = stream.write_all(&last_message.lock().unwrap()) {
+        if let Err(err) = stream.write_all(&last_message.lock().expect(FAILED_TO_LOCK)) {
             error!("{}", err);
             continue;
         }
@@ -197,7 +198,7 @@ impl<T: Message> PublisherStream<T> {
         let bytes = Arc::new(message.encode_vec()?);
 
         if self.latching {
-            *self.last_message.lock().unwrap() = Arc::clone(&bytes);
+            *self.last_message.lock().expect(FAILED_TO_LOCK) = Arc::clone(&bytes);
         }
 
         // Subscriptions can only be closed from the Publisher side

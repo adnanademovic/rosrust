@@ -5,6 +5,7 @@ use crate::error::{Result, ResultExt};
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
+use crate::util::FAILED_TO_LOCK;
 use ctrlc;
 use lazy_static::lazy_static;
 use log::info;
@@ -17,11 +18,11 @@ lazy_static! {
 
 #[inline]
 pub fn init(name: &str) {
-    try_init(name).unwrap();
+    try_init(name).expect("ROS init failed!");
 }
 
 pub fn try_init(name: &str) -> Result<()> {
-    let mut ros = ROS.lock().expect(LOCK_FAIL);
+    let mut ros = ROS.lock().expect(FAILED_TO_LOCK);
     if ros.is_some() {
         bail!(INITIALIZED);
     }
@@ -39,7 +40,10 @@ pub fn try_init(name: &str) -> Result<()> {
 
 macro_rules! ros {
     () => {
-        ROS.lock().expect(LOCK_FAIL).as_mut().expect(UNINITIALIZED)
+        ROS.lock()
+            .expect(FAILED_TO_LOCK)
+            .as_mut()
+            .expect(UNINITIALIZED)
     };
 }
 
@@ -156,6 +160,5 @@ pub fn log(level: i8, msg: String, file: &str, line: u32) {
 }
 
 static CTRLC_FAIL: &str = "Failed to override SIGINT functionality.";
-static LOCK_FAIL: &str = "Failed to acquire lock on ROS instance.";
 static UNINITIALIZED: &str = "ROS uninitialized. Please run ros::init(name) first!";
 static INITIALIZED: &str = "ROS initialized multiple times through ros::init.";

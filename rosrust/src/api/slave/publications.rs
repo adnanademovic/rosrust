@@ -1,5 +1,6 @@
 use crate::api::error;
 use crate::tcpros::{Publisher, Topic};
+use crate::util::FAILED_TO_LOCK;
 use crate::Message;
 use crate::PublisherStream;
 use std::collections::HashMap;
@@ -69,5 +70,3 @@ impl PublicationsTracker {
         self.mapping.lock().expect(FAILED_TO_LOCK).remove(topic);
     }
 }
-
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";

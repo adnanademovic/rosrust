@@ -106,7 +106,7 @@ impl Ros {
             &name,
             shutdown_tx.clone(),
         )?;
-        let master = Master::new(master_uri, &name, slave.uri());
+        let master = Master::new(master_uri, &name, slave.uri())?;
 
         Ok(Ros {
             master: Arc::new(master),
