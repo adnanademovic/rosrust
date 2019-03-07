@@ -15,6 +15,7 @@ pub struct Publisher {
     pub port: u16,
     pub topic: Topic,
     last_message: Arc<Mutex<Arc<Vec<u8>>>>,
+    queue_size: usize,
     _raii: tcpconnection::Raii,
 }
 
@@ -85,7 +86,7 @@ fn listen_for_subscribers<T, U, V>(
 }
 
 impl Publisher {
-    pub fn new<T, U>(address: U, topic: &str) -> Result<Publisher>
+    pub fn new<T, U>(address: U, topic: &str, queue_size: usize) -> Result<Publisher>
     where
         T: Message,
         U: ToSocketAddrs,
@@ -98,6 +99,7 @@ impl Publisher {
             raii,
             listener,
             socket_address.port(),
+            queue_size,
         ))
     }
 
@@ -106,13 +108,14 @@ impl Publisher {
         raii: tcpconnection::Raii,
         listener: V,
         port: u16,
+        queue_size: usize,
     ) -> Publisher
     where
         T: Message,
         U: std::io::Read + std::io::Write + Send + 'static,
         V: Iterator<Item = U> + Send + 'static,
     {
-        let (targets, data) = fork();
+        let (targets, data) = fork(queue_size);
         let topic_name = String::from(topic);
         let last_message = Arc::new(Mutex::new(Arc::new(Vec::new())));
         let last_msg_for_thread = Arc::clone(&last_message);
@@ -128,12 +131,15 @@ impl Publisher {
             port,
             topic,
             last_message,
+            queue_size,
             _raii: raii,
         }
     }
 
-    pub fn stream<T: Message>(&self) -> Result<PublisherStream<T>> {
-        PublisherStream::new(self)
+    pub fn stream<T: Message>(&self, queue_size: usize) -> Result<PublisherStream<T>> {
+        let mut stream = PublisherStream::new(self)?;
+        stream.set_queue_size_max(queue_size);
+        Ok(stream)
     }
 
     pub fn get_topic(&self) -> &Topic {
@@ -162,12 +168,14 @@ impl<T: Message> PublisherStream<T> {
                 msg_type,
             ));
         }
-        Ok(PublisherStream {
+        let mut stream = PublisherStream {
             stream: publisher.subscriptions.clone(),
             datatype: std::marker::PhantomData,
             last_message: Arc::clone(&publisher.last_message),
             latching: false,
-        })
+        };
+        stream.set_queue_size_max(publisher.queue_size);
+        Ok(stream)
     }
 
     #[inline]
@@ -176,8 +184,13 @@ impl<T: Message> PublisherStream<T> {
     }
 
     #[inline]
-    pub fn set_queue_size(&mut self, queue_size: Option<usize>) {
+    pub fn set_queue_size(&mut self, queue_size: usize) {
         self.stream.set_queue_size(queue_size);
+    }
+
+    #[inline]
+    pub fn set_queue_size_max(&mut self, queue_size: usize) {
+        self.stream.set_queue_size_max(queue_size);
     }
 
     pub fn send(&mut self, message: &T) -> Result<()> {

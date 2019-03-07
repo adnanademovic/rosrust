@@ -1,47 +1,48 @@
+use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use std::collections::VecDeque;
 use std::io::Write;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-pub fn fork<T: Write + Send + 'static>() -> (TargetList<T>, DataStream) {
+pub fn fork<T: Write + Send + 'static>(queue_size: usize) -> (TargetList<T>, DataStream) {
     let (streams_sender, streams) = unbounded();
-    let (data_sender, data) = unbounded();
-    let queue_size = Arc::new(AtomicUsize::new(usize::max_value()));
-    let queue_size_for_thread = Arc::clone(&queue_size);
-    thread::spawn(move || fork_thread::<T>(&streams, &data, &queue_size_for_thread));
+    let (data_sender, data) = lossy_channel(queue_size);
+    thread::spawn(move || fork_thread::<T>(&streams, &data));
     (
         TargetList(streams_sender),
         DataStream {
             sender: data_sender,
-            queue_size,
         },
     )
 }
 
-fn fill_with_queued(data: &Receiver<Arc<Vec<u8>>>, queue: &mut VecDeque<Arc<Vec<u8>>>) -> bool {
+fn fill_with_queued<T>(data: &LossyReceiver<T>, queue: &mut VecDeque<T>) -> bool {
     if queue.is_empty() {
         match data.recv() {
-            Err(_) => return false,
-            Ok(item) => queue.push_front(item),
+            Err(_) | Ok(None) => return false,
+            Ok(Some(value)) => queue.push_front(value),
         };
     }
     while let Ok(item) = data.try_recv() {
-        queue.push_front(item);
+        match item {
+            Some(value) => queue.push_front(value),
+            None => return false,
+        }
     }
     true
 }
 
 fn fork_thread<T: Write + Send + 'static>(
     streams: &Receiver<T>,
-    data: &Receiver<Arc<Vec<u8>>>,
-    queue_size: &AtomicUsize,
+    data: &LossyReceiver<Arc<Vec<u8>>>,
 ) {
     let mut targets = Vec::new();
     let mut datapoints = VecDeque::new();
-    while fill_with_queued(data, &mut datapoints) {
-        datapoints.truncate(queue_size.load(Ordering::Relaxed));
+    let mut sender_is_open = true;
+    while sender_is_open {
+        sender_is_open = fill_with_queued(data, &mut datapoints);
+
         let buffer = match datapoints.pop_back() {
             Some(v) => v,
             None => continue,
@@ -71,17 +72,19 @@ impl<T: Write + Send + 'static> TargetList<T> {
 
 #[derive(Clone)]
 pub struct DataStream {
-    sender: Sender<Arc<Vec<u8>>>,
-    queue_size: Arc<AtomicUsize>,
+    sender: LossySender<Arc<Vec<u8>>>,
 }
 
 impl DataStream {
     pub fn send(&self, data: Arc<Vec<u8>>) -> ForkResult {
-        self.sender.send(data).or(Err(()))
+        self.sender.try_send(data).or(Err(()))
     }
 
-    pub fn set_queue_size(&self, queue_size: Option<usize>) {
-        self.queue_size
-            .store(queue_size.unwrap_or(usize::max_value()), Ordering::Relaxed);
+    pub fn set_queue_size(&self, queue_size: usize) {
+        self.sender.set_queue_size(queue_size);
+    }
+
+    pub fn set_queue_size_max(&self, queue_size: usize) {
+        self.sender.set_queue_size_max(queue_size);
     }
 }

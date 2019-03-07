@@ -71,7 +71,7 @@ impl Ros {
             ros.clock = ros_clock;
         }
 
-        ros.logger = Some(ros.publish("/rosout")?);
+        ros.logger = Some(ros.publish("/rosout", 100)?);
 
         Ok(ros)
     }
@@ -257,13 +257,16 @@ impl Ros {
     pub fn subscribe<T, F>(
         &mut self,
         topic: &str,
-        queue_size: usize,
+        mut queue_size: usize,
         callback: F,
     ) -> Result<Subscriber>
     where
         T: Message,
         F: Fn(T) -> () + Send + 'static,
     {
+        if queue_size == 0 {
+            queue_size = usize::max_value();
+        }
         let name = self.resolver.translate(topic)?;
         Subscriber::new::<T, F>(
             Arc::clone(&self.master),
@@ -274,10 +277,13 @@ impl Ros {
         )
     }
 
-    pub fn publish<T>(&mut self, topic: &str) -> Result<Publisher<T>>
+    pub fn publish<T>(&mut self, topic: &str, mut queue_size: usize) -> Result<Publisher<T>>
     where
         T: Message,
     {
+        if queue_size == 0 {
+            queue_size = usize::max_value();
+        }
         let name = self.resolver.translate(topic)?;
         Publisher::new(
             Arc::clone(&self.master),
@@ -285,6 +291,7 @@ impl Ros {
             Arc::clone(&self.clock),
             &self.bind_address,
             &name,
+            queue_size,
         )
     }
 

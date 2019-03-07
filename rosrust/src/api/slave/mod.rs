@@ -130,11 +130,12 @@ impl Slave {
         &self,
         hostname: &str,
         topic: &str,
+        queue_size: usize,
     ) -> error::tcpros::Result<PublisherStream<T>>
     where
         T: Message,
     {
-        self.publications.add(hostname, topic)
+        self.publications.add(hostname, topic, queue_size)
     }
 
     #[inline]

@@ -75,7 +75,7 @@ fn main() {
     rosrust::init("talker");
 
     // Create publisher
-    let mut chatter_pub = rosrust::publish("chatter").unwrap();
+    let mut chatter_pub = rosrust::publish("chatter", 100).unwrap();
 
     let mut count = 0;
 
@@ -120,7 +120,7 @@ fn main() {
 
     // Create subscriber
     // The subscriber is stopped when the returned object is destroyed
-    let _subscriber_raii = rosrust::subscribe("chatter", |v: msg::std_msgs::UInt64| {
+    let _subscriber_raii = rosrust::subscribe("chatter", 100, |v: msg::std_msgs::UInt64| {
         // Callback for handling received messages
         ros_info!("Received: {}", v.data);
     }).unwrap();

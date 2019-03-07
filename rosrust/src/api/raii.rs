@@ -23,8 +23,9 @@ impl<T: Message> Publisher<T> {
         clock: Arc<Clock>,
         hostname: &str,
         name: &str,
+        queue_size: usize,
     ) -> Result<Self> {
-        let stream = slave.add_publication::<T>(hostname, name)?;
+        let stream = slave.add_publication::<T>(hostname, name, queue_size)?;
 
         let raii = Arc::new(InteractorRaii::new(PublisherInfo {
             master,
@@ -54,7 +55,7 @@ impl<T: Message> Publisher<T> {
     }
 
     #[inline]
-    pub fn set_queue_size(&mut self, queue_size: Option<usize>) {
+    pub fn set_queue_size(&mut self, queue_size: usize) {
         self.stream.set_queue_size(queue_size);
     }
 

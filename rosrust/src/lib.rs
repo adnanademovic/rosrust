@@ -21,3 +21,4 @@ mod rosxmlrpc;
 pub mod singleton;
 mod tcpros;
 mod time;
+mod util;
