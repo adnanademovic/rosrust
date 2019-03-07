@@ -1,3 +1,4 @@
+use crate::util::FAILED_TO_LOCK;
 use crossbeam::channel::{unbounded, Receiver, SendError, Sender, TrySendError};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -60,5 +61,3 @@ impl<T> LossySender<T> {
 }
 
 pub type LossyReceiver<T> = Receiver<Option<T>>;
-
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";

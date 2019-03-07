@@ -5,6 +5,7 @@ mod subscriptions;
 use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result, ResultExt};
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
+use crate::util::FAILED_TO_LOCK;
 use crossbeam::channel::{unbounded, Sender};
 use futures::sync::mpsc::channel as futures_channel;
 use log::{error, info};
@@ -158,5 +159,3 @@ impl Slave {
         self.subscriptions.remove(topic)
     }
 }
-
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";

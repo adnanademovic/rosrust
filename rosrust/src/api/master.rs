@@ -29,12 +29,16 @@ macro_rules! request_tree {
 }
 
 impl Master {
-    pub fn new(master_uri: &str, client_id: &str, caller_api: &str) -> Master {
-        Master {
-            client: rosxmlrpc::Client::new(master_uri).unwrap(),
+    pub fn new(
+        master_uri: &str,
+        client_id: &str,
+        caller_api: &str,
+    ) -> rosxmlrpc::error::Result<Master> {
+        Ok(Master {
+            client: rosxmlrpc::Client::new(master_uri)?,
             client_id: client_id.to_owned(),
             caller_api: caller_api.to_owned(),
-        }
+        })
     }
 
     pub fn register_service(&self, service: &str, service_api: &str) -> Result<i32> {

@@ -1,5 +1,6 @@
 use crate::api::error::{self, ErrorKind, Result};
 use crate::tcpros::{Subscriber, Topic};
+use crate::util::FAILED_TO_LOCK;
 use crate::Message;
 use log::error;
 use std::collections::HashMap;
@@ -110,5 +111,3 @@ fn request_topic(
         .map_err(|_| "error")?;
     Ok(protocols)
 }
-
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
