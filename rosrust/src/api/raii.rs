@@ -143,6 +143,7 @@ impl Service {
         master: Arc<Master>,
         slave: Arc<Slave>,
         hostname: &str,
+        bind_address: &str,
         name: &str,
         handler: F,
     ) -> Result<Self>
@@ -150,7 +151,7 @@ impl Service {
         T: ServicePair,
         F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
-        let api = slave.add_service::<T, F>(hostname, name, handler)?;
+        let api = slave.add_service::<T, F>(hostname, bind_address, name, handler)?;
 
         let raii = Arc::new(InteractorRaii::new(ServiceInfo {
             master,

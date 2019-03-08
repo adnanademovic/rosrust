@@ -94,6 +94,7 @@ impl Slave {
     pub fn add_service<T, F>(
         &self,
         hostname: &str,
+        bind_address: &str,
         service: &str,
         handler: F,
     ) -> SerdeResult<String>
@@ -113,7 +114,8 @@ impl Slave {
                 Err(ErrorKind::Duplicate("service".into()).into())
             }
             Entry::Vacant(entry) => {
-                let service = Service::new::<T, _>(hostname, 0, service, &self.name, handler)?;
+                let service =
+                    Service::new::<T, _>(hostname, bind_address, 0, service, &self.name, handler)?;
                 let api = service.api.clone();
                 entry.insert(service);
                 Ok(api)

@@ -22,6 +22,7 @@ pub struct Service {
 impl Service {
     pub fn new<T, F>(
         hostname: &str,
+        bind_address: &str,
         port: u16,
         service: &str,
         node_name: &str,
@@ -31,7 +32,7 @@ impl Service {
         T: ServicePair,
         F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
     {
-        let listener = TcpListener::bind((hostname, port))?;
+        let listener = TcpListener::bind((bind_address, port))?;
         let socket_address = listener.local_addr()?;
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
         let (raii, listener) = tcpconnection::iterate(listener, format!("service '{}'", service));

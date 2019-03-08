@@ -248,6 +248,7 @@ impl Ros {
         Service::new::<T, F>(
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
+            &self.hostname,
             &self.bind_address,
             &name,
             handler,
