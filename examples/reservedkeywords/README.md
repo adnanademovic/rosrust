@@ -1,3 +1,3 @@
-# Camera feed example
+# Reserved keywords compilation test
 
-Example that requires a lot of processing power to handle all the data received.
+Example used to check if ROS messages with reserved keywords in them compile.
