@@ -5,6 +5,7 @@ members = [
     "examples/pubsub",
     "examples/serviceclient",
     "examples/oldedition",
+    "examples/reservedkeywords",
     "rosrust",
     "rosrust_codegen",
 ]

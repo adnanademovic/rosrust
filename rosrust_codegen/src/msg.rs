@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
 use quote::{quote, ToTokens};
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use syn::Ident;
 
 #[derive(Clone)]
@@ -174,6 +174,20 @@ static FIELD_TYPE: &'static str = r"([a-zA-Z0-9_/]+)";
 static FIELD_NAME: &'static str = r"([a-zA-Z][a-zA-Z0-9_]*)";
 static EMPTY_BRACKETS: &'static str = r"\[\s*\]";
 static NUMBER_BRACKETS: &'static str = r"\[\s*([0-9]+)\s*\]";
+
+lazy_static! {
+    static ref RESERVED_KEYWORDS: BTreeSet<String> = [
+        "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn",
+        "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref",
+        "return", "Self", "self", "static", "struct", "super", "trait", "true", "type", "unsafe",
+        "use", "where", "while", "abstract", "alignof", "become", "box", "do", "final", "macro",
+        "offsetof", "override", "priv", "proc", "pure", "sizeof", "typeof", "unsized", "virtual",
+        "yield",
+    ]
+    .iter()
+    .map(|&item| String::from(item))
+    .collect();
+}
 
 fn match_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
@@ -362,6 +376,14 @@ pub struct FieldInfo {
 }
 
 impl FieldInfo {
+    #[allow(dead_code)]
+    pub fn create_identifier(&self, span: Span) -> Ident {
+        if RESERVED_KEYWORDS.contains(&self.name) {
+            return Ident::new(&format!("_{}", self.name), span);
+        }
+        Ident::new(&self.name, span)
+    }
+
     fn is_constant(&self) -> bool {
         match self.case {
             FieldCase::Const(..) => true,
@@ -371,7 +393,7 @@ impl FieldInfo {
 
     pub fn field_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let datatype = self.datatype.token_stream(crate_prefix);
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { pub #name: #datatype, },
             FieldCase::Vector => quote! { pub #name: Vec<#datatype>, },
@@ -381,7 +403,7 @@ impl FieldInfo {
     }
 
     pub fn field_default_token_stream<T: ToTokens>(&self, _crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit | FieldCase::Vector => quote! { #name: Default::default(), },
             FieldCase::Array(l) => quote! { #name: [Default::default(); #l], },
@@ -390,7 +412,7 @@ impl FieldInfo {
     }
 
     pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { self.#name.encode(w.by_ref())?; },
             FieldCase::Vector => match self.datatype {
@@ -413,7 +435,7 @@ impl FieldInfo {
     }
 
     pub fn field_token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
             FieldCase::Vector => match self.datatype {
@@ -442,7 +464,7 @@ impl FieldInfo {
             FieldCase::Const(ref value) => value,
             _ => return quote! {},
         };
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         let datatype = self.datatype.token_stream(crate_prefix);
         let insides = match self.datatype {
             DataType::Bool => {
@@ -822,6 +844,30 @@ mod tests {
             .calculate_md5(&hashes)
             .unwrap(),
             "e45d45a5a1ce597b249e23fb30fc871f".to_owned()
+        );
+        let mut hashes = HashMap::new();
+        hashes.insert(
+            ("geometry_msgs".into(), "Point".into()),
+            "4a842b65f413084dc2b10fb484ea7f17".into(),
+        );
+        hashes.insert(
+            ("std_msgs".into(), "ColorRGBA".into()),
+            "a29a96539573343b1310c73607334b00".into(),
+        );
+        hashes.insert(
+            ("std_msgs".into(), "Header".into()),
+            "2176decaecbce78abc3b96ef049fabed".into(),
+        );
+        assert_eq!(
+            Msg::new(
+                "visualization_msgs",
+                "ImageMarker",
+                include_str!("msg_examples/visualization_msgs/msg/ImageMarker.msg"),
+            )
+            .unwrap()
+            .calculate_md5(&hashes)
+            .unwrap(),
+            "1de93c67ec8858b831025a08fbf1b35c".to_owned()
         );
     }
 
