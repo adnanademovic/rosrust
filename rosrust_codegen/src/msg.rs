@@ -379,7 +379,7 @@ impl FieldInfo {
     #[allow(dead_code)]
     pub fn create_identifier(&self, span: Span) -> Ident {
         if RESERVED_KEYWORDS.contains(&self.name) {
-            return Ident::new(&format!("_{}", self.name), span);
+            return Ident::new(&format!("{}_", self.name), span);
         }
         Ident::new(&self.name, span)
     }
