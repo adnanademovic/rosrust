@@ -184,7 +184,7 @@ lazy_static! {
         "offsetof", "override", "priv", "proc", "pure", "sizeof", "typeof", "unsized", "virtual",
         "yield",
     ]
-    .into_iter()
+    .iter()
     .map(|&item| String::from(item))
     .collect();
 }
@@ -844,6 +844,30 @@ mod tests {
             .calculate_md5(&hashes)
             .unwrap(),
             "e45d45a5a1ce597b249e23fb30fc871f".to_owned()
+        );
+        let mut hashes = HashMap::new();
+        hashes.insert(
+            ("geometry_msgs".into(), "Point".into()),
+            "4a842b65f413084dc2b10fb484ea7f17".into(),
+        );
+        hashes.insert(
+            ("std_msgs".into(), "ColorRGBA".into()),
+            "a29a96539573343b1310c73607334b00".into(),
+        );
+        hashes.insert(
+            ("std_msgs".into(), "Header".into()),
+            "2176decaecbce78abc3b96ef049fabed".into(),
+        );
+        assert_eq!(
+            Msg::new(
+                "visualization_msgs",
+                "ImageMarker",
+                include_str!("msg_examples/visualization_msgs/msg/ImageMarker.msg"),
+            )
+            .unwrap()
+            .calculate_md5(&hashes)
+            .unwrap(),
+            "1de93c67ec8858b831025a08fbf1b35c".to_owned()
         );
     }
 
