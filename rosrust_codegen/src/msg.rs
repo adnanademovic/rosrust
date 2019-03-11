@@ -362,6 +362,11 @@ pub struct FieldInfo {
 }
 
 impl FieldInfo {
+    #[allow(dead_code)]
+    pub fn create_identifier(&self, span: Span) -> Ident {
+        Ident::new(&self.name, span)
+    }
+
     fn is_constant(&self) -> bool {
         match self.case {
             FieldCase::Const(..) => true,
@@ -371,7 +376,7 @@ impl FieldInfo {
 
     pub fn field_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let datatype = self.datatype.token_stream(crate_prefix);
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { pub #name: #datatype, },
             FieldCase::Vector => quote! { pub #name: Vec<#datatype>, },
@@ -381,7 +386,7 @@ impl FieldInfo {
     }
 
     pub fn field_default_token_stream<T: ToTokens>(&self, _crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit | FieldCase::Vector => quote! { #name: Default::default(), },
             FieldCase::Array(l) => quote! { #name: [Default::default(); #l], },
@@ -390,7 +395,7 @@ impl FieldInfo {
     }
 
     pub fn field_token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { self.#name.encode(w.by_ref())?; },
             FieldCase::Vector => match self.datatype {
@@ -413,7 +418,7 @@ impl FieldInfo {
     }
 
     pub fn field_token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit => quote! { #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
             FieldCase::Vector => match self.datatype {
@@ -442,7 +447,7 @@ impl FieldInfo {
             FieldCase::Const(ref value) => value,
             _ => return quote! {},
         };
-        let name = Ident::new(&self.name, Span::call_site());
+        let name = self.create_identifier(Span::call_site());
         let datatype = self.datatype.token_stream(crate_prefix);
         let insides = match self.datatype {
             DataType::Bool => {
