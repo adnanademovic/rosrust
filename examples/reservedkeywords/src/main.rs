@@ -3,5 +3,6 @@
 mod msg;
 
 fn main() {
-    println!("{}", msg::visualization_msgs::ImageMarker::default().id);
+    let message = msg::visualization_msgs::ImageMarker::default();
+    println!("{:?} {:?}", message.id, message._type);
 }

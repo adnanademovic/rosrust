@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
 use quote::{quote, ToTokens};
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use syn::Ident;
 
 #[derive(Clone)]
@@ -174,6 +174,20 @@ static FIELD_TYPE: &'static str = r"([a-zA-Z0-9_/]+)";
 static FIELD_NAME: &'static str = r"([a-zA-Z][a-zA-Z0-9_]*)";
 static EMPTY_BRACKETS: &'static str = r"\[\s*\]";
 static NUMBER_BRACKETS: &'static str = r"\[\s*([0-9]+)\s*\]";
+
+lazy_static! {
+    static ref RESERVED_KEYWORDS: BTreeSet<String> = [
+        "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn",
+        "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref",
+        "return", "Self", "self", "static", "struct", "super", "trait", "true", "type", "unsafe",
+        "use", "where", "while", "abstract", "alignof", "become", "box", "do", "final", "macro",
+        "offsetof", "override", "priv", "proc", "pure", "sizeof", "typeof", "unsized", "virtual",
+        "yield",
+    ]
+    .into_iter()
+    .map(|&item| String::from(item))
+    .collect();
+}
 
 fn match_field(data: &str) -> Option<FieldLine> {
     lazy_static! {
@@ -364,6 +378,9 @@ pub struct FieldInfo {
 impl FieldInfo {
     #[allow(dead_code)]
     pub fn create_identifier(&self, span: Span) -> Ident {
+        if RESERVED_KEYWORDS.contains(&self.name) {
+            return Ident::new(&format!("_{}", self.name), span);
+        }
         Ident::new(&self.name, span)
     }
 
