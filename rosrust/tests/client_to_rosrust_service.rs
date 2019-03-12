@@ -19,7 +19,7 @@ fn test_request(client: &rosrust::Client<msg::roscpp_tutorials::TwoInts>, a: i64
 
 #[test]
 fn client_to_rosrust_service() {
-    let _roscore = util::run_roscore(11314);
+    let _roscore = util::run_roscore_for(util::Language::Rust, util::Feature::Client);
     let _service = util::ChildProcessTerminator::spawn_example(
         "../examples/serviceclient",
         Command::new("cargo").arg("run").arg("--bin").arg("service"),

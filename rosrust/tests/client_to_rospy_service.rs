@@ -19,7 +19,7 @@ fn test_request(client: &rosrust::Client<msg::rospy_tutorials::AddTwoInts>, a: i
 
 #[test]
 fn client_to_rospy_service() {
-    let _roscore = util::run_roscore(11313);
+    let _roscore = util::run_roscore_for(util::Language::Python, util::Feature::Client);
     let _service = util::ChildProcessTerminator::spawn(
         Command::new("rosrun")
             .arg("rospy_tutorials")
