@@ -4,8 +4,10 @@ use std::process::{Command, Output};
 use std::str::from_utf8;
 use std::thread::sleep;
 use std::time::Duration;
+pub use subscriber_test::test_subscriber;
 
 mod child_process_terminator;
+mod subscriber_test;
 
 fn rostopic_listing_succeeds() -> bool {
     return Command::new("rostopic")
