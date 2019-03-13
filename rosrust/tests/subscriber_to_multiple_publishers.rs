@@ -45,23 +45,23 @@ fn subscriber_to_multiple_publishers() {
 
     rosrust::init("hello_world_listener");
     let _subscriber = rosrust::subscribe::<msg::std_msgs::String, _>("chatter", 100, move |data| {
-        println!("{}",data.data);
+        println!("{}", data.data);
         tx.send(data.data).unwrap();
     })
     .unwrap();
 
     println!("Checking roscpp publisher");
-    util::test_subscriber_detailed(rx.clone(), r"hello world (\d+)", true, 10, false);
+    util::test_subscriber_detailed(rx.clone(), r"^hello world (\d+)$", true, 10, false);
     println!("Checking rospy publisher");
-    util::test_subscriber_detailed(rx.clone(), r"hello world (\d+\.\d+)", true, 10, false);
+    util::test_subscriber_detailed(rx.clone(), r"^hello world (\d+\.\d+)$", true, 10, false);
     println!("Checking rosrust publisher");
     util::test_subscriber_detailed(
         rx.clone(),
-        r"hello world from rosrust (\d+)",
+        r"^hello world from rosrust (\d+)$",
         true,
         10,
         false,
     );
     println!("Checking rostopic publisher");
-    util::test_subscriber_detailed(rx.clone(), r"hello world from rostopic", false, 10, false);
+    util::test_subscriber_detailed(rx.clone(), r"^hello world from rostopic$", false, 10, false);
 }
