@@ -45,7 +45,6 @@ fn subscriber_to_multiple_publishers() {
 
     rosrust::init("hello_world_listener");
     let _subscriber = rosrust::subscribe::<msg::std_msgs::String, _>("chatter", 100, move |data| {
-        println!("{}", data.data);
         tx.send(data.data).unwrap();
     })
     .unwrap();
