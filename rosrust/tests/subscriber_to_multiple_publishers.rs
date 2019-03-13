@@ -51,17 +51,17 @@ fn subscriber_to_multiple_publishers() {
     .unwrap();
 
     println!("Checking roscpp publisher");
-    util::test_subscriber_detailed(rx.clone(), r"hello world (\d+)", true, 2, false);
+    util::test_subscriber_detailed(rx.clone(), r"hello world (\d+)", true, 10, false);
     println!("Checking rospy publisher");
-    util::test_subscriber_detailed(rx.clone(), r"hello world (\d+\.\d+)", true, 2, false);
+    util::test_subscriber_detailed(rx.clone(), r"hello world (\d+\.\d+)", true, 10, false);
     println!("Checking rosrust publisher");
     util::test_subscriber_detailed(
         rx.clone(),
         r"hello world from rosrust (\d+)",
         true,
-        2,
+        10,
         false,
     );
     println!("Checking rostopic publisher");
-    util::test_subscriber_detailed(rx.clone(), r"hello world from rostopic", false, 2, false);
+    util::test_subscriber_detailed(rx.clone(), r"hello world from rostopic", false, 10, false);
 }
