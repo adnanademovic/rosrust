@@ -12,7 +12,7 @@ mod msg {
 fn can_read_log_from_rosout() {
     let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Log);
 
-    rosrust::init("hello_world_listener");
+    rosrust::init("rosout_agg_listener");
 
     let (tx, rx) = unbounded();
 
