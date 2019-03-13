@@ -3,7 +3,7 @@ use crate::tcpros::{Subscriber, Topic};
 use crate::util::FAILED_TO_LOCK;
 use crate::Message;
 use log::error;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
 
@@ -18,7 +18,9 @@ impl SubscriptionsTracker {
         T: Iterator<Item = String>,
     {
         if let Some(mut subscription) = self.mapping.lock().expect(FAILED_TO_LOCK).get_mut(topic) {
-            for publisher in publishers {
+            let publisher_set: BTreeSet<String> = publishers.collect();
+            subscription.limit_publishers_to(&publisher_set);
+            for publisher in publisher_set {
                 if let Err(err) = connect_to_publisher(&mut subscription, name, &publisher, topic) {
                     let info = err
                         .iter()
@@ -80,6 +82,9 @@ fn connect_to_publisher(
     publisher: &str,
     topic: &str,
 ) -> Result<()> {
+    if subscriber.is_connected_to(publisher) {
+        return Ok(());
+    }
     let (protocol, hostname, port) = request_topic(publisher, caller_id, topic)?;
     if protocol != "TCPROS" {
         bail!(
@@ -88,7 +93,7 @@ fn connect_to_publisher(
         )
     }
     subscriber
-        .connect_to((hostname.as_str(), port as u16))
+        .connect_to(publisher, (hostname.as_str(), port as u16))
         .map_err(|err| ErrorKind::Io(err).into())
 }
 
