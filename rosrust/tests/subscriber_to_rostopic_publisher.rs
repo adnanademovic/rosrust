@@ -10,7 +10,7 @@ mod msg {
 
 #[test]
 fn subscriber_to_rostopic_publisher() {
-    let _roscore = util::run_roscore_for(util::Language::Python, util::Feature::Subscriber);
+    let _roscore = util::run_roscore_for(util::Language::Shell, util::Feature::Subscriber);
     let _publisher = util::ChildProcessTerminator::spawn(
         Command::new("rostopic")
             .arg("pub")

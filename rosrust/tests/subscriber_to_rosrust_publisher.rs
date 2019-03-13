@@ -27,5 +27,5 @@ fn subscriber_to_rosrust_publisher() {
     })
     .unwrap();
 
-    util::test_subscriber(rx, r"hello world (\d+)", true, 20);
+    util::test_subscriber(rx, r"hello world from rosrust (\d+)", true, 20);
 }

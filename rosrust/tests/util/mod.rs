@@ -4,7 +4,7 @@ use std::process::{Command, Output};
 use std::str::from_utf8;
 use std::thread::sleep;
 use std::time::Duration;
-pub use subscriber_test::test_subscriber;
+pub use subscriber_test::{test_subscriber, test_subscriber_detailed};
 
 mod child_process_terminator;
 mod subscriber_test;
