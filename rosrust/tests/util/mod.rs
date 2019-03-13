@@ -39,6 +39,7 @@ pub fn run_roscore_for(language: Language, feature: Feature) -> ChildProcessTerm
 
 #[allow(dead_code)]
 pub enum Language {
+    None,
     Cpp,
     Python,
     Rust,
@@ -48,6 +49,7 @@ pub enum Language {
 impl Language {
     fn get_offset(&self) -> u32 {
         match self {
+            Language::None => 1,
             Language::Cpp => 2,
             Language::Python => 3,
             Language::Rust => 4,
@@ -62,6 +64,7 @@ pub enum Feature {
     Service,
     Publisher,
     Subscriber,
+    Log,
 }
 
 impl Feature {
@@ -71,6 +74,7 @@ impl Feature {
             Feature::Service => 200,
             Feature::Publisher => 300,
             Feature::Subscriber => 400,
+            Feature::Log => 500,
         }
     }
 }
