@@ -40,27 +40,15 @@ fn publisher_to_multiple_subscribers() {
         })
         .unwrap();
 
-    let mut publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
+    let publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
 
     let mut message = msg::std_msgs::String::default();
     message.data = "hello world".to_owned();
 
     println!("Checking roscpp subscriber");
-    util::test_publisher(
-        &mut publisher,
-        &message,
-        &rx,
-        r"^I heard: \[hello world\]$",
-        50,
-    );
+    util::test_publisher(&publisher, &message, &rx, r"^I heard: \[hello world\]$", 50);
     println!("Checking rospy subscriber");
-    util::test_publisher(&mut publisher, &message, &rx, r"I heard hello world$", 50);
+    util::test_publisher(&publisher, &message, &rx, r"I heard hello world$", 50);
     println!("Checking rosrust subscriber");
-    util::test_publisher(
-        &mut publisher,
-        &message,
-        &rx,
-        r"^Received: hello world$",
-        50,
-    );
+    util::test_publisher(&publisher, &message, &rx, r"^Received: hello world$", 50);
 }

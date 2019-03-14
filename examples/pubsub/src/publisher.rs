@@ -12,7 +12,7 @@ fn main() {
     rosrust::init("talker");
 
     // Create publisher
-    let mut chatter_pub = rosrust::publish("chatter", 2).unwrap();
+    let chatter_pub = rosrust::publish("chatter", 2).unwrap();
 
     let mut count = 0;
 

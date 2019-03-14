@@ -27,10 +27,10 @@ fn publisher_to_rospy_subscriber() {
         })
         .unwrap();
 
-    let mut publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
+    let publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
 
     let mut message = msg::std_msgs::String::default();
     message.data = "hello world".to_owned();
 
-    util::test_publisher(&mut publisher, &message, &rx, r"I heard hello world$", 50);
+    util::test_publisher(&publisher, &message, &rx, r"I heard hello world$", 50);
 }

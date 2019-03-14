@@ -194,7 +194,7 @@ impl<T: Message> PublisherStream<T> {
         self.stream.set_queue_size_max(queue_size);
     }
 
-    pub fn send(&mut self, message: &T) -> Result<()> {
+    pub fn send(&self, message: &T) -> Result<()> {
         let bytes = Arc::new(message.encode_vec()?);
 
         if self.latching {

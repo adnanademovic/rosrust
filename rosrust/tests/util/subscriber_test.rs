@@ -41,7 +41,7 @@ pub fn test_subscriber_detailed(
 
 #[allow(dead_code)]
 pub fn test_publisher<T: Clone + rosrust::Message>(
-    publisher: &mut rosrust::Publisher<T>,
+    publisher: &rosrust::Publisher<T>,
     message: &T,
     rx: &Receiver<(i8, String)>,
     regex_string: &str,
