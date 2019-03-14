@@ -38,3 +38,30 @@ pub fn test_subscriber_detailed(
         checks_to_perform -= 1;
     }
 }
+
+#[allow(dead_code)]
+pub fn test_publisher<T: Clone + rosrust::Message>(
+    publisher: &mut rosrust::Publisher<T>,
+    message: &T,
+    rx: &Receiver<(i8, String)>,
+    regex_string: &str,
+    attempts: usize,
+) {
+    let regex = regex::Regex::new(regex_string).unwrap();
+
+    let mut rate = rosrust::rate(10.0);
+
+    for _ in 0..attempts {
+        publisher.send(message.clone()).unwrap();
+        rate.sleep();
+
+        for (level, message) in rx.try_iter() {
+            println!("Received message at level {}: {}", level, message);
+            if level == 2 && regex.is_match(&message) {
+                return;
+            }
+        }
+    }
+
+    panic!("Failed to receive logged data on /rosout_agg");
+}
