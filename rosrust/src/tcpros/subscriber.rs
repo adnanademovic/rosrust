@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use crossbeam::channel::{unbounded, Receiver, Sender, TrySendError};
 use log::error;
 use std;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::thread;
 
@@ -15,6 +15,7 @@ pub struct Subscriber {
     data_stream: LossySender<Vec<u8>>,
     publishers_stream: Sender<SocketAddr>,
     pub topic: Topic,
+    pub connected_publishers: BTreeSet<String>,
 }
 
 impl Subscriber {
@@ -38,10 +39,15 @@ impl Subscriber {
             data_stream,
             publishers_stream: pub_tx,
             topic,
+            connected_publishers: BTreeSet::new(),
         }
     }
 
-    pub fn connect_to<U: ToSocketAddrs>(&mut self, addresses: U) -> std::io::Result<()> {
+    pub fn connect_to<U: ToSocketAddrs>(
+        &mut self,
+        publisher: &str,
+        addresses: U,
+    ) -> std::io::Result<()> {
         for address in addresses.to_socket_addrs()? {
             // This should never fail, so it's safe to unwrap
             // Failure could only be caused by the join_connections
@@ -51,7 +57,23 @@ impl Subscriber {
                 .send(address)
                 .expect("Connected thread died");
         }
+        self.connected_publishers.insert(publisher.to_owned());
         Ok(())
+    }
+
+    pub fn is_connected_to(&self, publisher: &str) -> bool {
+        self.connected_publishers.contains(publisher)
+    }
+
+    pub fn limit_publishers_to(&mut self, publishers: &BTreeSet<String>) {
+        let difference: Vec<String> = self
+            .connected_publishers
+            .difference(publishers)
+            .cloned()
+            .collect();
+        for item in difference {
+            self.connected_publishers.remove(&item);
+        }
     }
 
     pub fn get_topic(&self) -> &Topic {

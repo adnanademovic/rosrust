@@ -1,7 +1,8 @@
 language: rust
 cache: cargo
+dist: xenial
 env:
-  - ROSRUST_MSG_PATH=/home/travis/build/adnanademovic/rosrust/rosrust_codegen/src/msg_examples
+  - ROS_DISTRO=kinetic
 rust:
   - stable
   - beta
@@ -10,3 +11,13 @@ matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
+
+before_install:
+  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+  - sudo apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116
+  - sudo apt-get update -qq
+  - sudo apt-get install dpkg
+  - sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool ros-$ROS_DISTRO-ros-base ros-$ROS_DISTRO-roscpp-tutorials ros-$ROS_DISTRO-rospy-tutorials
+  - source /opt/ros/$ROS_DISTRO/setup.bash
+  - sudo rosdep init
+  - rosdep update

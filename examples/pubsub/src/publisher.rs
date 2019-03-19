@@ -12,7 +12,7 @@ fn main() {
     rosrust::init("talker");
 
     // Create publisher
-    let mut chatter_pub = rosrust::publish("chatter", 2).unwrap();
+    let chatter_pub = rosrust::publish("chatter", 2).unwrap();
 
     let mut count = 0;
 
@@ -23,7 +23,7 @@ fn main() {
     while rosrust::is_ok() {
         // Create string message
         let mut msg = msg::std_msgs::String::default();
-        msg.data = format!("hello world {}", count);
+        msg.data = format!("hello world from rosrust {}", count);
 
         // Log event
         rosrust::ros_info!("Publishing: {}", msg.data);

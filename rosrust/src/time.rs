@@ -72,6 +72,11 @@ impl Duration {
     }
 
     #[inline]
+    pub fn from_seconds(sec: i32) -> Duration {
+        Duration { sec, nsec: 0 }
+    }
+
+    #[inline]
     fn nanos(&self) -> i64 {
         i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }

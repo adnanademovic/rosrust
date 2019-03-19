@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate error_chain;
 
-pub use crate::api::raii::Service;
+pub use crate::api::raii::{Publisher, Service};
 pub use crate::api::{error, Clock, Parameter};
 pub use crate::rosmsg::RosMsg;
 pub use crate::singleton::*;
