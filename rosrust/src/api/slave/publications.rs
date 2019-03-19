@@ -1,8 +1,7 @@
 use crate::api::error;
-use crate::tcpros::{Publisher, Topic};
+use crate::tcpros::{Publisher, PublisherStream, Topic};
 use crate::util::FAILED_TO_LOCK;
 use crate::Message;
-use crate::PublisherStream;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
