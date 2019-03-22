@@ -87,10 +87,10 @@ fn connect_to_publisher(
     }
     let (protocol, hostname, port) = request_topic(publisher, caller_id, topic)?;
     if protocol != "TCPROS" {
-        bail!(
+        bail!(ErrorKind::CommunicationIssue(format!(
             "Publisher responded with a non-TCPROS protocol: {}",
             protocol
-        )
+        )))
     }
     subscriber
         .connect_to(publisher, (hostname.as_str(), port as u16))
@@ -108,7 +108,7 @@ fn request_topic(
         .call(
             &publisher_uri
                 .parse()
-                .chain_err(|| format!("Could not parse URI: {:?}", publisher_uri))?,
+                .chain_err(|| error::rosxmlrpc::ErrorKind::BadUri(publisher_uri.into()))?,
             "requestTopic",
             &(caller_id, topic, [["TCPROS"]]),
         )

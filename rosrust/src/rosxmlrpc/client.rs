@@ -1,4 +1,4 @@
-use super::error::{Result, ResultExt};
+use super::error::{ErrorKind, Result, ResultExt};
 use super::{Response, ResponseError, ResponseInfo};
 use serde::{Deserialize, Serialize};
 use xml_rpc::{self, Params, Uri, Value};
@@ -9,7 +9,9 @@ pub struct Client {
 
 impl Client {
     pub fn new(master_uri: &str) -> Result<Client> {
-        let master_uri = master_uri.parse().chain_err(|| "Bad Master URI provided")?;
+        let master_uri = master_uri
+            .parse()
+            .chain_err(|| ErrorKind::BadUri(master_uri.into()))?;
         Ok(Client { master_uri })
     }
 

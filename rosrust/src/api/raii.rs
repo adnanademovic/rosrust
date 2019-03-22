@@ -62,7 +62,7 @@ impl<T: Message> Publisher<T> {
     #[inline]
     pub fn send(&self, mut message: T) -> Result<()> {
         message.set_header(&self.clock, &self.seq);
-        self.stream.send(&message).map_err(|v| v.into())
+        self.stream.send(&message).map_err(Into::into)
     }
 }
 

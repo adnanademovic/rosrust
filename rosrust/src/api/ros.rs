@@ -47,13 +47,13 @@ impl Ros {
         }
         for (src, dest) in resolve::params() {
             let data = YamlLoader::load_from_str(&dest)
-                .chain_err(|| format!("Failed to load YAML: {}", dest))?
+                .chain_err(|| ErrorKind::BadYamlData(dest.clone()))?
                 .into_iter()
                 .next()
-                .ok_or_else(|| format!("Failed to load YAML: {}", dest))?;
+                .ok_or_else(|| ErrorKind::BadYamlData(dest.clone()))?;
             let param = ros
                 .param(&src)
-                .ok_or_else(|| format!("Failed to resolve name: {}", src))?;
+                .ok_or_else(|| ErrorKind::CannotResolveName(src))?;
             param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
 
@@ -66,7 +66,9 @@ impl Ros {
             let ros_clock = Arc::clone(&clock);
             let sub = ros
                 .subscribe::<ClockMsg, _>("/clock", 1, move |v| clock.trigger(v.clock))
-                .chain_err(|| "Failed to subscribe to simulated clock")?;
+                .chain_err(|| {
+                    ErrorKind::CommunicationIssue("Failed to subscribe to simulated clock".into())
+                })?;
             ros.static_subs.push(sub);
             ros.clock = ros_clock;
         }
@@ -124,7 +126,7 @@ impl Ros {
     }
 
     fn map(&mut self, source: &str, destination: &str) -> Result<()> {
-        self.resolver.map(source, destination).map_err(|v| v.into())
+        self.resolver.map(source, destination).map_err(Into::into)
     }
 
     #[inline]
@@ -359,7 +361,10 @@ impl Parameter {
 
 fn yaml_to_xmlrpc(val: Yaml) -> Result<xml_rpc::Value> {
     Ok(match val {
-        Yaml::Real(v) => xml_rpc::Value::Double(v.parse().chain_err(|| "Failed to parse float")?),
+        Yaml::Real(v) => xml_rpc::Value::Double(
+            v.parse()
+                .chain_err(|| ErrorKind::BadYamlData("Failed to parse float".into()))?,
+        ),
         Yaml::Integer(v) => xml_rpc::Value::Int(v as i32),
         Yaml::String(v) => xml_rpc::Value::String(v),
         Yaml::Boolean(v) => xml_rpc::Value::Bool(v),
@@ -371,9 +376,9 @@ fn yaml_to_xmlrpc(val: Yaml) -> Result<xml_rpc::Value> {
                 .map(|(k, v)| Ok((yaml_to_string(k)?, yaml_to_xmlrpc(v)?)))
                 .collect::<Result<_>>()?,
         ),
-        Yaml::Alias(_) => bail!("Alias is not supported"),
-        Yaml::Null => bail!("Illegal null value"),
-        Yaml::BadValue => bail!("Bad value provided"),
+        Yaml::Alias(_) => bail!(ErrorKind::BadYamlData("Alias is not supported".into())),
+        Yaml::Null => bail!(ErrorKind::BadYamlData("Illegal null value".into())),
+        Yaml::BadValue => bail!(ErrorKind::BadYamlData("Bad value provided".into())),
     })
 }
 
@@ -383,7 +388,9 @@ fn yaml_to_string(val: Yaml) -> Result<String> {
         Yaml::Integer(v) => v.to_string(),
         Yaml::Boolean(true) => "true".into(),
         Yaml::Boolean(false) => "false".into(),
-        _ => bail!("Hash keys need to be strings"),
+        _ => bail!(ErrorKind::BadYamlData(
+            "Hash keys need to be strings".into()
+        )),
     })
 }
 

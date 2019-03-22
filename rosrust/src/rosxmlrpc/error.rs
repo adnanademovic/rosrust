@@ -11,5 +11,9 @@ error_chain! {
             description("Could not connect to topic")
             display("Could not connect to {}", topic)
         }
+        BadUri(uri: String) {
+            description("Bad URI provided")
+            display("Bad URI provided: {}", uri)
+        }
     }
 }

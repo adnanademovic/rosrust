@@ -11,6 +11,7 @@ error_chain! {
         Nix(::nix::Error);
         FromUTF8(::std::string::FromUtf8Error);
         Response(ResponseError);
+        SigintOverride(::ctrlc::Error);
     }
     links {
         XmlRpc(rosxmlrpc::Error, rosxmlrpc::ErrorKind);
@@ -22,7 +23,23 @@ error_chain! {
             description("Could not add duplicate")
             display("Could not add duplicate {}", t)
         }
+        MultipleInitialization {
+            description("Cannot initialize multiple nodes")
+            display("Cannot initialize multiple nodes")
+        }
         TimeoutError
+        BadYamlData(details: String) {
+            description("Bad YAML data provided")
+            display("Bad YAML data provided: {}", details)
+        }
+        CannotResolveName(name: String) {
+            description("Failed to resolve name")
+            display("Failed to resolve name: {}", name)
+        }
+        CommunicationIssue(details: String) {
+            description("Failure in communication with ROS API")
+            display("Failure in communication with ROS API: {}", details)
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::api::raii::{Publisher, Service, Subscriber};
 use crate::api::resolve::get_unused_args;
 use crate::api::{Parameter, Rate, Ros, SystemState, Topic};
-use crate::error::{Result, ResultExt};
+use crate::error::{ErrorKind, Result};
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
@@ -24,7 +24,7 @@ pub fn init(name: &str) {
 pub fn try_init(name: &str) -> Result<()> {
     let mut ros = ROS.lock().expect(FAILED_TO_LOCK);
     if ros.is_some() {
-        bail!(INITIALIZED);
+        bail!(ErrorKind::MultipleInitialization);
     }
     let client = Ros::new(name)?;
     let shutdown_sender = client.shutdown_sender();
@@ -32,8 +32,7 @@ pub fn try_init(name: &str) -> Result<()> {
         if shutdown_sender.send(()).is_err() {
             info!("ROS client is already down");
         }
-    })
-    .chain_err(|| CTRLC_FAIL)?;
+    })?;
     *ros = Some(client);
     Ok(())
 }
@@ -159,6 +158,4 @@ pub fn log(level: i8, msg: String, file: &str, line: u32) {
     ros!().log(level, msg, file, line)
 }
 
-static CTRLC_FAIL: &str = "Failed to override SIGINT functionality.";
 static UNINITIALIZED: &str = "ROS uninitialized. Please run ros::init(name) first!";
-static INITIALIZED: &str = "ROS initialized multiple times through ros::init.";

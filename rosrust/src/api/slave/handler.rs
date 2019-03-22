@@ -1,6 +1,6 @@
 use super::publications::PublicationsTracker;
 use super::subscriptions::SubscriptionsTracker;
-use crate::rosxmlrpc::{Response, ResponseError, Server};
+use crate::rosxmlrpc::{self, Response, ResponseError, Server};
 use crate::tcpros::Service;
 use futures::sync::mpsc::Sender;
 use log::{error, info};
@@ -202,8 +202,8 @@ impl SlaveHandler {
         }
     }
 
-    pub fn bind(self, addr: &SocketAddr) -> xml_rpc::error::Result<xml_rpc::server::BoundServer> {
-        self.server.bind(addr)
+    pub fn bind(self, addr: &SocketAddr) -> rosxmlrpc::error::Result<xml_rpc::server::BoundServer> {
+        self.server.bind(addr).map_err(Into::into)
     }
 }
 

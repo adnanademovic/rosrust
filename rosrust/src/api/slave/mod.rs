@@ -3,9 +3,9 @@ mod publications;
 mod subscriptions;
 
 use self::handler::SlaveHandler;
-use super::error::{self, ErrorKind, Result, ResultExt};
+use super::error::{self, ErrorKind, Result};
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
-use crate::util::FAILED_TO_LOCK;
+use crate::util::{FAILED_TO_LOCK, MPSC_CHANNEL_UNEXPECTEDLY_CLOSED};
 use crossbeam::channel::{unbounded, Sender};
 use futures::sync::mpsc::channel as futures_channel;
 use log::{error, info};
@@ -43,19 +43,26 @@ impl Slave {
         let (port_tx, port_rx) = unbounded();
         let socket_addr = match (bind_address, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
-            None => bail!("Bad address provided: {}:{}", hostname, port),
+            None => bail!(error::ErrorKind::from(error::rosxmlrpc::ErrorKind::BadUri(
+                format!("{}:{}", hostname, port)
+            ))),
         };
 
         thread::spawn(move || {
             let bound_handler = match handler.bind(&socket_addr) {
                 Ok(v) => v,
                 Err(err) => {
-                    port_tx.send(Err(err)).expect(FAILED_TO_LOCK);
+                    port_tx
+                        .send(Err(err))
+                        .expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
                     return;
                 }
             };
-            let port = bound_handler.local_addr().map(|v| v.port());
-            port_tx.send(port).expect(FAILED_TO_LOCK);
+            let port = bound_handler
+                .local_addr()
+                .map(|v| v.port())
+                .map_err(Into::into);
+            port_tx.send(port).expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
             let shutdown_future = shutdown_rx.into_future().map(|_| ()).map_err(|_| ());
             if let Err(err) = bound_handler.run_until(shutdown_future) {
                 info!("Error during ROS Slave API initiation: {}", err);
@@ -63,10 +70,7 @@ impl Slave {
             outer_shutdown_tx.send(()).is_ok();
         });
 
-        let port = port_rx
-            .recv()
-            .expect(FAILED_TO_LOCK)
-            .chain_err(|| "Failed to get port")?;
+        let port = port_rx.recv().expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED)?;
         let uri = format!("http://{}:{}/", hostname, port);
 
         Ok(Slave {
