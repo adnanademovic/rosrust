@@ -44,6 +44,25 @@ pub struct Client<T: ServicePair> {
     phantom: std::marker::PhantomData<T>,
 }
 
+fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> std::io::Result<TcpStream> {
+    let mut err = std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Tried to connect via TCP with 0 connection attempts",
+    );
+    let mut repeat_delay_ms = 1;
+    for _ in 0..attempts {
+        match TcpStream::connect(uri) {
+            Ok(stream) => {
+                return Ok(stream);
+            }
+            Err(error) => err = error,
+        }
+        std::thread::sleep(std::time::Duration::from_millis(repeat_delay_ms));
+        repeat_delay_ms *= 2;
+    }
+    Err(err)
+}
+
 impl<T: ServicePair> Client<T> {
     pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
         Client {
@@ -80,8 +99,8 @@ impl<T: ServicePair> Client<T> {
         caller_id: &str,
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
-        let connection = TcpStream::connect(uri.trim_start_matches("rosrpc://"));
-        let mut stream = connection
+        let trimmed_uri = uri.trim_start_matches("rosrpc://");
+        let mut stream = connect_to_tcp_with_multiple_attempts(trimmed_uri, 15)
             .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
 
         // Service request starts by exchanging connection headers
