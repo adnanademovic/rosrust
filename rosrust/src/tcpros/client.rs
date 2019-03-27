@@ -4,6 +4,7 @@ use super::{ServicePair, ServiceResult};
 use crate::rosmsg::RosMsg;
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::error;
+use net2::TcpStreamExt;
 use std;
 use std::collections::HashMap;
 use std::io;
@@ -52,7 +53,11 @@ fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> io::Resu
     );
     let mut repeat_delay_ms = 1;
     for _ in 0..attempts {
-        match TcpStream::connect(uri) {
+        let stream_result = TcpStream::connect(uri).and_then(|stream| {
+            stream.set_linger(None)?;
+            Ok(stream)
+        });
+        match stream_result {
             Ok(stream) => {
                 return Ok(stream);
             }

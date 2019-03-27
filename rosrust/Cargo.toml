@@ -22,6 +22,7 @@ serde_derive = "1.0.25"
 xml-rpc = "0.0.10"
 yaml-rust = "0.4.0"
 crossbeam = "0.7"
+net2 = "0.2.33"
 
 [dev-dependencies]
 regex = "1.1.2"
