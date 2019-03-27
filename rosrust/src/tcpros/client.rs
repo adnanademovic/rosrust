@@ -3,10 +3,11 @@ use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
 use crate::rosmsg::RosMsg;
 use byteorder::{LittleEndian, ReadBytesExt};
+use log::error;
 use std;
 use std::collections::HashMap;
 use std::io;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::thread;
@@ -44,9 +45,9 @@ pub struct Client<T: ServicePair> {
     phantom: std::marker::PhantomData<T>,
 }
 
-fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> std::io::Result<TcpStream> {
-    let mut err = std::io::Error::new(
-        std::io::ErrorKind::Other,
+fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> io::Result<TcpStream> {
+    let mut err = io::Error::new(
+        io::ErrorKind::Other,
         "Tried to connect via TCP with 0 connection attempts",
     );
     let mut repeat_delay_ms = 1;
@@ -129,10 +130,24 @@ impl<T: ServicePair> Client<T> {
             // TODO: validate response length
             let _length = stream.read_u32::<LittleEndian>();
 
-            Ok(RosMsg::decode(&mut stream)?)
+            let data = RosMsg::decode(&mut stream)?;
+
+            let mut dump = vec![];
+            if let Err(err) = stream.read_to_end(&mut dump) {
+                error!("Failed to read from TCP stream: {:?}", err)
+            }
+
+            Ok(data)
         } else {
             // Decode response as string upon failure
-            Err(RosMsg::decode(&mut stream)?)
+            let data = RosMsg::decode(&mut stream)?;
+
+            let mut dump = vec![];
+            if let Err(err) = stream.read_to_end(&mut dump) {
+                error!("Failed to read from TCP stream: {:?}", err)
+            }
+
+            Err(data)
         })
     }
 }
