@@ -52,6 +52,7 @@ impl Msg {
             pub struct #name {
                 #(#fields)*
             }
+
             impl #name {
                 #(#const_fields)*
             }

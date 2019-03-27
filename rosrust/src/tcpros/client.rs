@@ -38,6 +38,7 @@ struct ClientInfo {
     service: String,
 }
 
+#[derive(Clone)]
 pub struct Client<T: ServicePair> {
     info: std::sync::Arc<ClientInfo>,
     phantom: std::marker::PhantomData<T>,
