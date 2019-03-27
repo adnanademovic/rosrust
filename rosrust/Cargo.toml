@@ -25,3 +25,9 @@ crossbeam = "0.7"
 
 [dev-dependencies]
 regex = "1.1.2"
+criterion = "0.2.10"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+path = "tests/benchmarks.rs"
