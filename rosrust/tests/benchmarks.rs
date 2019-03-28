@@ -59,6 +59,15 @@ fn call_service(criterion: &mut Criterion) {
             .arg("add_two_ints:=add_two_ints_rust"),
     );
 
+    let service_name_inline = format!("service_at_line_{}", line!());
+
+    let _service_raii =
+        rosrust::service::<msg::roscpp_tutorials::TwoInts, _>(&service_name_inline, move |req| {
+            let sum = req.a + req.b;
+            Ok(msg::roscpp_tutorials::TwoIntsRes { sum })
+        })
+        .unwrap();
+
     let service_name_cpp = format!("{}/add_two_ints_cpp", namespace);
     let service_name_py = format!("{}/add_two_ints_py", namespace);
     let service_name_rust = format!("{}/add_two_ints_rust", namespace);
@@ -66,6 +75,7 @@ fn call_service(criterion: &mut Criterion) {
     rosrust::wait_for_service(&service_name_cpp, Some(time::Duration::from_secs(10))).unwrap();
     rosrust::wait_for_service(&service_name_py, Some(time::Duration::from_secs(10))).unwrap();
     rosrust::wait_for_service(&service_name_rust, Some(time::Duration::from_secs(10))).unwrap();
+    rosrust::wait_for_service(&service_name_inline, Some(time::Duration::from_secs(10))).unwrap();
 
     let client_original =
         rosrust::client::<msg::roscpp_tutorials::TwoInts>(&service_name_cpp).unwrap();
@@ -130,6 +140,34 @@ fn call_service(criterion: &mut Criterion) {
             }
         });
     });
+
+    let client_original =
+        rosrust::client::<msg::roscpp_tutorials::TwoInts>(&service_name_inline).unwrap();
+    let client = client_original.clone();
+    criterion.bench_function("call inline rosrust service once", move |b| {
+        b.iter(|| {
+            let sum = client
+                .req(&msg::roscpp_tutorials::TwoIntsReq { a: 48, b: 12 })
+                .unwrap()
+                .unwrap()
+                .sum;
+            assert_eq!(60, sum);
+        });
+    });
+    let client = client_original.clone();
+    criterion.bench_function(
+        "call inline rosrust service 50 times in parallel",
+        move |b| {
+            b.iter(|| {
+                let requests = (0..50)
+                    .map(|a| client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b: 5 }))
+                    .collect::<Vec<_>>();
+                for (idx, request) in requests.into_iter().enumerate() {
+                    assert_eq!(idx as i64 + 5, request.read().unwrap().unwrap().sum);
+                }
+            });
+        },
+    );
 }
 
 criterion_group!(benches, call_service);
