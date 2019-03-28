@@ -67,7 +67,9 @@ fn call_service(criterion: &mut Criterion) {
     rosrust::wait_for_service(&service_name_py, Some(time::Duration::from_secs(10))).unwrap();
     rosrust::wait_for_service(&service_name_rust, Some(time::Duration::from_secs(10))).unwrap();
 
-    let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>(&service_name_cpp).unwrap();
+    let client_original =
+        rosrust::client::<msg::roscpp_tutorials::TwoInts>(&service_name_cpp).unwrap();
+    let client = client_original.clone();
     criterion.bench_function("call roscpp service once", move |b| {
         b.iter(|| {
             let sum = client
@@ -78,8 +80,21 @@ fn call_service(criterion: &mut Criterion) {
             assert_eq!(60, sum);
         });
     });
+    let client = client_original.clone();
+    criterion.bench_function("call roscpp service 50 times in parallel", move |b| {
+        b.iter(|| {
+            let requests = (0..50)
+                .map(|a| client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b: 5 }))
+                .collect::<Vec<_>>();
+            for (idx, request) in requests.into_iter().enumerate() {
+                assert_eq!(idx as i64 + 5, request.read().unwrap().unwrap().sum);
+            }
+        });
+    });
 
-    let client = rosrust::client::<msg::rospy_tutorials::AddTwoInts>(&service_name_py).unwrap();
+    let client_original =
+        rosrust::client::<msg::rospy_tutorials::AddTwoInts>(&service_name_py).unwrap();
+    let client = client_original.clone();
     criterion.bench_function("call rospy service once", move |b| {
         b.iter(|| {
             let sum = client
@@ -91,7 +106,9 @@ fn call_service(criterion: &mut Criterion) {
         });
     });
 
-    let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>(&service_name_rust).unwrap();
+    let client_original =
+        rosrust::client::<msg::roscpp_tutorials::TwoInts>(&service_name_rust).unwrap();
+    let client = client_original.clone();
     criterion.bench_function("call rosrust service once", move |b| {
         b.iter(|| {
             let sum = client
@@ -100,6 +117,17 @@ fn call_service(criterion: &mut Criterion) {
                 .unwrap()
                 .sum;
             assert_eq!(60, sum);
+        });
+    });
+    let client = client_original.clone();
+    criterion.bench_function("call rosrust service 50 times in parallel", move |b| {
+        b.iter(|| {
+            let requests = (0..50)
+                .map(|a| client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b: 5 }))
+                .collect::<Vec<_>>();
+            for (idx, request) in requests.into_iter().enumerate() {
+                assert_eq!(idx as i64 + 5, request.read().unwrap().unwrap().sum);
+            }
         });
     });
 }

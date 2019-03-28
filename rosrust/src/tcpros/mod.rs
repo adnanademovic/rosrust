@@ -1,4 +1,4 @@
-pub use self::client::Client;
+pub use self::client::{Client, ClientResponse};
 pub use self::error::Error;
 pub use self::publisher::{Publisher, PublisherStream};
 pub use self::service::Service;
