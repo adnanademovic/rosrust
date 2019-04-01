@@ -1,10 +1,10 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::{Response, ResponseError, ResponseInfo};
 use serde::{Deserialize, Serialize};
-use xml_rpc::{self, Params, Uri, Value};
+use xml_rpc::{self, Params, Url, Value};
 
 pub struct Client {
-    master_uri: Uri,
+    master_uri: Url,
 }
 
 impl Client {

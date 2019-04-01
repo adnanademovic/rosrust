@@ -100,18 +100,12 @@ impl Ros {
 
         let (shutdown_tx, shutdown_rx) = unbounded();
 
-        let slave = Slave::new(
-            master_uri,
-            hostname,
-            bind_host,
-            0,
-            &name,
-            shutdown_tx.clone(),
-        )?;
+        let slave = Slave::new(master_uri, hostname, bind_host, 0, &name, shutdown_tx)?;
         let master = Master::new(master_uri, &name, slave.uri())?;
 
         Ok(Ros {
             master: Arc::new(master),
+            shutdown_tx: slave.shutdown_tx.clone(),
             slave: Arc::new(slave),
             hostname: String::from(hostname),
             bind_address: String::from(bind_host),
@@ -120,7 +114,6 @@ impl Ros {
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
             logger: None,
-            shutdown_tx,
             shutdown_rx: Some(shutdown_rx),
         })
     }
@@ -176,7 +169,7 @@ impl Ros {
         if let Some(ref rx) = self.shutdown_rx {
             rx.try_recv() == Err(TryRecvError::Empty)
         } else {
-            return false;
+            false
         }
     }
 
