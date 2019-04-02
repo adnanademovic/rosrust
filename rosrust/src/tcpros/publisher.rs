@@ -20,11 +20,25 @@ pub struct Publisher {
     _raii: tcpconnection::Raii,
 }
 
+fn match_concrete_headers<T: Message>(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
+    header::match_field(fields, "md5sum", &T::md5sum())?;
+    header::match_field(fields, "type", &T::msg_type())?;
+    header::match_field(fields, "topic", topic)?;
+    Ok(())
+}
+
+fn match_wildcard_headers(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
+    header::match_field(fields, "md5sum", "*")?;
+    header::match_field(fields, "type", "*")?;
+    header::match_field(fields, "topic", topic)?;
+    Ok(())
+}
+
 fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<()> {
     let fields = header::decode(&mut stream)?;
-    header::match_field(&fields, "md5sum", &T::md5sum())?;
-    header::match_field(&fields, "type", &T::msg_type())?;
-    header::match_field(&fields, "topic", topic)?;
+    if let Err(err) = match_concrete_headers::<T>(&fields, topic) {
+        match_wildcard_headers(&fields, topic).map_err(|_| err)?;
+    }
     if fields.get("callerid").is_none() {
         bail!(ErrorKind::HeaderMissingField("callerid".into()));
     }
