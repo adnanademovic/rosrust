@@ -1,13 +1,19 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use crossbeam::unbounded;
 use lazy_static::lazy_static;
 use rosrust;
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time;
 
 mod util;
 
 mod msg {
-    rosrust::rosmsg_include!(roscpp_tutorials / TwoInts, rospy_tutorials / AddTwoInts);
+    rosrust::rosmsg_include!(
+        roscpp_tutorials / TwoInts,
+        rospy_tutorials / AddTwoInts,
+        std_msgs / String
+    );
 }
 
 fn global_init() -> util::ChildProcessTerminator {
@@ -22,6 +28,79 @@ lazy_static! {
 
 fn setup() {
     assert!(ROS_CORE.is_some());
+}
+
+fn subscribe_publish_directly(criterion: &mut Criterion) {
+    setup();
+
+    let topic = format!("/topicat{}", line!());
+
+    let publisher = rosrust::publish::<msg::std_msgs::String>(&topic, 2000).unwrap();
+
+    let (tx, rx) = unbounded();
+
+    let _subscriber =
+        rosrust::subscribe::<msg::std_msgs::String, _>(&topic, 2000, move |message| {
+            tx.send(message.data).unwrap();
+        })
+        .unwrap();
+
+    loop {
+        publisher
+            .send(msg::std_msgs::String { data: "".into() })
+            .unwrap();
+        if !rx.is_empty() {
+            break;
+        }
+    }
+
+    publisher
+        .send(msg::std_msgs::String {
+            data: "ready".into(),
+        })
+        .unwrap();
+
+    while rx.recv().unwrap() != "ready" {}
+
+    let inner_publisher = publisher.clone();
+    let receiver = rx.clone();
+    criterion.bench_function("send and receive single message directly", move |b| {
+        let idx = AtomicUsize::new(0);
+
+        b.iter_batched(
+            || format!("{}:{}", line!(), idx.fetch_add(1, Ordering::SeqCst)),
+            |data| {
+                inner_publisher
+                    .send(msg::std_msgs::String { data: data.clone() })
+                    .unwrap();
+                let response = receiver.recv().unwrap();
+                assert_eq!(data, response);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    let inner_publisher = publisher.clone();
+    let receiver = rx.clone();
+    criterion.bench_function("send and receive 100 messages directly", move |b| {
+        let idx = AtomicUsize::new(0);
+
+        b.iter_batched(
+            || format!("{}:{}", line!(), idx.fetch_add(1, Ordering::SeqCst)),
+            |data| {
+                for _ in 0..100 {
+                    inner_publisher
+                        .send(msg::std_msgs::String { data: data.clone() })
+                        .unwrap();
+                }
+                for _ in 0..100 {
+                    let response = receiver.recv().unwrap();
+                    assert_eq!(data, response);
+                }
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 fn call_service(criterion: &mut Criterion) {
@@ -170,5 +249,5 @@ fn call_service(criterion: &mut Criterion) {
     );
 }
 
-criterion_group!(benches, call_service);
+criterion_group!(benches, subscribe_publish_directly, call_service);
 criterion_main!(benches);
