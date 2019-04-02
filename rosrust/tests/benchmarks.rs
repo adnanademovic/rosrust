@@ -30,6 +30,95 @@ fn setup() {
     assert!(ROS_CORE.is_some());
 }
 
+fn subscribe_publish_relayed(criterion: &mut Criterion) {
+    setup();
+
+    let pub_topic = format!("/chatter_at_{}", line!());
+    let sub_topic = format!("/chatter_at_{}", line!());
+
+    let _subscriber = util::ChildProcessTerminator::spawn(
+        Command::new("rosrun")
+            .arg("topic_tools")
+            .arg("relay")
+            .arg(&pub_topic)
+            .arg(&sub_topic),
+    );
+
+    let (tx, rx) = unbounded();
+
+    let _log_subscriber =
+        rosrust::subscribe::<msg::std_msgs::String, _>(&sub_topic, 2000, move |data| {
+            tx.send(data.data).unwrap();
+        })
+        .unwrap();
+
+    let publisher = rosrust::publish::<msg::std_msgs::String>(&pub_topic, 2000).unwrap();
+
+    loop {
+        publisher
+            .send(msg::std_msgs::String { data: "".into() })
+            .unwrap();
+        std::thread::sleep(time::Duration::from_millis(100));
+        if !rx.is_empty() {
+            break;
+        }
+    }
+
+    publisher
+        .send(msg::std_msgs::String {
+            data: "ready".into(),
+        })
+        .unwrap();
+
+    while rx.recv().unwrap() != "ready" {}
+
+    let inner_publisher = publisher.clone();
+    let receiver = rx.clone();
+    criterion.bench_function("send and receive single message relayed", move |b| {
+        let idx = AtomicUsize::new(0);
+
+        b.iter_batched(
+            || format!("{}:{}", line!(), idx.fetch_add(1, Ordering::SeqCst)),
+            |data| {
+                inner_publisher
+                    .send(msg::std_msgs::String { data: data.clone() })
+                    .unwrap();
+                let response = receiver.recv().unwrap();
+                assert_eq!(data, response);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    let inner_publisher = publisher.clone();
+    let receiver = rx.clone();
+    // Limit to 8 due to the relay node's buffer limit being 10
+    criterion.bench_function("send and receive 8 messages relayed", move |b| {
+        let idx = AtomicUsize::new(0);
+
+        b.iter_batched(
+            || {
+                let id = idx.fetch_add(1, Ordering::SeqCst);
+                (0..8)
+                    .map(|item| format!("{}:{}:{}", line!(), id, item))
+                    .collect::<Vec<String>>()
+            },
+            |data| {
+                for item in &data {
+                    inner_publisher
+                        .send(msg::std_msgs::String { data: item.clone() })
+                        .unwrap();
+                }
+                for item in &data {
+                    let response = receiver.recv().unwrap();
+                    assert_eq!(item, &response);
+                }
+            },
+            BatchSize::LargeInput,
+        );
+    });
+}
+
 fn subscribe_publish_directly(criterion: &mut Criterion) {
     setup();
 
@@ -249,5 +338,10 @@ fn call_service(criterion: &mut Criterion) {
     );
 }
 
-criterion_group!(benches, subscribe_publish_directly, call_service);
+criterion_group!(
+    benches,
+    subscribe_publish_directly,
+    subscribe_publish_relayed,
+    call_service
+);
 criterion_main!(benches);
