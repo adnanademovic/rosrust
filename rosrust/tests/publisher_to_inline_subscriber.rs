@@ -1,5 +1,6 @@
 use crossbeam::channel::unbounded;
 use rosrust;
+use rosrust::singleton::publish;
 use std::process::Command;
 
 mod util;
@@ -28,4 +29,6 @@ fn publisher_to_inline_subscriber() {
     message.data = "hello world".to_owned();
 
     util::test_publisher(&publisher, &message, &rx, r"^hello world", 50);
+
+    assert_eq!(publisher.subscriber_count(), 1);
 }

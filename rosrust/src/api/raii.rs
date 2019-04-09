@@ -50,6 +50,11 @@ impl<T: Message> Publisher<T> {
     }
 
     #[inline]
+    pub fn subscriber_count(&self) -> usize {
+        self.stream.subscriber_count()
+    }
+
+    #[inline]
     pub fn set_latching(&mut self, latching: bool) {
         self.stream.set_latching(latching);
     }

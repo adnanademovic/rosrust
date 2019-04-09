@@ -51,4 +51,6 @@ fn publisher_to_multiple_subscribers() {
     util::test_publisher(&publisher, &message, &rx, r"I heard hello world$", 50);
     println!("Checking rosrust subscriber");
     util::test_publisher(&publisher, &message, &rx, r"^Received: hello world$", 50);
+
+    assert_eq!(publisher.subscriber_count(), 3);
 }
