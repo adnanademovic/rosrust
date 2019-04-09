@@ -6,9 +6,8 @@ use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result};
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 use crate::util::{FAILED_TO_LOCK, MPSC_CHANNEL_UNEXPECTEDLY_CLOSED};
-use crossbeam::channel::{unbounded, Sender};
-use futures::sync::mpsc::channel as futures_channel;
-use log::{error, info};
+use crossbeam::channel::{bounded, unbounded, Sender, TryRecvError};
+use log::error;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -19,6 +18,7 @@ pub struct Slave {
     pub publications: publications::PublicationsTracker,
     pub subscriptions: subscriptions::SubscriptionsTracker,
     pub services: Arc<Mutex<HashMap<String, Service>>>,
+    pub shutdown_tx: Sender<()>,
 }
 
 type SerdeResult<T> = Result<T>;
@@ -32,11 +32,10 @@ impl Slave {
         name: &str,
         outer_shutdown_tx: Sender<()>,
     ) -> Result<Slave> {
-        use futures::{Future, Stream};
         use std::net::ToSocketAddrs;
 
-        let (shutdown_tx, shutdown_rx) = futures_channel(1);
-        let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx);
+        let (shutdown_tx, shutdown_rx) = bounded(0);
+        let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx.clone());
         let publications = handler.publications.clone();
         let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
@@ -58,14 +57,16 @@ impl Slave {
                     return;
                 }
             };
-            let port = bound_handler
-                .local_addr()
-                .map(|v| v.port())
-                .map_err(Into::into);
-            port_tx.send(port).expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
-            let shutdown_future = shutdown_rx.into_future().map(|_| ()).map_err(|_| ());
-            if let Err(err) = bound_handler.run_until(shutdown_future) {
-                info!("Error during ROS Slave API initiation: {}", err);
+            let port = bound_handler.local_addr().port();
+            port_tx
+                .send(Ok(port))
+                .expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
+            loop {
+                match shutdown_rx.try_recv() {
+                    Ok(_) | Err(TryRecvError::Disconnected) => break,
+                    Err(TryRecvError::Empty) => {}
+                }
+                bound_handler.poll();
             }
             outer_shutdown_tx.send(()).is_ok();
         });
@@ -79,6 +80,7 @@ impl Slave {
             publications,
             subscriptions,
             services,
+            shutdown_tx,
         })
     }
 
@@ -163,5 +165,10 @@ impl Slave {
     #[inline]
     pub fn remove_subscription(&self, topic: &str) {
         self.subscriptions.remove(topic)
+    }
+
+    #[inline]
+    pub fn get_publisher_count_of_subscription(&self, topic: &str) -> usize {
+        self.subscriptions.publisher_count(topic)
     }
 }

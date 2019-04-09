@@ -2,13 +2,13 @@ use super::publications::PublicationsTracker;
 use super::subscriptions::SubscriptionsTracker;
 use crate::rosxmlrpc::{self, Response, ResponseError, Server};
 use crate::tcpros::Service;
-use futures::sync::mpsc::Sender;
+use crossbeam::channel::Sender;
 use log::{error, info};
 use nix::unistd::getpid;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use xml_rpc::{self, Params, Value};
+use xml_rpc::{self, rouille, Params, Value};
 
 pub struct SlaveHandler {
     pub subscriptions: SubscriptionsTracker,
@@ -31,8 +31,6 @@ impl SlaveHandler {
         name: &str,
         shutdown_signal: Sender<()>,
     ) -> SlaveHandler {
-        use futures::Sink;
-
         let mut server = Server::default();
 
         server.register_value("getBusStats", "Bus stats", |_args| {
@@ -61,7 +59,7 @@ impl SlaveHandler {
                 _ => return Err(ResponseError::Client("Missing argument 'message'".into())),
             };
             info!("Server is shutting down because: {}", message);
-            match shutdown_signal.clone().wait().send(()) {
+            match shutdown_signal.clone().send(()) {
                 Ok(()) => Ok(Value::Int(0)),
                 Err(err) => {
                     error!("Shutdown error: {:?}", err);
@@ -202,7 +200,14 @@ impl SlaveHandler {
         }
     }
 
-    pub fn bind(self, addr: &SocketAddr) -> rosxmlrpc::error::Result<xml_rpc::server::BoundServer> {
+    pub fn bind(
+        self,
+        addr: &SocketAddr,
+    ) -> rosxmlrpc::error::Result<
+        xml_rpc::server::BoundServer<
+            impl Fn(&rouille::Request) -> rouille::Response + Send + Sync + 'static,
+        >,
+    > {
         self.server.bind(addr).map_err(Into::into)
     }
 }

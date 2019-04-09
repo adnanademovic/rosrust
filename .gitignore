@@ -5,3 +5,7 @@
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here http://doc.crates.io/guide.html#cargotoml-vs-cargolock
 Cargo.lock
+
+# Will have benchmark results
+# We are ignoring this until we figure out what to do with it
+/rosrust/target/

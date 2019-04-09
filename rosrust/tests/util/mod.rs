@@ -69,6 +69,7 @@ pub enum Feature {
     Subscriber,
     Log,
     Parameters,
+    Benchmarks,
 }
 
 impl Feature {
@@ -79,7 +80,8 @@ impl Feature {
             Feature::Publisher => 300,
             Feature::Subscriber => 400,
             Feature::Log => 500,
-            Feature::Parameters => 500,
+            Feature::Parameters => 600,
+            Feature::Benchmarks => 700,
         }
     }
 }

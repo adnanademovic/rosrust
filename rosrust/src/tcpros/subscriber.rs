@@ -43,6 +43,11 @@ impl Subscriber {
         }
     }
 
+    #[inline]
+    pub fn publisher_count(&self) -> usize {
+        self.connected_publishers.len()
+    }
+
     pub fn connect_to<U: ToSocketAddrs>(
         &mut self,
         publisher: &str,

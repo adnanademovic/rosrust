@@ -28,6 +28,21 @@ impl ChildProcessTerminator {
 
         Self::spawn(command.current_dir(&canonical_path))
     }
+
+    #[allow(dead_code)]
+    pub fn spawn_example_bench(path: &str, command: &mut Command) -> ChildProcessTerminator {
+        let canonical_path = canonicalize(path).unwrap();
+        assert!(Command::new("cargo")
+            .arg("build")
+            .arg("--release")
+            .current_dir(&canonical_path)
+            .output()
+            .unwrap()
+            .status
+            .success());
+
+        Self::spawn(command.current_dir(&canonical_path))
+    }
 }
 
 impl Drop for ChildProcessTerminator {

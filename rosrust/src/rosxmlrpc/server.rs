@@ -1,6 +1,6 @@
 use super::ResponseInfo;
 use std::net::SocketAddr;
-use xml_rpc::{self, Value};
+use xml_rpc::{self, rouille, Value};
 
 use super::{Response, ResponseError};
 
@@ -30,7 +30,14 @@ impl Server {
     }
 
     #[inline]
-    pub fn bind(self, uri: &SocketAddr) -> xml_rpc::error::Result<xml_rpc::server::BoundServer> {
+    pub fn bind(
+        self,
+        uri: &SocketAddr,
+    ) -> xml_rpc::error::Result<
+        xml_rpc::server::BoundServer<
+            impl Fn(&rouille::Request) -> rouille::Response + Send + Sync + 'static,
+        >,
+    > {
         self.server.bind(uri)
     }
 }

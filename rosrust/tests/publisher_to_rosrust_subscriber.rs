@@ -35,4 +35,6 @@ fn publisher_to_rosrust_subscriber() {
     message.data = "hello world".to_owned();
 
     util::test_publisher(&publisher, &message, &rx, r"^Received: hello world$", 50);
+
+    assert_eq!(publisher.subscriber_count(), 1);
 }

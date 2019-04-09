@@ -22,3 +22,7 @@ path = "src/publisher_latch_demo.rs"
 [[bin]]
 name = "subscriber"
 path = "src/subscriber.rs"
+
+[[bin]]
+name = "loopback"
+path = "src/loopback.rs"

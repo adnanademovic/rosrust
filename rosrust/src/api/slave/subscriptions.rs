@@ -74,6 +74,15 @@ impl SubscriptionsTracker {
     pub fn remove(&self, topic: &str) {
         self.mapping.lock().expect(FAILED_TO_LOCK).remove(topic);
     }
+
+    #[inline]
+    pub fn publisher_count(&self, topic: &str) -> usize {
+        self.mapping
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .get(topic)
+            .map_or(0, |sub| sub.publisher_count())
+    }
 }
 
 fn connect_to_publisher(
