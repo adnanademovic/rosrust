@@ -166,4 +166,9 @@ impl Slave {
     pub fn remove_subscription(&self, topic: &str) {
         self.subscriptions.remove(topic)
     }
+
+    #[inline]
+    pub fn get_publisher_count_of_subscription(&self, topic: &str) -> usize {
+        self.subscriptions.publisher_count(topic)
+    }
 }

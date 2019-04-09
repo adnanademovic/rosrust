@@ -1,7 +1,5 @@
 use crossbeam::channel::unbounded;
 use rosrust;
-use rosrust::singleton::publish;
-use std::process::Command;
 
 mod util;
 
@@ -17,11 +15,10 @@ fn publisher_to_inline_subscriber() {
 
     let (tx, rx) = unbounded();
 
-    let _log_subscriber =
-        rosrust::subscribe::<msg::std_msgs::String, _>("chatter", 100, move |data| {
-            tx.send((2, data.data)).unwrap();
-        })
-        .unwrap();
+    let subscriber = rosrust::subscribe::<msg::std_msgs::String, _>("chatter", 100, move |data| {
+        tx.send((2, data.data)).unwrap();
+    })
+    .unwrap();
 
     let publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
 
@@ -31,4 +28,5 @@ fn publisher_to_inline_subscriber() {
     util::test_publisher(&publisher, &message, &rx, r"^hello world", 50);
 
     assert_eq!(publisher.subscriber_count(), 1);
+    assert_eq!(subscriber.publisher_count(), 1);
 }

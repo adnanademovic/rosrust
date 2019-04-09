@@ -86,7 +86,7 @@ impl Interactor for PublisherInfo {
 
 #[derive(Clone)]
 pub struct Subscriber {
-    _raii: Arc<InteractorRaii<SubscriberInfo>>,
+    info: Arc<InteractorRaii<SubscriberInfo>>,
 }
 
 impl Subscriber {
@@ -99,18 +99,18 @@ impl Subscriber {
     ) -> Result<Self> {
         slave.add_subscription::<T, F>(name, queue_size, callback)?;
 
-        let raii = Arc::new(InteractorRaii::new(SubscriberInfo {
+        let info = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,
             slave,
             name: name.into(),
         }));
 
-        let publishers = raii
+        let publishers = info
             .interactor
             .master
             .register_subscriber(name, &T::msg_type())?;
 
-        if let Err(err) = raii
+        if let Err(err) = info
             .interactor
             .slave
             .add_publishers_to_subscription(name, publishers.into_iter())
@@ -121,7 +121,15 @@ impl Subscriber {
             );
         }
 
-        Ok(Self { _raii: raii })
+        Ok(Self { info })
+    }
+
+    #[inline]
+    pub fn publisher_count(&self) -> usize {
+        self.info
+            .interactor
+            .slave
+            .get_publisher_count_of_subscription(&self.info.interactor.name)
     }
 }
 

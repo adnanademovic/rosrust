@@ -18,10 +18,12 @@ fn subscriber_to_rospy_publisher() {
     let (tx, rx) = unbounded();
 
     rosrust::init("hello_world_listener");
-    let _subscriber = rosrust::subscribe::<msg::std_msgs::String, _>("chatter", 100, move |data| {
+    let subscriber = rosrust::subscribe::<msg::std_msgs::String, _>("chatter", 100, move |data| {
         tx.send(data.data).unwrap();
     })
     .unwrap();
 
     util::test_subscriber(rx, r"hello world (\d+\.\d+)", true, 20);
+
+    assert_eq!(subscriber.publisher_count(), 1);
 }
