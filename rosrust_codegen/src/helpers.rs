@@ -1,5 +1,6 @@
 use crate::error::{Result, ResultExt};
 use crate::msg::Msg;
+use lazy_static::lazy_static;
 use regex::RegexBuilder;
 use std;
 use std::collections::{HashMap, HashSet, LinkedList};
@@ -134,6 +135,28 @@ enum MessageCase {
     Service(String, Msg, Msg),
 }
 
+lazy_static! {
+    static ref IN_MEMORY_MESSAGES: HashMap<&'static str, &'static str> =
+        generate_in_memory_messages();
+}
+
+fn generate_in_memory_messages() -> HashMap<&'static str, &'static str> {
+    let mut output = HashMap::new();
+    output.insert(
+        "rosgraph_msgs/Clock",
+        include_str!("msg_examples/rosgraph_msgs/msg/Clock.msg"),
+    );
+    output.insert(
+        "rosgraph_msgs/Log",
+        include_str!("msg_examples/rosgraph_msgs/msg/Log.msg"),
+    );
+    output.insert(
+        "std_msgs/Header",
+        include_str!("msg_examples/std_msgs/msg/Header.msg"),
+    );
+    output
+}
+
 #[allow(clippy::trivial_regex)]
 fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
     use std::io::Read;
@@ -175,6 +198,9 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             let res = Msg::new(package, &format!("{}Res", name), res)?;
             return Ok(MessageCase::Service(name.into(), req, res));
         }
+    }
+    if let Some(contents) = IN_MEMORY_MESSAGES.get(format!("{}/{}", package, name).as_str()) {
+        return Msg::new(package, name, contents).map(MessageCase::Message);
     }
     bail!(format!(
         "Could not find requested message in provided folders: {}/{}",
