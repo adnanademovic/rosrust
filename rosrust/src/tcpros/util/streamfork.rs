@@ -1,6 +1,5 @@
 use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
-use crossbeam::channel::{unbounded, Receiver, Sender};
-use std::collections::VecDeque;
+use crossbeam::channel::{self, unbounded, Receiver, Sender};
 use std::io::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -9,9 +8,12 @@ use std::thread;
 pub fn fork<T: Write + Send + 'static>(queue_size: usize) -> (TargetList<T>, DataStream) {
     let (streams_sender, streams) = unbounded();
     let (data_sender, data) = lossy_channel(queue_size);
-    let target_count = Arc::new(AtomicUsize::new(0));
-    let target_count_thread = Arc::clone(&target_count);
-    thread::spawn(move || fork_thread::<T>(&streams, &data, &target_count_thread));
+
+    let mut fork_thread = ForkThread::new();
+    let target_count = fork_thread.clone_target_count();
+
+    thread::spawn(move || fork_thread.run(&streams, &data));
+
     (
         TargetList(streams_sender),
         DataStream {
@@ -21,51 +23,67 @@ pub fn fork<T: Write + Send + 'static>(queue_size: usize) -> (TargetList<T>, Dat
     )
 }
 
-fn fill_with_queued<T>(data: &LossyReceiver<T>, queue: &mut VecDeque<T>) -> bool {
-    if queue.is_empty() {
-        match data.recv() {
-            Err(_) | Ok(None) => return false,
-            Ok(Some(value)) => queue.push_front(value),
-        };
-    }
-    while let Ok(item) = data.try_recv() {
-        match item {
-            Some(value) => queue.push_front(value),
-            None => return false,
-        }
-    }
-    true
+struct ForkThread<T: Write + Send + 'static> {
+    targets: Vec<T>,
+    target_count: Arc<AtomicUsize>,
 }
 
-fn fork_thread<T: Write + Send + 'static>(
-    streams: &Receiver<T>,
-    data: &LossyReceiver<Arc<Vec<u8>>>,
-    target_count: &AtomicUsize,
-) {
-    let mut targets = Vec::new();
-    let mut datapoints = VecDeque::new();
-    let mut sender_is_open = true;
-    while sender_is_open {
-        sender_is_open = fill_with_queued(data, &mut datapoints);
-
-        let buffer = match datapoints.pop_back() {
-            Some(v) => v,
-            None => continue,
-        };
-        while let Ok(target) = streams.try_recv() {
-            targets.push(target);
+impl<T: Write + Send + 'static> ForkThread<T> {
+    pub fn new() -> Self {
+        Self {
+            targets: vec![],
+            target_count: Arc::new(AtomicUsize::new(0)),
         }
-        targets = targets
-            .into_iter()
-            .filter_map(|mut target| match target.write_all(&buffer) {
-                Ok(()) => Some(target),
-                Err(_) => None,
-            })
-            .collect();
-        // It's not extremely important that the count is correct at every moment,
-        // so the ordering is relaxed.
-        // Getting this wrong for a very short amount of time should make no problems.
-        target_count.store(targets.len(), Ordering::Relaxed);
+    }
+
+    pub fn clone_target_count(&self) -> Arc<AtomicUsize> {
+        Arc::clone(&self.target_count)
+    }
+
+    fn publish_buffer_and_prune_targets(&mut self, buffer: &[u8]) {
+        let mut dropped_targets = vec![];
+        for (idx, target) in self.targets.iter_mut().enumerate() {
+            if target.write_all(&buffer).is_err() {
+                dropped_targets.push(idx);
+            }
+        }
+
+        if !dropped_targets.is_empty() {
+            // We reverse the order, to remove bigger indices first.
+            for idx in dropped_targets.into_iter().rev() {
+                self.targets.swap_remove(idx);
+            }
+
+            self.target_count
+                .store(self.targets.len(), Ordering::SeqCst);
+        }
+    }
+
+    fn add_target(&mut self, target: T) {
+        self.targets.push(target);
+        self.target_count
+            .store(self.targets.len(), Ordering::SeqCst);
+    }
+
+    fn step(
+        &mut self,
+        streams: &Receiver<T>,
+        data: &LossyReceiver<Arc<Vec<u8>>>,
+    ) -> Result<(), channel::RecvError> {
+        channel::select! {
+            recv(data) -> msg => {
+                let buffer = msg?.ok_or(channel::RecvError)?;
+                self.publish_buffer_and_prune_targets(&buffer);
+            }
+            recv(streams) -> target => {
+                self.add_target(target?);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn run(&mut self, streams: &Receiver<T>, data: &LossyReceiver<Arc<Vec<u8>>>) {
+        while self.step(streams, data).is_ok() {}
     }
 }
 
@@ -92,7 +110,7 @@ impl DataStream {
 
     #[inline]
     pub fn get_target_count(&self) -> usize {
-        self.target_count.load(Ordering::Relaxed)
+        self.target_count.load(Ordering::SeqCst)
     }
 
     #[inline]
