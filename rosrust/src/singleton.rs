@@ -21,18 +21,25 @@ pub fn init(name: &str) {
     try_init(name).expect("ROS init failed!");
 }
 
+#[inline]
 pub fn try_init(name: &str) -> Result<()> {
+    try_init_with_options(name, true)
+}
+
+pub fn try_init_with_options(name: &str, capture_sigint: bool) -> Result<()> {
     let mut ros = ROS.lock().expect(FAILED_TO_LOCK);
     if ros.is_some() {
         bail!(ErrorKind::MultipleInitialization);
     }
     let client = Ros::new(name)?;
-    let shutdown_sender = client.shutdown_sender();
-    ctrlc::set_handler(move || {
-        if shutdown_sender.send(()).is_err() {
-            info!("ROS client is already down");
-        }
-    })?;
+    if capture_sigint {
+        let shutdown_sender = client.shutdown_sender();
+        ctrlc::set_handler(move || {
+            if shutdown_sender.send(()).is_err() {
+                info!("ROS client is already down");
+            }
+        })?;
+    }
     *ros = Some(client);
     Ok(())
 }
