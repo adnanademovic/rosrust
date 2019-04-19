@@ -1,0 +1,10 @@
+[package]
+edition = "2018"
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+description = "Helper structures for handling diagnostics publishing in rosrust"
+license = "MIT"
+name = "rosrust_diagnostics"
+version = "0.0.1"
+
+[dependencies]
+rosrust = {path="../rosrust"}
