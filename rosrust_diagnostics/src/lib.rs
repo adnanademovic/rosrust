@@ -1,8 +1,14 @@
+pub use composite_task::CompositeTask;
+pub use function_task::{FunctionExt, FunctionTask};
 pub use msg::diagnostic_msgs::KeyValue;
 pub use status::Status;
+pub use task::Task;
 
-mod msg;
+mod composite_task;
+mod function_task;
+pub mod msg;
 mod status;
+mod task;
 
 #[repr(i8)]
 #[derive(Copy, Clone, Debug)]
