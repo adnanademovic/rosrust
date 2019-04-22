@@ -11,8 +11,8 @@ fn main() {
     updater.add_task(
         (|status: &mut Status| {
             status.set_summary(Level::Warn, "foo");
-            status.add("one".into(), 1);
-            status.add("true_bool".into(), true);
+            status.add("one", 1);
+            status.add("true_bool", true);
         })
         .into_task("my_task"),
     );

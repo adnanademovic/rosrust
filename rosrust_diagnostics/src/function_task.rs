@@ -1,5 +1,6 @@
 use crate::{Status, Task};
 
+#[derive(Clone)]
 pub struct FunctionTask<F>
 where
     F: Fn(&mut Status),

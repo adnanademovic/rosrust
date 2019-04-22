@@ -23,14 +23,14 @@ impl Default for Status {
 }
 
 impl Status {
-    pub fn set_summary(&mut self, level: Level, message: &str) {
+    pub fn set_summary(&mut self, level: Level, message: impl Into<String>) {
         self.level = level;
         self.message = message.into();
     }
 
     #[inline]
     pub fn copy_summary(&mut self, other: &Status) {
-        self.set_summary(other.level, &other.message)
+        self.set_summary(other.level, other.message.clone())
     }
 
     #[inline]
@@ -71,7 +71,8 @@ impl Status {
         self.values.clear();
     }
 
-    pub fn add(&mut self, key: String, value: impl std::string::ToString) {
+    pub fn add(&mut self, key: impl std::string::ToString, value: impl std::string::ToString) {
+        let key = key.to_string();
         let value = value.to_string();
         self.values.push(KeyValue { key, value });
     }

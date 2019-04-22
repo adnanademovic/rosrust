@@ -7,8 +7,8 @@ fn simple_function_task_works() {
         status.name = "bar".into();
         status.hardware_id = "baz".into();
         status.clear_values();
-        status.add("one".into(), 1);
-        status.add("true_bool".into(), true);
+        status.add("one", 1);
+        status.add("true_bool", true);
     })
     .into_task("my_task");
 

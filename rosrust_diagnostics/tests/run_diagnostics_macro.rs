@@ -14,7 +14,7 @@ struct SubsystemPreset {
 
 impl Task for SubsystemPreset {
     fn run(&self, status: &mut Status) {
-        status.set_summary(self.level, &self.message);
+        status.set_summary(self.level, self.message.clone());
         for (key, value) in &self.additions {
             status.add(key.clone(), value);
         }

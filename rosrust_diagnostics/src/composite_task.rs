@@ -1,34 +1,34 @@
 use crate::{Level, Status, Task};
 
-pub struct CompositeTask<'a> {
-    name: &'a str,
-    tasks: Vec<&'a dyn Task>,
+pub struct CompositeTask {
+    name: String,
+    tasks: Vec<Box<dyn Task>>,
 }
 
-impl<'a> CompositeTask<'a> {
-    pub fn new(name: &'a str) -> Self {
+impl CompositeTask {
+    pub fn new(name: impl std::string::ToString) -> Self {
         Self {
-            name,
+            name: name.to_string(),
             tasks: vec![],
         }
     }
 
-    pub fn add_task(&mut self, task: &'a dyn Task) {
-        self.tasks.push(task)
+    pub fn add_task(&mut self, task: impl Task + 'static) {
+        self.tasks.push(Box::new(task))
     }
 }
 
-impl<'a> Task for CompositeTask<'a> {
+impl Task for CompositeTask {
     #[inline]
     fn name(&self) -> &str {
-        self.name
+        &self.name
     }
 
     fn run(&self, status: &mut Status) {
         let mut runner = CompositeTaskRunner::new(status);
 
         for task in &self.tasks {
-            runner.run(*task);
+            runner.run(&(**task));
         }
     }
 }
@@ -59,7 +59,7 @@ impl<'a> CompositeTaskRunner<'a> {
     }
 
     pub fn run(&mut self, task: &dyn Task) {
-        self.target.set_summary(self.level, &self.message);
+        self.target.set_summary(self.level, self.message.clone());
         task.run(&mut self.target);
         self.combination.merge_summary_with(&self.target);
     }

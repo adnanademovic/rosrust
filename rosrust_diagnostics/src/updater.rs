@@ -19,6 +19,10 @@ impl Updater {
         })
     }
 
+    pub fn set_hardware_id(&mut self, hardware_id: impl std::string::ToString) {
+        self.hardware_id = hardware_id.to_string();
+    }
+
     pub fn add_task(&mut self, task: impl Task + 'static) {
         self.tasks.push(Box::new(task))
     }

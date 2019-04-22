@@ -11,8 +11,8 @@ fn main() {
     updater.add_task(
         (|status: &mut Status| {
             status.set_summary(Level::Warn, "foo");
-            status.add("one".into(), 1);
-            status.add("true_bool".into(), true);
+            status.add("one", 1);
+            status.add("true_bool", true);
         })
         .into_task("my_task"),
     );
@@ -21,13 +21,13 @@ fn main() {
 
     let task1 = (|status: &mut Status| {
         status.set_summary(Level::Error, "bar");
-        status.add("two".into(), 2);
+        status.add("two", 2);
     })
     .into_task("my_task1");
 
     let task2 = (|status: &mut Status| {
         status.set_summary(Level::Warn, "baz");
-        status.add("three".into(), 3);
+        status.add("three", 3);
     })
     .into_task("my_task2");
 
