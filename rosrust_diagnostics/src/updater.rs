@@ -53,6 +53,7 @@ impl Updater {
             values: vec![],
         };
         task.run(&mut status);
+        // TODO: Add support for higher verbosity and unset hardware id warnings
         status.into()
     }
 
