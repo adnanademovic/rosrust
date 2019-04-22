@@ -32,13 +32,13 @@ impl Updater {
     }
 
     pub fn update(&self) -> Result<()> {
-        self.update_with_extra(&vec![])
+        self.update_with_extra(&[])
     }
 
     pub fn perform_checks<'a>(&self, extra_tasks: &[&'a dyn Task]) -> Vec<DiagnosticStatus> {
         Iterator::chain(
             self.tasks.iter().map(|v| &(**v)),
-            extra_tasks.into_iter().map(|v| *v),
+            extra_tasks.iter().cloned(),
         )
         .map(|task| self.perform_passed_check(task))
         .collect()
