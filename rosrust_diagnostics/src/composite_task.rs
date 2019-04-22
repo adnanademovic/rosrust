@@ -1,8 +1,8 @@
-use crate::{Status, Task};
+use crate::{Level, Status, Task};
 
 pub struct CompositeTask<'a> {
     name: &'a str,
-    tasks: Vec<&'a Task>,
+    tasks: Vec<&'a dyn Task>,
 }
 
 impl<'a> CompositeTask<'a> {
@@ -13,7 +13,7 @@ impl<'a> CompositeTask<'a> {
         }
     }
 
-    pub fn add_task(&mut self, task: &'a Task) {
+    pub fn add_task(&mut self, task: &'a dyn Task) {
         self.tasks.push(task)
     }
 }
@@ -25,15 +25,54 @@ impl<'a> Task for CompositeTask<'a> {
     }
 
     fn run(&self, status: &mut Status) {
-        let mut combined_summary = Status::default();
-        let original_level = status.level;
-        let original_message = status.message.clone();
+        let mut runner = CompositeTaskRunner::new(status);
 
         for task in &self.tasks {
-            status.set_summary(original_level, &original_message);
-            task.run(status);
-            combined_summary.merge_summary_with(status);
+            runner.run(*task);
         }
-        status.copy_summary(&combined_summary);
+    }
+}
+
+pub struct CompositeTaskRunner<'a> {
+    level: Level,
+    message: String,
+    target: &'a mut Status,
+    combination: Status,
+    finished: bool,
+}
+
+impl<'a> Drop for CompositeTaskRunner<'a> {
+    fn drop(&mut self) {
+        self.apply_summary()
+    }
+}
+
+impl<'a> CompositeTaskRunner<'a> {
+    pub fn new(target: &'a mut Status) -> Self {
+        Self {
+            level: target.level,
+            message: target.message.clone(),
+            target,
+            combination: Status::default(),
+            finished: false,
+        }
+    }
+
+    pub fn run(&mut self, task: &dyn Task) {
+        self.target.set_summary(self.level, &self.message);
+        task.run(&mut self.target);
+        self.combination.merge_summary_with(&self.target);
+    }
+
+    pub fn finish(mut self) {
+        self.apply_summary()
+    }
+
+    fn apply_summary(&mut self) {
+        if self.finished {
+            return;
+        }
+        self.finished = true;
+        self.target.copy_summary(&self.combination);
     }
 }

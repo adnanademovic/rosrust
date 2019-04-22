@@ -1,4 +1,4 @@
-pub use composite_task::CompositeTask;
+pub use composite_task::{CompositeTask, CompositeTaskRunner};
 pub use function_task::{FunctionExt, FunctionTask};
 pub use msg::diagnostic_msgs::KeyValue;
 pub use status::Status;
@@ -6,6 +6,8 @@ pub use task::Task;
 
 mod composite_task;
 mod function_task;
+#[macro_use]
+mod macros;
 pub mod msg;
 mod status;
 mod task;
