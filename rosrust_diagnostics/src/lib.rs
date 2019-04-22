@@ -11,7 +11,7 @@ mod status;
 mod task;
 
 #[repr(i8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Level {
     Ok = msg::diagnostic_msgs::DiagnosticStatus::OK,
     Warn = msg::diagnostic_msgs::DiagnosticStatus::WARN,

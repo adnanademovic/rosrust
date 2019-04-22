@@ -67,6 +67,10 @@ impl Status {
         self.merge_summary(other.level, &other.message)
     }
 
+    pub fn clear_values(&mut self) {
+        self.values.clear();
+    }
+
     pub fn add(&mut self, key: String, value: impl std::string::ToString) {
         let value = value.to_string();
         self.values.push(KeyValue { key, value });
