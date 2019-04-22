@@ -36,18 +36,20 @@ impl Updater {
             self.tasks.iter().map(|v| &(**v)),
             extra_tasks.into_iter().map(|v| *v),
         )
-        .map(|task| {
-            let mut status = Status {
-                name: task.name().into(),
-                hardware_id: self.hardware_id.clone(),
-                level: Level::Error,
-                message: "No message was set".into(),
-                values: vec![],
-            };
-            task.run(&mut status);
-            status.into()
-        })
+        .map(|task| self.perform_passed_check(task))
         .collect()
+    }
+
+    pub fn perform_passed_check(&self, task: &dyn Task) -> DiagnosticStatus {
+        let mut status = Status {
+            name: task.name().into(),
+            hardware_id: self.hardware_id.clone(),
+            level: Level::Error,
+            message: "No message was set".into(),
+            values: vec![],
+        };
+        task.run(&mut status);
+        status.into()
     }
 
     pub fn publish(&self, status: Vec<DiagnosticStatus>) -> Result<()> {
