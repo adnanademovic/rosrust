@@ -3,6 +3,7 @@ pub use function_task::{FunctionExt, FunctionTask};
 pub use msg::diagnostic_msgs::KeyValue;
 pub use status::Status;
 pub use task::Task;
+pub use updater::Updater;
 
 mod composite_task;
 mod function_task;
@@ -11,6 +12,7 @@ mod macros;
 pub mod msg;
 mod status;
 mod task;
+mod updater;
 
 #[repr(i8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
