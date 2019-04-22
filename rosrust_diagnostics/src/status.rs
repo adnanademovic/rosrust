@@ -13,7 +13,7 @@ pub struct Status {
 impl Default for Status {
     fn default() -> Self {
         Self {
-            level: Level::Error,
+            level: Level::Ok,
             name: "".to_string(),
             message: "".to_string(),
             hardware_id: "".to_string(),
@@ -51,14 +51,14 @@ impl Status {
     }
 
     pub fn merge_summary(&mut self, level: Level, message: &str) {
-        if level as i8 > self.level as i8 {
-            self.level = level;
-        }
         match (self.level, level) {
             (Level::Ok, Level::Ok) => self.merge_messages(message),
             (Level::Ok, _) => self.message = message.into(),
             (_, Level::Ok) => {}
             _ => self.merge_messages(message),
+        }
+        if level as i8 > self.level as i8 {
+            self.level = level;
         }
     }
 
