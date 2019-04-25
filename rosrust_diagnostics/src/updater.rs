@@ -15,7 +15,7 @@ impl Updater {
         Ok(Self {
             publisher,
             tasks: vec![],
-            hardware_id: String::new(),
+            hardware_id: "none".into(),
         })
     }
 
