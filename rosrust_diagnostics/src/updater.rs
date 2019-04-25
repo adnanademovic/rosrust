@@ -7,6 +7,7 @@ pub struct Updater {
     publisher: Publisher<DiagnosticArray>,
     tasks: Vec<Box<dyn Task>>,
     hardware_id: String,
+    verbose: bool,
 }
 
 impl Updater {
@@ -16,12 +17,28 @@ impl Updater {
             publisher,
             tasks: vec![],
             hardware_id: "none".into(),
+            verbose: false,
         })
     }
 
     #[inline]
     pub fn set_hardware_id(&mut self, hardware_id: impl std::string::ToString) {
         self.hardware_id = hardware_id.to_string();
+    }
+
+    #[inline]
+    pub fn get_hardware_id(&self) -> &str {
+        &self.hardware_id
+    }
+
+    #[inline]
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
+    }
+
+    #[inline]
+    pub fn is_verbose(&self) -> bool {
+        self.verbose
     }
 
     #[inline]
@@ -53,7 +70,14 @@ impl Updater {
             values: vec![],
         };
         task.run(&mut status);
-        // TODO: Add support for higher verbosity and unset hardware id warnings
+        if self.verbose && status.level != Level::Ok {
+            rosrust::ros_warn!(
+                "Non-zero diagnostic status. Name: '{}', status {}: '{}'",
+                status.name,
+                status.level as i8,
+                status.message,
+            );
+        }
         status.into()
     }
 

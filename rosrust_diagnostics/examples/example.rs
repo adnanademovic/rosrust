@@ -73,6 +73,7 @@ fn main() {
 
     let mut updater = Updater::new().unwrap();
     updater.set_hardware_id("none");
+    updater.set_verbose(true);
 
     updater.add_task(dummy_diagnostic.into_task("Function updater"));
 
