@@ -49,7 +49,6 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<(String, String
 }
 
 fn calculate_md5_from_representation(v: &str) -> String {
-    use hex;
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
     hasher.input(v);
