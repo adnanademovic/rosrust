@@ -2,26 +2,6 @@
 macro_rules! ros_log {
     ($level:expr, $($arg:tt)+) => {
         let msg = format!($($arg)*);
-        match $level {
-            $crate::msg::rosgraph_msgs::Log::DEBUG => {
-                println!("[DEBUG @ {}:{}]: {}", file!(), line!(), msg);
-            }
-            $crate::msg::rosgraph_msgs::Log::INFO => {
-                println!("[INFO @ {}:{}]: {}", file!(), line!(), msg);
-            }
-            $crate::msg::rosgraph_msgs::Log::WARN => {
-                eprintln!("[WARN @ {}:{}]: {}", file!(), line!(), msg);
-
-            }
-            $crate::msg::rosgraph_msgs::Log::ERROR => {
-                eprintln!("[ERROR @ {}:{}]: {}", file!(), line!(), msg);
-
-            }
-            $crate::msg::rosgraph_msgs::Log::FATAL => {
-                eprintln!("[FATAL @ {}:{}]: {}", file!(), line!(), msg);
-            }
-            _ => {}
-        }
         $crate::log($level, msg, file!(), line!());
     }
 }

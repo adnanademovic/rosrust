@@ -291,7 +291,24 @@ impl Ros {
         )
     }
 
+    fn log_to_terminal(&self, level: i8, msg: &str, file: &str, line: u32) {
+        use colored::{Color, Colorize};
+
+        let format_string =
+            |prefix, color| format!("[{} @ {}:{}]: {}", prefix, file, line, msg).color(color);
+
+        match level {
+            Log::DEBUG => println!("{}", format_string("DEBUG", Color::White)),
+            Log::INFO => println!("{}", format_string("INFO", Color::White)),
+            Log::WARN => eprintln!("{}", format_string("WARN", Color::Yellow)),
+            Log::ERROR => eprintln!("{}", format_string("ERROR", Color::Red)),
+            Log::FATAL => eprintln!("{}", format_string("FATAL", Color::Red)),
+            _ => {}
+        }
+    }
+
     pub fn log(&mut self, level: i8, msg: String, file: &str, line: u32) {
+        self.log_to_terminal(level, &msg, file, line);
         let logger = &mut match self.logger {
             Some(ref mut v) => v,
             None => return,
