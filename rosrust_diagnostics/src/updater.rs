@@ -19,32 +19,32 @@ impl Updater {
         })
     }
 
+    #[inline]
     pub fn set_hardware_id(&mut self, hardware_id: impl std::string::ToString) {
         self.hardware_id = hardware_id.to_string();
     }
 
+    #[inline]
     pub fn add_task(&mut self, task: impl Task + 'static) {
         self.tasks.push(Box::new(task))
     }
 
-    pub fn update_with_extra<'a>(&'a self, extra_tasks: &[&'a dyn Task]) -> Result<()> {
-        self.publish(self.perform_checks(extra_tasks))
-    }
-
+    #[inline]
     pub fn update(&self) -> Result<()> {
         self.update_with_extra(&[])
     }
 
-    pub fn perform_checks<'a>(&self, extra_tasks: &[&'a dyn Task]) -> Vec<DiagnosticStatus> {
-        Iterator::chain(
-            self.tasks.iter().map(|v| &(**v)),
-            extra_tasks.iter().cloned(),
-        )
-        .map(|task| self.perform_passed_check(task))
-        .collect()
+    #[inline]
+    pub fn update_with_extra<'a>(&'a self, extra_tasks: &[&'a dyn Task]) -> Result<()> {
+        self.publish(self.make_update_statuses(extra_tasks))
     }
 
-    pub fn perform_passed_check(&self, task: &dyn Task) -> DiagnosticStatus {
+    #[inline]
+    pub fn make_update_statuses<'a>(&self, extra_tasks: &[&'a dyn Task]) -> Vec<DiagnosticStatus> {
+        self.map_over_tasks(extra_tasks, |task| self.make_update_status(task))
+    }
+
+    pub fn make_update_status(&self, task: &dyn Task) -> DiagnosticStatus {
         let mut status = Status {
             name: task.name().into(),
             hardware_id: self.hardware_id.clone(),
@@ -57,11 +57,72 @@ impl Updater {
         status.into()
     }
 
+    #[inline]
+    pub fn broadcast(&self, level: Level, message: &str) -> Result<()> {
+        self.broadcast_with_extra(&[], level, message)
+    }
+
+    #[inline]
+    pub fn broadcast_with_extra<'a>(
+        &'a self,
+        extra_tasks: &[&'a dyn Task],
+        level: Level,
+        message: &str,
+    ) -> Result<()> {
+        self.publish(self.make_broadcast_statuses(extra_tasks, level, message))
+    }
+
+    #[inline]
+    pub fn make_broadcast_statuses<'a>(
+        &self,
+        extra_tasks: &[&'a dyn Task],
+        level: Level,
+        message: &str,
+    ) -> Vec<DiagnosticStatus> {
+        self.map_over_tasks(extra_tasks, |task| {
+            self.make_broadcast_status_for(task, level, message)
+        })
+    }
+
+    #[inline]
+    pub fn make_broadcast_status_for(
+        &self,
+        task: &dyn Task,
+        level: Level,
+        message: &str,
+    ) -> DiagnosticStatus {
+        Status {
+            name: task.name().into(),
+            hardware_id: self.hardware_id.clone(),
+            level,
+            message: message.into(),
+            values: vec![],
+        }
+        .into()
+    }
+
+    #[inline]
     pub fn publish(&self, status: Vec<DiagnosticStatus>) -> Result<()> {
         let message = DiagnosticArray {
             header: Header::default(),
             status,
         };
         self.publisher.send(message)
+    }
+
+    fn map_over_tasks<'a, F>(
+        &self,
+        extra_tasks: &[&'a dyn Task],
+        handler: F,
+    ) -> Vec<DiagnosticStatus>
+    where
+        F: Fn(&dyn Task) -> DiagnosticStatus,
+    {
+        Iterator::chain(
+            self.tasks.iter().map(|v| &(**v)),
+            extra_tasks.iter().cloned(),
+        )
+        .map(handler)
+        .collect()
     }
 }
