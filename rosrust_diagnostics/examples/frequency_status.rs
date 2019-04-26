@@ -1,5 +1,6 @@
 use rosrust::Duration;
 use rosrust_diagnostics::{FrequencyStatus, Updater};
+use std::sync::Arc;
 
 fn main() {
     // Initialize ROS node
@@ -11,30 +12,32 @@ fn main() {
 
     let mut freq_statuses = vec![];
 
-    freq_statuses.push(FrequencyStatus::builder().name("No limits").build());
-    freq_statuses.push(
+    freq_statuses.push(Arc::new(
+        FrequencyStatus::builder().name("No limits").build(),
+    ));
+    freq_statuses.push(Arc::new(
         FrequencyStatus::builder()
             .name("Only max")
             .max_frequency(10.0)
             .build(),
-    );
-    freq_statuses.push(
+    ));
+    freq_statuses.push(Arc::new(
         FrequencyStatus::builder()
             .name("Only min")
             .min_frequency(5.0)
             .build(),
-    );
-    freq_statuses.push(
+    ));
+    freq_statuses.push(Arc::new(
         FrequencyStatus::builder()
             .name("Both limits")
             .min_frequency(5.0)
             .max_frequency(10.0)
             .build(),
-    );
+    ));
 
     let updater_freq_statuses = freq_statuses.clone();
     for task in &updater_freq_statuses {
-        updater.add_task(task).unwrap();
+        updater.add_task(&**task).unwrap();
     }
 
     let delay_param = rosrust::param("~delay").unwrap();

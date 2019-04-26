@@ -1,7 +1,7 @@
 use crate::{Level, Status, Task};
 use rosrust::Time;
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 pub struct FrequencyStatusBuilder<'a> {
     min_frequency: f64,
@@ -65,14 +65,13 @@ impl<'a> FrequencyStatusBuilder<'a> {
     }
 }
 
-#[derive(Clone)]
 pub struct FrequencyStatus {
     min_frequency: f64,
     max_frequency: f64,
     min_tolerated_frequency: f64,
     max_tolerated_frequency: f64,
     name: String,
-    tracker: Arc<Mutex<Tracker>>,
+    tracker: Mutex<Tracker>,
 }
 
 struct Tracker {
@@ -98,7 +97,7 @@ impl FrequencyStatus {
         let mut history = VecDeque::with_capacity(window_size);
         history.extend((0..window_size).map(|_| history_entry.clone()));
 
-        let tracker = Arc::new(Mutex::new(Tracker { count: 0, history }));
+        let tracker = Mutex::new(Tracker { count: 0, history });
 
         Self {
             min_frequency,
