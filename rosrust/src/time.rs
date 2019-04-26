@@ -80,6 +80,11 @@ impl Duration {
     fn nanos(&self) -> i64 {
         i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }
+
+    #[inline]
+    pub fn seconds(&self) -> f64 {
+        self.sec as f64 + self.nsec as f64 / BILLION as f64
+    }
 }
 
 impl cmp::PartialEq for Duration {

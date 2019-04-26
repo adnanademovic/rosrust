@@ -3,6 +3,7 @@ pub use function_task::{FunctionExt, FunctionTask};
 pub use msg::diagnostic_msgs::KeyValue;
 pub use status::Status;
 pub use task::Task;
+pub use tasks::FrequencyStatus;
 pub use updater::Updater;
 
 mod composite_task;
@@ -12,6 +13,7 @@ mod macros;
 pub mod msg;
 mod status;
 mod task;
+pub mod tasks;
 mod updater;
 
 #[repr(i8)]
