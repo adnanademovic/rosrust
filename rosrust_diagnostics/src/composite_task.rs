@@ -16,6 +16,10 @@ impl CompositeTask {
     pub fn add_task(&mut self, task: impl Task + 'static) {
         self.tasks.push(Box::new(task))
     }
+
+    pub fn remove(&mut self, task: impl Task + 'static) {
+        self.tasks.push(Box::new(task))
+    }
 }
 
 impl Task for CompositeTask {

@@ -75,22 +75,20 @@ fn main() {
     updater.set_hardware_id("none");
     updater.set_verbose(true);
 
-    updater.add_task(dummy_diagnostic.into_task("Function updater"));
+    updater
+        .add_task(dummy_diagnostic.into_task("Function updater"))
+        .unwrap();
 
     let dummy_task = DummyTask;
     let dummy_task2 = DummyTask;
 
-    updater.add_task(dummy_task);
+    updater.add_task(dummy_task).unwrap();
 
     let mut bounds = CompositeTask::new("Bound check");
     bounds.add_task(check_lower_bound.into_task("Lower-bound check"));
     bounds.add_task(check_upper_bound.into_task("Upper-bound check"));
 
-    updater.add_task(bounds);
-
-    // TODO: implement broadcast
-    // TODO: implement topic diagnostics
-    // TODO: implement updater remove
+    updater.add_task(bounds).unwrap();
 
     let mut rate = rosrust::rate(10.0);
 

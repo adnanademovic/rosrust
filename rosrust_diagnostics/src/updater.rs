@@ -42,8 +42,19 @@ impl Updater {
     }
 
     #[inline]
-    pub fn add_task(&mut self, task: impl Task + 'static) {
-        self.tasks.push(Box::new(task))
+    pub fn add_task(&mut self, task: impl Task + 'static) -> Result<()> {
+        let advertisement_result = self.advertise_added_task(&task);
+        self.tasks.push(Box::new(task));
+        advertisement_result
+    }
+
+    pub fn advertise_added_task(&mut self, task: &dyn Task) -> Result<()> {
+        let status = self.make_broadcast_status_for(task, Level::Ok, "Node starting up");
+        self.publish(vec![status])
+    }
+
+    pub fn remove_task(&mut self, name: &str) {
+        self.tasks.retain(|task| task.name() != name);
     }
 
     #[inline]

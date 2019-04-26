@@ -8,14 +8,16 @@ fn main() {
     let mut updater = Updater::new().unwrap();
 
     // Create simple task and add it to the updater
-    updater.add_task(
-        (|status: &mut Status| {
-            status.set_summary(Level::Warn, "foo");
-            status.add("one", 1);
-            status.add("true_bool", true);
-        })
-        .into_task("my_task"),
-    );
+    updater
+        .add_task(
+            (|status: &mut Status| {
+                status.set_summary(Level::Warn, "foo");
+                status.add("one", 1);
+                status.add("true_bool", true);
+            })
+            .into_task("my_task"),
+        )
+        .unwrap();
 
     // Create simple tasks
 
