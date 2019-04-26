@@ -83,7 +83,7 @@ impl Duration {
 
     #[inline]
     pub fn seconds(&self) -> f64 {
-        self.sec as f64 + self.nsec as f64 / BILLION as f64
+        f64::from(self.sec) + f64::from(self.nsec) / BILLION as f64
     }
 }
 

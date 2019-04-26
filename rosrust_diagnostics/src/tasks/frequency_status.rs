@@ -69,9 +69,7 @@ impl<'a> FrequencyStatusBuilder<'a> {
             self.max_frequency,
             self.tolerance,
             self.window_size,
-            self.ticker
-                .cloned()
-                .unwrap_or_else(FrequencyStatusTicker::new),
+            self.ticker.cloned().unwrap_or_default(),
             self.name.into(),
         )
     }
@@ -82,14 +80,16 @@ pub struct FrequencyStatusTicker {
     tick_count: Arc<AtomicUsize>,
 }
 
-impl FrequencyStatusTicker {
+impl Default for FrequencyStatusTicker {
     #[inline]
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
             tick_count: Arc::new(AtomicUsize::new(0)),
         }
     }
+}
 
+impl FrequencyStatusTicker {
     #[inline]
     pub fn tick(&self) {
         self.tick_count.fetch_add(1, Ordering::SeqCst);
@@ -143,7 +143,7 @@ impl FrequencyStatus {
 
     #[inline]
     pub fn create_ticker() -> FrequencyStatusTicker {
-        FrequencyStatusTicker::new()
+        FrequencyStatusTicker::default()
     }
 
     #[inline]
@@ -160,7 +160,8 @@ impl FrequencyStatus {
         }
     }
 
-    fn add_frequency_info(&self, status: &mut Status) -> () {
+    #[allow(clippy::float_cmp)]
+    fn add_frequency_info(&self, status: &mut Status) {
         if self.max_frequency == self.min_frequency {
             status.add("Target frequency (Hz)", self.min_frequency)
         }
@@ -198,7 +199,7 @@ impl Task for FrequencyStatus {
         };
         let history_end = HistoryEntry::new(self.ticker.read());
 
-        let end_count = history_end.count.clone();
+        let end_count = history_end.count;
         let end_time = history_end.time.clone();
 
         let history_start = match history.pop_front() {
