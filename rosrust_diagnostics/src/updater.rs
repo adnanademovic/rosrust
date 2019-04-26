@@ -3,14 +3,14 @@ use crate::msg::std_msgs::Header;
 use crate::{Level, Status, Task};
 use rosrust::{error::Result, Publisher};
 
-pub struct Updater {
+pub struct Updater<'a> {
     publisher: Publisher<DiagnosticArray>,
-    tasks: Vec<Box<dyn Task>>,
+    tasks: Vec<&'a dyn Task>,
     hardware_id: String,
     verbose: bool,
 }
 
-impl Updater {
+impl<'a> Updater<'a> {
     pub fn new() -> Result<Self> {
         let publisher = rosrust::publish("/diagnostics", 10)?;
         Ok(Self {
@@ -42,9 +42,9 @@ impl Updater {
     }
 
     #[inline]
-    pub fn add_task(&mut self, task: impl Task + 'static) -> Result<()> {
-        let advertisement_result = self.advertise_added_task(&task);
-        self.tasks.push(Box::new(task));
+    pub fn add_task(&mut self, task: &'a dyn Task) -> Result<()> {
+        let advertisement_result = self.advertise_added_task(task);
+        self.tasks.push(task);
         advertisement_result
     }
 
@@ -63,12 +63,12 @@ impl Updater {
     }
 
     #[inline]
-    pub fn update_with_extra<'a>(&'a self, extra_tasks: &[&'a dyn Task]) -> Result<()> {
+    pub fn update_with_extra(&'a self, extra_tasks: &[&'a dyn Task]) -> Result<()> {
         self.publish(self.make_update_statuses(extra_tasks))
     }
 
     #[inline]
-    pub fn make_update_statuses<'a>(&self, extra_tasks: &[&'a dyn Task]) -> Vec<DiagnosticStatus> {
+    pub fn make_update_statuses(&self, extra_tasks: &[&'a dyn Task]) -> Vec<DiagnosticStatus> {
         self.map_over_tasks(extra_tasks, |task| self.make_update_status(task))
     }
 
@@ -98,7 +98,7 @@ impl Updater {
     }
 
     #[inline]
-    pub fn broadcast_with_extra<'a>(
+    pub fn broadcast_with_extra(
         &'a self,
         extra_tasks: &[&'a dyn Task],
         level: Level,
@@ -108,7 +108,7 @@ impl Updater {
     }
 
     #[inline]
-    pub fn make_broadcast_statuses<'a>(
+    pub fn make_broadcast_statuses(
         &self,
         extra_tasks: &[&'a dyn Task],
         level: Level,
@@ -145,11 +145,7 @@ impl Updater {
         self.publisher.send(message)
     }
 
-    fn map_over_tasks<'a, F>(
-        &self,
-        extra_tasks: &[&'a dyn Task],
-        handler: F,
-    ) -> Vec<DiagnosticStatus>
+    fn map_over_tasks<F>(&self, extra_tasks: &[&'a dyn Task], handler: F) -> Vec<DiagnosticStatus>
     where
         F: Fn(&dyn Task) -> DiagnosticStatus,
     {

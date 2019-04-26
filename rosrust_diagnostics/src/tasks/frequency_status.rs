@@ -1,7 +1,6 @@
 use crate::{Level, Status, Task};
 use rosrust::Time;
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub struct FrequencyStatusBuilder<'a> {
@@ -9,7 +8,6 @@ pub struct FrequencyStatusBuilder<'a> {
     max_frequency: f64,
     tolerance: f64,
     window_size: usize,
-    ticker: Option<&'a FrequencyStatusTicker>,
     name: &'a str,
 }
 
@@ -21,7 +19,6 @@ impl<'a> FrequencyStatusBuilder<'a> {
             max_frequency: std::f64::INFINITY,
             tolerance: 0.1,
             window_size: 5,
-            ticker: None,
             name: "Frequency Status",
         }
     }
@@ -57,58 +54,30 @@ impl<'a> FrequencyStatusBuilder<'a> {
     }
 
     #[inline]
-    pub fn ticker(&mut self, ticker: &'a FrequencyStatusTicker) -> &mut Self {
-        self.ticker = Some(ticker);
-        self
-    }
-
-    #[inline]
     pub fn build(&self) -> FrequencyStatus {
         FrequencyStatus::new(
             self.min_frequency,
             self.max_frequency,
             self.tolerance,
             self.window_size,
-            self.ticker.cloned().unwrap_or_default(),
             self.name.into(),
         )
     }
 }
 
 #[derive(Clone)]
-pub struct FrequencyStatusTicker {
-    tick_count: Arc<AtomicUsize>,
-}
-
-impl Default for FrequencyStatusTicker {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            tick_count: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-}
-
-impl FrequencyStatusTicker {
-    #[inline]
-    pub fn tick(&self) {
-        self.tick_count.fetch_add(1, Ordering::SeqCst);
-    }
-
-    #[inline]
-    fn read(&self) -> usize {
-        self.tick_count.load(Ordering::SeqCst)
-    }
-}
-
 pub struct FrequencyStatus {
     min_frequency: f64,
     max_frequency: f64,
     min_tolerated_frequency: f64,
     max_tolerated_frequency: f64,
     name: String,
-    ticker: FrequencyStatusTicker,
-    history: Arc<Mutex<VecDeque<HistoryEntry>>>,
+    tracker: Arc<Mutex<Tracker>>,
+}
+
+struct Tracker {
+    count: usize,
+    history: VecDeque<HistoryEntry>,
 }
 
 impl FrequencyStatus {
@@ -117,12 +86,11 @@ impl FrequencyStatus {
         FrequencyStatusBuilder::new()
     }
 
-    fn new(
+    pub fn new(
         min_frequency: f64,
         max_frequency: f64,
         tolerance: f64,
         window_size: usize,
-        ticker: FrequencyStatusTicker,
         name: String,
     ) -> Self {
         let history_entry = HistoryEntry::new(0);
@@ -130,25 +98,21 @@ impl FrequencyStatus {
         let mut history = VecDeque::with_capacity(window_size);
         history.extend((0..window_size).map(|_| history_entry.clone()));
 
+        let tracker = Arc::new(Mutex::new(Tracker { count: 0, history }));
+
         Self {
             min_frequency,
             max_frequency,
             min_tolerated_frequency: min_frequency * (1.0 - tolerance),
             max_tolerated_frequency: max_frequency * (1.0 + tolerance),
             name,
-            ticker,
-            history: Arc::new(Mutex::new(history)),
+            tracker,
         }
     }
 
     #[inline]
-    pub fn create_ticker() -> FrequencyStatusTicker {
-        FrequencyStatusTicker::default()
-    }
-
-    #[inline]
-    pub fn ticker(&self) -> &FrequencyStatusTicker {
-        &self.ticker
+    pub fn tick(&self) {
+        self.tracker.lock().expect(FAILED_TO_LOCK).count += 1;
     }
 
     fn frequency_to_summary(&self, frequency: f64) -> (Level, &str) {
@@ -187,7 +151,7 @@ impl Task for FrequencyStatus {
     }
 
     fn run(&self, status: &mut Status) {
-        let mut history = match self.history.lock() {
+        let mut tracker = match self.tracker.lock() {
             Ok(value) => value,
             Err(_err) => {
                 status.set_summary(
@@ -197,12 +161,12 @@ impl Task for FrequencyStatus {
                 return;
             }
         };
-        let history_end = HistoryEntry::new(self.ticker.read());
+        let history_end = HistoryEntry::new(tracker.count);
 
         let end_count = history_end.count;
         let end_time = history_end.time.clone();
 
-        let history_start = match history.pop_front() {
+        let history_start = match tracker.history.pop_front() {
             Some(value) => value,
             None => {
                 status.set_summary(
@@ -212,7 +176,9 @@ impl Task for FrequencyStatus {
                 return;
             }
         };
-        history.push_back(history_end);
+        tracker.history.push_back(history_end);
+
+        drop(tracker);
 
         let events = end_count - history_start.count;
         let window = (end_time - history_start.time).seconds();
@@ -244,3 +210,5 @@ impl HistoryEntry {
         }
     }
 }
+
+static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";

@@ -9,44 +9,33 @@ fn main() {
     let mut updater = Updater::new().unwrap();
     updater.set_verbose(true);
 
-    let ticker = FrequencyStatus::create_ticker();
+    let mut freq_statuses = vec![];
 
-    updater
-        .add_task(
-            FrequencyStatus::builder()
-                .name("No limits")
-                .ticker(&ticker)
-                .build(),
-        )
-        .unwrap();
-    updater
-        .add_task(
-            FrequencyStatus::builder()
-                .name("Only max")
-                .ticker(&ticker)
-                .max_frequency(10.0)
-                .build(),
-        )
-        .unwrap();
-    updater
-        .add_task(
-            FrequencyStatus::builder()
-                .name("Only min")
-                .ticker(&ticker)
-                .min_frequency(5.0)
-                .build(),
-        )
-        .unwrap();
-    updater
-        .add_task(
-            FrequencyStatus::builder()
-                .name("Both limits")
-                .ticker(&ticker)
-                .min_frequency(5.0)
-                .max_frequency(10.0)
-                .build(),
-        )
-        .unwrap();
+    freq_statuses.push(FrequencyStatus::builder().name("No limits").build());
+    freq_statuses.push(
+        FrequencyStatus::builder()
+            .name("Only max")
+            .max_frequency(10.0)
+            .build(),
+    );
+    freq_statuses.push(
+        FrequencyStatus::builder()
+            .name("Only min")
+            .min_frequency(5.0)
+            .build(),
+    );
+    freq_statuses.push(
+        FrequencyStatus::builder()
+            .name("Both limits")
+            .min_frequency(5.0)
+            .max_frequency(10.0)
+            .build(),
+    );
+
+    let updater_freq_statuses = freq_statuses.clone();
+    for task in &updater_freq_statuses {
+        updater.add_task(task).unwrap();
+    }
 
     let delay_param = rosrust::param("~delay").unwrap();
 
@@ -57,7 +46,9 @@ fn main() {
             rosrust::sleep(Duration::from_nanos(
                 (delay_seconds * 1_000_000_000.0) as i64,
             ));
-            ticker.tick();
+            for task in &freq_statuses {
+                task.tick();
+            }
         }
     });
 
