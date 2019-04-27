@@ -67,6 +67,8 @@ impl Slave {
                     Err(TryRecvError::Empty) => {}
                 }
                 bound_handler.poll();
+                // TODO: use a timed out poll once rouille provides it
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
             outer_shutdown_tx.send(()).is_ok();
         });
