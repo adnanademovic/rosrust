@@ -1,6 +1,6 @@
 use crate::api::raii::{Publisher, Service, Subscriber};
 use crate::api::resolve::get_unused_args;
-use crate::api::{Parameter, Rate, Ros, SystemState, Topic};
+use crate::api::{Delay, Parameter, Rate, Ros, SystemState, Topic};
 use crate::error::{ErrorKind, Result};
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
@@ -79,8 +79,13 @@ pub fn now() -> Time {
 }
 
 #[inline]
+pub fn delay(d: Duration) -> Delay {
+    ros!().delay(d)
+}
+
+#[inline]
 pub fn sleep(d: Duration) {
-    ros!().sleep(d)
+    delay(d).sleep();
 }
 
 #[inline]

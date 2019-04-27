@@ -1,4 +1,4 @@
-pub use self::clock::{Clock, Rate};
+pub use self::clock::{Clock, Delay, Rate};
 pub use self::master::{SystemState, Topic};
 pub use self::ros::{Parameter, Ros};
 

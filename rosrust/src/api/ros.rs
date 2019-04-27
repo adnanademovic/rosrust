@@ -6,6 +6,7 @@ use super::naming::{self, Resolver};
 use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
 use super::slave::Slave;
+use crate::api::clock::Delay;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
@@ -148,9 +149,9 @@ impl Ros {
     }
 
     #[inline]
-    pub fn sleep(&self, d: Duration) {
+    pub fn delay(&self, d: Duration) -> Delay {
         self.clock.await_init();
-        self.clock.sleep(d);
+        Delay::new(Arc::clone(&self.clock), d)
     }
 
     #[inline]
