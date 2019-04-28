@@ -4,6 +4,7 @@ mod subscriptions;
 
 use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result};
+use crate::api::ShutdownManager;
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 use crate::util::{FAILED_TO_LOCK, MPSC_CHANNEL_UNEXPECTEDLY_CLOSED};
 use crossbeam::channel::{bounded, unbounded, Sender, TryRecvError};
@@ -30,7 +31,7 @@ impl Slave {
         bind_address: &str,
         port: u16,
         name: &str,
-        outer_shutdown_tx: Sender<()>,
+        shutdown_manager: Arc<ShutdownManager>,
     ) -> Result<Slave> {
         use std::net::ToSocketAddrs;
 
@@ -70,7 +71,7 @@ impl Slave {
                 // TODO: use a timed out poll once rouille provides it
                 std::thread::sleep(std::time::Duration::from_millis(5));
             }
-            outer_shutdown_tx.send(()).is_ok();
+            shutdown_manager.shutdown();
         });
 
         let port = port_rx.recv().expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED)?;
