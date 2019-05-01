@@ -255,13 +255,11 @@ pub trait UpdaterLowLevelExt {
 }
 
 impl<'a> UpdaterLowLevelExt for Updater<'a> {
-    /// Generate diagnostic statuses for tasks without publishing the results.
     #[inline]
     fn make_update_statuses(&self, extra_tasks: &[&dyn Task]) -> Vec<DiagnosticStatus> {
         self.map_over_tasks(extra_tasks, |task| self.make_update_status(task))
     }
 
-    /// Generate the diagnostic status for a single task without publishing the results.
     fn make_update_status(&self, task: &dyn Task) -> DiagnosticStatus {
         let mut status = Status {
             name: task.name().into(),
@@ -282,7 +280,6 @@ impl<'a> UpdaterLowLevelExt for Updater<'a> {
         status.into()
     }
 
-    /// Generate broadcast statuses for tasks without publishing the results.
     #[inline]
     fn make_broadcast_statuses(
         &self,
@@ -295,7 +292,6 @@ impl<'a> UpdaterLowLevelExt for Updater<'a> {
         })
     }
 
-    /// Generate the broadcast status for a single task without publishing the results.
     #[inline]
     fn make_broadcast_status_for(
         &self,
