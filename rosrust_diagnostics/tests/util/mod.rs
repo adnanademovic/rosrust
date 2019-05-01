@@ -38,6 +38,7 @@ pub fn run_roscore_for(feature: Feature) -> ChildProcessTerminator {
 #[repr(u32)]
 pub enum Feature {
     TimestampStatusTest = 1,
+    FrequencyStatusTest = 2,
 }
 
 fn generate_port(feature: Feature) -> u32 {

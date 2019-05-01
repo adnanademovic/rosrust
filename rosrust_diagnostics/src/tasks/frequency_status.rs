@@ -77,6 +77,32 @@ pub struct FrequencyStatus {
 struct Tracker {
     count: usize,
     history: VecDeque<HistoryEntry>,
+    window_size: usize,
+}
+
+impl Tracker {
+    #[inline]
+    fn new(window_size: usize) -> Tracker {
+        let mut tracker = Tracker {
+            count: 0,
+            history: VecDeque::with_capacity(window_size),
+            window_size,
+        };
+
+        tracker.clear();
+
+        tracker
+    }
+
+    fn clear(&mut self) {
+        self.count = 0;
+
+        self.history.clear();
+        let history_entry = HistoryEntry::new(0);
+
+        self.history
+            .extend((0..self.window_size).map(|_| history_entry.clone()));
+    }
 }
 
 impl FrequencyStatus {
@@ -85,6 +111,7 @@ impl FrequencyStatus {
         FrequencyStatusBuilder::new()
     }
 
+    #[inline]
     pub fn new(
         min_frequency: f64,
         max_frequency: f64,
@@ -92,26 +119,24 @@ impl FrequencyStatus {
         window_size: usize,
         name: String,
     ) -> Self {
-        let history_entry = HistoryEntry::new(0);
-
-        let mut history = VecDeque::with_capacity(window_size);
-        history.extend((0..window_size).map(|_| history_entry.clone()));
-
-        let tracker = Mutex::new(Tracker { count: 0, history });
-
         Self {
             min_frequency,
             max_frequency,
             min_tolerated_frequency: min_frequency * (1.0 - tolerance),
             max_tolerated_frequency: max_frequency * (1.0 + tolerance),
             name,
-            tracker,
+            tracker: Mutex::new(Tracker::new(window_size)),
         }
     }
 
     #[inline]
     pub fn tick(&self) {
         self.tracker.lock().expect(FAILED_TO_LOCK).count += 1;
+    }
+
+    #[inline]
+    pub fn clear(&self) {
+        self.tracker.lock().expect(FAILED_TO_LOCK).clear();
     }
 
     fn frequency_to_summary(&self, frequency: f64) -> (Level, &str) {

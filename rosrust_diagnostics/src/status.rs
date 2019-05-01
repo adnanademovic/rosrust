@@ -11,21 +11,28 @@ pub struct Status {
 }
 
 impl Default for Status {
+    #[inline]
     fn default() -> Self {
-        Self {
-            level: Level::Ok,
-            name: "".to_string(),
-            message: "".to_string(),
-            hardware_id: "".to_string(),
-            values: vec![],
-        }
+        Self::new(Level::Ok, "")
     }
 }
 
 impl Status {
-    pub fn set_summary(&mut self, level: Level, message: impl Into<String>) {
+    #[inline]
+    pub fn new(level: Level, message: &str) -> Self {
+        let message = message.to_string();
+        Self {
+            level,
+            name: "".to_string(),
+            message,
+            hardware_id: "".to_string(),
+            values: vec![],
+        }
+    }
+
+    pub fn set_summary(&mut self, level: Level, message: impl std::string::ToString) {
         self.level = level;
-        self.message = message.into();
+        self.message = message.to_string();
     }
 
     #[inline]
