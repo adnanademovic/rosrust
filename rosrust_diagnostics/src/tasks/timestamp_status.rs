@@ -184,3 +184,183 @@ impl Range {
 }
 
 static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck::{Arbitrary, Gen};
+    use quickcheck_macros::quickcheck;
+
+    #[quickcheck]
+    fn timestamp_status_constructor_initializes_properly(low: f64, high: f64, name: String) {
+        let ts = TimestampStatus::new(low, high, name.clone());
+        let tracker = ts.tracker.lock().unwrap();
+
+        assert_eq!(ts.acceptable.min, low);
+        assert_eq!(ts.acceptable.max, high);
+        assert_eq!(ts.name, name);
+        assert_eq!(tracker.zero_seen, false);
+        assert_eq!(tracker.delta_valid, false);
+        assert_eq!(tracker.counts.early, 0);
+        assert_eq!(tracker.counts.late, 0);
+        assert_eq!(tracker.counts.zero, 0);
+        assert_eq!(tracker.delta_range.min, 0.0);
+        assert_eq!(tracker.delta_range.max, 0.0);
+    }
+
+    #[quickcheck]
+    fn timestamp_status_builder_initializes_properly(
+        low: Option<f64>,
+        high: Option<f64>,
+        name: Option<String>,
+    ) {
+        let mut tsb = TimestampStatus::builder();
+        if let Some(low) = low {
+            tsb.min_acceptable(low);
+        }
+        if let Some(high) = high {
+            tsb.max_acceptable(high);
+        }
+        if let Some(ref name) = name {
+            tsb.name(name);
+        }
+        let ts = tsb.build();
+
+        let low = low.unwrap_or(-1.0);
+        let high = high.unwrap_or(5.0);
+        let name = name.unwrap_or_else(|| "Timestamp Status".into());
+        let tracker = ts.tracker.lock().unwrap();
+
+        assert_eq!(ts.acceptable.min, low);
+        assert_eq!(ts.acceptable.max, high);
+        assert_eq!(ts.name, name);
+        assert_eq!(tracker.zero_seen, false);
+        assert_eq!(tracker.delta_valid, false);
+        assert_eq!(tracker.counts.early, 0);
+        assert_eq!(tracker.counts.late, 0);
+        assert_eq!(tracker.counts.zero, 0);
+        assert_eq!(tracker.delta_range.min, 0.0);
+        assert_eq!(tracker.delta_range.max, 0.0);
+    }
+
+    #[test]
+    fn counter_defaults_to_zeros() {
+        let counter = Counter::default();
+        assert_eq!(counter.early, 0);
+        assert_eq!(counter.late, 0);
+        assert_eq!(counter.zero, 0);
+    }
+
+    #[test]
+    fn range_defaults_to_zeros() {
+        let range = Range::default();
+        assert_eq!(range.min, 0.0);
+        assert_eq!(range.max, 0.0);
+    }
+
+    #[quickcheck]
+    fn range_new_sets_both_values_to_input(value: f64) {
+        let range = Range::new(value);
+        assert_eq!(range.min, value);
+        assert_eq!(range.max, value);
+    }
+
+    #[quickcheck]
+    fn range_range_sets_respective_values_to_inputs(min: f64, max: f64) {
+        let range = Range::range(min, max);
+        assert_eq!(range.min, min);
+        assert_eq!(range.max, max);
+    }
+
+    #[derive(Clone, Debug)]
+    struct SortedTriplet {
+        low: f64,
+        mid: f64,
+        high: f64,
+    }
+
+    impl From<(f64, f64, f64)> for SortedTriplet {
+        fn from((a, b, c): (f64, f64, f64)) -> Self {
+            let mut inputs = [a, b, c];
+            inputs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
+            let [low, mid, high] = inputs;
+            SortedTriplet { low, mid, high }
+        }
+    }
+
+    impl Arbitrary for SortedTriplet {
+        fn arbitrary<G: Gen>(g: &mut G) -> Self {
+            <(f64, f64, f64)>::arbitrary(g).into()
+        }
+
+        fn shrink(&self) -> Box<Iterator<Item = Self>> {
+            Box::new(Arbitrary::shrink(&(self.low, self.mid, self.high)).map(Into::into))
+        }
+    }
+
+    #[quickcheck]
+    fn range_combination_with_higher_increases_max(triplet: SortedTriplet) {
+        let mut range = Range::range(triplet.low, triplet.mid);
+        range.combine_with(triplet.high);
+        assert_eq!(range.min, triplet.low);
+        assert_eq!(range.max, triplet.high);
+    }
+
+    #[quickcheck]
+    fn range_combination_with_lower_decreases_min(triplet: SortedTriplet) {
+        let mut range = Range::range(triplet.mid, triplet.high);
+        range.combine_with(triplet.low);
+        assert_eq!(range.min, triplet.low);
+        assert_eq!(range.max, triplet.high);
+    }
+
+    #[quickcheck]
+    fn range_combination_with_inbetween_does_nothing(triplet: SortedTriplet) {
+        let mut range = Range::range(triplet.low, triplet.high);
+        range.combine_with(triplet.mid);
+        assert_eq!(range.min, triplet.low);
+        assert_eq!(range.max, triplet.high);
+    }
+
+    #[quickcheck]
+    fn range_combination_fixes_reverse_range(triplet: SortedTriplet) {
+        let mut range = Range::range(triplet.high, triplet.low);
+        range.combine_with(triplet.mid);
+        assert_eq!(range.min, triplet.mid);
+        assert_eq!(range.max, triplet.mid);
+    }
+
+    #[test]
+    fn tracker_defaults_to_zeros_and_false() {
+        let tracker = Tracker::default();
+        assert_eq!(tracker.zero_seen, false);
+        assert_eq!(tracker.delta_valid, false);
+        assert_eq!(tracker.counts.early, 0);
+        assert_eq!(tracker.counts.late, 0);
+        assert_eq!(tracker.counts.zero, 0);
+        assert_eq!(tracker.delta_range.min, 0.0);
+        assert_eq!(tracker.delta_range.max, 0.0);
+    }
+
+    #[test]
+    fn tracker_clearing_reading_only_maintains_counts() {
+        let mut tracker = Tracker::default();
+        tracker.zero_seen = true;
+        tracker.delta_valid = true;
+        tracker.counts.early = 5;
+        tracker.counts.late = 6;
+        tracker.counts.zero = 7;
+        tracker.delta_range.min = -5.0;
+        tracker.delta_range.max = 14.0;
+
+        tracker.clear_last_reading();
+
+        assert_eq!(tracker.zero_seen, false);
+        assert_eq!(tracker.delta_valid, false);
+        assert_eq!(tracker.counts.early, 5);
+        assert_eq!(tracker.counts.late, 6);
+        assert_eq!(tracker.counts.zero, 7);
+        assert_eq!(tracker.delta_range.min, 0.0);
+        assert_eq!(tracker.delta_range.max, 0.0);
+    }
+}
