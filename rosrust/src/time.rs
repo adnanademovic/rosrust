@@ -29,6 +29,11 @@ impl Time {
     pub fn nanos(&self) -> i64 {
         i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }
+
+    #[inline]
+    pub fn seconds(&self) -> f64 {
+        f64::from(self.sec) + f64::from(self.nsec) / BILLION as f64
+    }
 }
 
 impl cmp::PartialEq for Time {
