@@ -2,6 +2,7 @@ use crate::msg::diagnostic_msgs::{DiagnosticArray, DiagnosticStatus};
 use crate::msg::std_msgs::Header;
 use crate::{Level, Status, Task};
 use rosrust::{error::Result, Publisher};
+use std::sync::Mutex;
 
 /// Manages a list of diagnostic tasks, and calls them in a rate-limited manner.
 ///
@@ -21,6 +22,25 @@ pub struct Updater<'a> {
     tasks: Vec<&'a dyn Task>,
     hardware_id: String,
     verbose: bool,
+    check_tracker: Mutex<CheckTracker>,
+}
+
+struct CheckTracker {
+    last_update: f64,
+    last_check_time_seconds: f64,
+    diagnostic_period_seconds: f64,
+}
+
+impl CheckTracker {
+    fn check_diagnostic_period(&mut self) {
+        let now = rosrust::now();
+        let now_seconds = now.seconds();
+        if now_seconds < self.last_check_time_seconds + 0.25 {
+            return;
+        }
+        self.last_check_time_seconds = now_seconds;
+        self.diagnostic_period_seconds = get_diagnostic_period().unwrap_or(1.0);
+    }
 }
 
 impl<'a> Updater<'a> {
@@ -36,6 +56,11 @@ impl<'a> Updater<'a> {
             tasks: vec![],
             hardware_id: "none".into(),
             verbose: false,
+            check_tracker: Mutex::new(CheckTracker {
+                last_update: 0.0,
+                last_check_time_seconds: 0.0,
+                diagnostic_period_seconds: 1.0,
+            }),
         })
     }
 
@@ -108,9 +133,22 @@ impl<'a> Updater<'a> {
     /// Make sure you run `advertise_added_task` for any extra task you decide to pass before
     /// doing any updates.
     #[inline]
-    pub fn update_with_extra(&'a self, extra_tasks: &[&'a dyn Task]) -> Result<()> {
-        // TODO: Implement update with rate limiting
+    pub fn update_with_extra(&self, extra_tasks: &[&dyn Task]) -> Result<()> {
+        if !self.should_update() {
+            return Ok(());
+        }
         self.force_update_with_extra(extra_tasks)
+    }
+
+    fn should_update(&self) -> bool {
+        let mut tracker = self.check_tracker.lock().expect(FAILED_TO_LOCK);
+        tracker.check_diagnostic_period();
+        rosrust::now().seconds() > tracker.last_update + tracker.diagnostic_period_seconds
+    }
+
+    fn refresh_last_time(&self) {
+        let mut check_tracker = self.check_tracker.lock().expect(FAILED_TO_LOCK);
+        check_tracker.last_update = rosrust::now().seconds();
     }
 
     /// Forces the diagnostics to update.
@@ -130,7 +168,8 @@ impl<'a> Updater<'a> {
     /// Make sure you run `advertise_added_task` for any extra task you decide to pass before
     /// doing any updates.
     #[inline]
-    pub fn force_update_with_extra(&'a self, extra_tasks: &[&'a dyn Task]) -> Result<()> {
+    pub fn force_update_with_extra(&self, extra_tasks: &[&dyn Task]) -> Result<()> {
+        self.refresh_last_time();
         self.publish(self.make_update_statuses(extra_tasks))
     }
 
@@ -177,6 +216,14 @@ impl<'a> Updater<'a> {
         .map(handler)
         .collect()
     }
+}
+
+fn get_diagnostic_period() -> Option<f64> {
+    let diag_per = rosrust::param("~diagnostic_period")?;
+    println!("FOO");
+    let val = diag_per.get().ok()?;
+    println!("BAR {}", val);
+    Some(val)
 }
 
 /// A set of methods for low level handling of the updater.
@@ -266,3 +313,5 @@ impl<'a> UpdaterLowLevelExt for Updater<'a> {
         .into()
     }
 }
+
+static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
