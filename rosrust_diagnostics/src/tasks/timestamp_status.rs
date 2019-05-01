@@ -2,6 +2,9 @@ use crate::{Level, Status, Task};
 use rosrust::Time;
 use std::sync::Mutex;
 
+/// The structure for building a timestamp status task.
+///
+/// Use `TimestampStatus::builder()` to create an instance of this structure.
 pub struct TimestampStatusBuilder<'a> {
     min_acceptable: f64,
     max_acceptable: f64,
@@ -18,30 +21,48 @@ impl<'a> TimestampStatusBuilder<'a> {
         }
     }
 
+    /// Sets the minimum difference in timestamp that is expected, in seconds.
+    ///
+    /// Defaults to `-1.0`, which should be impossible to trigger if correctly used.
     #[inline]
     pub fn min_acceptable(&mut self, value: f64) -> &mut Self {
         self.min_acceptable = value;
         self
     }
 
+    /// Sets the maximum difference in timestamp that is expected, in seconds.
+    ///
+    /// Defaults to `5` seconds.
     #[inline]
     pub fn max_acceptable(&mut self, value: f64) -> &mut Self {
         self.max_acceptable = value;
         self
     }
 
+    /// Sets the name of the task.
+    ///
+    /// Defaults to "Timestamp Status".
     #[inline]
     pub fn name(&mut self, name: &'a str) -> &mut Self {
         self.name = name;
         self
     }
 
+    /// Builds the timestamp status with the provided parameters.
     #[inline]
     pub fn build(&self) -> TimestampStatus {
         TimestampStatus::new(self.min_acceptable, self.max_acceptable, self.name.into())
     }
 }
 
+/// Diagnostic task to monitor the interval between events.
+///
+/// This diagnostic task monitors the difference between consecutive events,
+/// and creates corresponding diagnostics. An error occurs if the interval
+/// between consecutive events is too large or too small. An error condition
+/// will only be reported during a single diagnostic report unless it
+/// persists. Tallies of errors are also maintained to keep track of errors
+/// in a more persistent way.
 pub struct TimestampStatus {
     acceptable: Range,
     name: String,
@@ -49,11 +70,16 @@ pub struct TimestampStatus {
 }
 
 impl TimestampStatus {
+    /// Creates a builder for a new timestamp status task.
     #[inline]
     pub fn builder<'a>() -> TimestampStatusBuilder<'a> {
         TimestampStatusBuilder::new()
     }
 
+    /// Creates a new timestamp status based on the provided parameters.
+    ///
+    /// Look at the `TimestampStatusBuilder` for more information about the parameters and
+    /// reasonable defaults.
     #[inline]
     pub fn new(min_acceptable: f64, max_acceptable: f64, name: String) -> Self {
         Self {
@@ -63,6 +89,7 @@ impl TimestampStatus {
         }
     }
 
+    /// Signals an event, with the timestamp provided as a float point in seconds.
     pub fn tick_float(&self, timestamp: f64) {
         let mut tracker = self.tracker.lock().expect(FAILED_TO_LOCK);
 
@@ -81,6 +108,7 @@ impl TimestampStatus {
         }
     }
 
+    /// Signals an event.
     #[inline]
     pub fn tick(&self, timestamp: &Time) {
         self.tick_float(timestamp.seconds())

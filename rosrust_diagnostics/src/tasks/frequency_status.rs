@@ -3,6 +3,9 @@ use rosrust::Time;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+/// The structure for building a frequency status task.
+///
+/// Use `FrequencyStatus::builder()` to create an instance of this structure.
 pub struct FrequencyStatusBuilder<'a> {
     min_frequency: f64,
     max_frequency: f64,
@@ -23,36 +26,60 @@ impl<'a> FrequencyStatusBuilder<'a> {
         }
     }
 
+    /// Sets the minimum frequency that is expected.
+    ///
+    /// Defaults to zero.
     #[inline]
     pub fn min_frequency(&mut self, value: f64) -> &mut Self {
         self.min_frequency = value;
         self
     }
 
+    /// Sets the maximum frequency that is expected.
+    ///
+    /// Defaults to infinity.
     #[inline]
     pub fn max_frequency(&mut self, value: f64) -> &mut Self {
         self.max_frequency = value;
         self
     }
 
+    /// Sets the tolerance to how far out of bounds a frequency is allowed to go.
+    ///
+    /// Defaults to `0.1`.
+    ///
+    /// It is provided as a fraction of the frequency limits.
+    ///
+    /// So, setting tolerance to `0.2` will accept frequencies 20% smaller than the
+    /// minimum frequency, and 20% larger than the maximum frequency.
     #[inline]
     pub fn tolerance(&mut self, value: f64) -> &mut Self {
         self.tolerance = value;
         self
     }
 
+    /// Sets the number of ticks we're averaging while estimating the frequency.
+    ///
+    /// Defaults to `5` ticks.
+    ///
+    /// A smaller window size could cause false positives, while a too large window
+    /// size could cause false negatives.
     #[inline]
     pub fn window_size(&mut self, value: usize) -> &mut Self {
         self.window_size = value;
         self
     }
 
+    /// Sets the name of the task.
+    ///
+    /// Defaults to "Frequency Status".
     #[inline]
     pub fn name(&mut self, name: &'a str) -> &mut Self {
         self.name = name;
         self
     }
 
+    /// Builds the frequency status with the provided parameters.
     #[inline]
     pub fn build(&self) -> FrequencyStatus {
         FrequencyStatus::new(
@@ -65,6 +92,12 @@ impl<'a> FrequencyStatusBuilder<'a> {
     }
 }
 
+/// Diagnostic task that monitors the frequency of an event.
+///
+/// This diagnostic task monitors the frequency of calls to its tick method,
+/// and creates corresponding diagnostics. It will report a warning if the
+/// frequency is outside acceptable bounds, and report an error if there have
+/// been no events in the latest window.
 pub struct FrequencyStatus {
     min_frequency: f64,
     max_frequency: f64,
@@ -106,11 +139,16 @@ impl Tracker {
 }
 
 impl FrequencyStatus {
+    /// Creates a builder for a new frequency status task.
     #[inline]
     pub fn builder<'a>() -> FrequencyStatusBuilder<'a> {
         FrequencyStatusBuilder::new()
     }
 
+    /// Creates a new frequency status based on the provided parameters.
+    ///
+    /// Look at the `FrequencyStatusBuilder` for more information about the parameters and
+    /// reasonable defaults.
     #[inline]
     pub fn new(
         min_frequency: f64,
@@ -129,11 +167,16 @@ impl FrequencyStatus {
         }
     }
 
+    /// Signals that an event has occurred.
     #[inline]
     pub fn tick(&self) {
         self.tracker.lock().expect(FAILED_TO_LOCK).count += 1;
     }
 
+    /// Resets the statistics.
+    ///
+    /// This is good to do right before the looped routine that is being observed, to prevent
+    /// the delay between task creation and the first call to give a too large initial reading.
     #[inline]
     pub fn clear(&self) {
         self.tracker.lock().expect(FAILED_TO_LOCK).clear();

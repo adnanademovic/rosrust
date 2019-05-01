@@ -20,7 +20,7 @@ fn main() {
 
     while rosrust::is_ok() {
         // Publish diagnostic update
-        updater.update().unwrap();
+        updater.force_update().unwrap();
         rate.sleep();
     }
 }

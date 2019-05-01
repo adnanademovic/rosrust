@@ -6,7 +6,7 @@ fn simple_function_task_works() {
         status.set_summary(Level::Warn, "foo");
         status.name = "bar".into();
         status.hardware_id = "baz".into();
-        status.clear_values();
+        status.values.clear();
         status.add("one", 1);
         status.add("true_bool", true);
     })

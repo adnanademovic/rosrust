@@ -1,7 +1,9 @@
-pub use self::frequency_status::FrequencyStatus;
-pub use self::heartbeat::Heartbeat;
-pub use self::timestamp_status::TimestampStatus;
+//! A set of commonly useful tasks.
 
-pub mod frequency_status;
-pub mod heartbeat;
-pub mod timestamp_status;
+pub use self::frequency_status::{FrequencyStatus, FrequencyStatusBuilder};
+pub use self::heartbeat::Heartbeat;
+pub use self::timestamp_status::{TimestampStatus, TimestampStatusBuilder};
+
+mod frequency_status;
+mod heartbeat;
+mod timestamp_status;

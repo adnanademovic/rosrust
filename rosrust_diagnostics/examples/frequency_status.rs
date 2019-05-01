@@ -58,7 +58,7 @@ fn main() {
     let mut rate = rosrust::rate(2.0);
 
     while rosrust::is_ok() {
-        updater.update().unwrap();
+        updater.force_update().unwrap();
         rate.sleep();
     }
 

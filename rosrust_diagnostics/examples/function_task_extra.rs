@@ -34,7 +34,7 @@ fn main() {
 
     while rosrust::is_ok() {
         // Publish diagnostic update
-        updater.update_with_extra(&[&task1, &task2]).unwrap();
+        updater.force_update_with_extra(&[&task1, &task2]).unwrap();
         rate.sleep();
     }
 }

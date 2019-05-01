@@ -92,7 +92,7 @@ fn main() {
     let mut rate = rosrust::rate(10.0);
 
     while rosrust::is_ok() {
-        updater.update_with_extra(&[&dummy_task2]).unwrap();
+        updater.force_update_with_extra(&[&dummy_task2]).unwrap();
         rate.sleep();
     }
 }
