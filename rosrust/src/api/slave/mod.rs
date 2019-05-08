@@ -6,8 +6,8 @@ use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result};
 use crate::api::ShutdownManager;
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
-use crate::util::{FAILED_TO_LOCK, MPSC_CHANNEL_UNEXPECTEDLY_CLOSED};
-use crossbeam::channel::{bounded, unbounded, Sender, TryRecvError};
+use crate::util::{CROSSBEAM_CHANNEL_UNEXPECTEDLY_CLOSED, FAILED_TO_LOCK};
+use crossbeam::channel::{bounded, Sender, TryRecvError};
 use log::error;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -40,7 +40,7 @@ impl Slave {
         let publications = handler.publications.clone();
         let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
-        let (port_tx, port_rx) = unbounded();
+        let (port_tx, port_rx) = bounded(1);
         let socket_addr = match (bind_address, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
             None => bail!(error::ErrorKind::from(error::rosxmlrpc::ErrorKind::BadUri(
@@ -54,14 +54,14 @@ impl Slave {
                 Err(err) => {
                     port_tx
                         .send(Err(err))
-                        .expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
+                        .expect(CROSSBEAM_CHANNEL_UNEXPECTEDLY_CLOSED);
                     return;
                 }
             };
             let port = bound_handler.local_addr().port();
             port_tx
                 .send(Ok(port))
-                .expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
+                .expect(CROSSBEAM_CHANNEL_UNEXPECTEDLY_CLOSED);
             loop {
                 match shutdown_rx.try_recv() {
                     Ok(_) | Err(TryRecvError::Disconnected) => break,
@@ -74,7 +74,9 @@ impl Slave {
             shutdown_manager.shutdown();
         });
 
-        let port = port_rx.recv().expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED)?;
+        let port = port_rx
+            .recv()
+            .expect(CROSSBEAM_CHANNEL_UNEXPECTEDLY_CLOSED)?;
         let uri = format!("http://{}:{}/", hostname, port);
 
         Ok(Slave {
