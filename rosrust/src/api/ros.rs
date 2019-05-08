@@ -6,15 +6,16 @@ use super::naming::{self, Resolver};
 use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
 use super::slave::Slave;
+use crate::api::clock::Delay;
+use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
-use crossbeam::channel::{unbounded, Receiver, Sender, TryRecvError};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time;
+use std::thread::sleep;
 use xml_rpc;
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -28,8 +29,7 @@ pub struct Ros {
     clock: Arc<Clock>,
     static_subs: Vec<Subscriber>,
     logger: Option<Publisher<Log>>,
-    shutdown_tx: Sender<()>,
-    shutdown_rx: Option<Receiver<()>>,
+    shutdown_manager: Arc<ShutdownManager>,
 }
 
 impl Ros {
@@ -98,14 +98,20 @@ impl Ros {
         let name = format!("{}/{}", namespace, name);
         let resolver = Resolver::new(&name)?;
 
-        let (shutdown_tx, shutdown_rx) = unbounded();
+        let shutdown_manager = Arc::new(ShutdownManager::default());
 
-        let slave = Slave::new(master_uri, hostname, bind_host, 0, &name, shutdown_tx)?;
+        let slave = Slave::new(
+            master_uri,
+            hostname,
+            bind_host,
+            0,
+            &name,
+            Arc::clone(&shutdown_manager),
+        )?;
         let master = Master::new(master_uri, &name, slave.uri())?;
 
         Ok(Ros {
             master: Arc::new(master),
-            shutdown_tx: slave.shutdown_tx.clone(),
             slave: Arc::new(slave),
             hostname: String::from(hostname),
             bind_address: String::from(bind_host),
@@ -114,7 +120,7 @@ impl Ros {
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
             logger: None,
-            shutdown_rx: Some(shutdown_rx),
+            shutdown_manager,
         })
     }
 
@@ -148,14 +154,14 @@ impl Ros {
     }
 
     #[inline]
-    pub fn sleep(&self, d: Duration) {
+    pub fn delay(&self, d: Duration) -> Delay {
         self.clock.await_init();
-        self.clock.sleep(d);
+        Delay::new(Arc::clone(&self.clock), d)
     }
 
     #[inline]
-    pub fn shutdown_sender(&self) -> Sender<()> {
-        self.shutdown_tx.clone()
+    pub fn shutdown_sender(&self) -> Arc<ShutdownManager> {
+        Arc::clone(&self.shutdown_manager)
     }
 
     pub fn rate(&self, rate: f64) -> Rate {
@@ -166,17 +172,13 @@ impl Ros {
 
     #[inline]
     pub fn is_ok(&self) -> bool {
-        if let Some(ref rx) = self.shutdown_rx {
-            rx.try_recv() == Err(TryRecvError::Empty)
-        } else {
-            false
-        }
+        !self.shutdown_manager.awaiting_shutdown()
     }
 
     #[inline]
-    pub fn spin(&mut self) -> Spinner {
+    pub fn spin(&self) -> Spinner {
         Spinner {
-            shutdown_rx: self.shutdown_rx.take(),
+            shutdown_manager: Arc::clone(&self.shutdown_manager),
         }
     }
 
@@ -207,12 +209,15 @@ impl Ros {
         Ok(Client::new(&self.name, &uri, &name))
     }
 
-    pub fn wait_for_service(&self, service: &str, timeout: Option<time::Duration>) -> Result<()> {
+    pub fn wait_for_service(
+        &self,
+        service: &str,
+        timeout: Option<std::time::Duration>,
+    ) -> Result<()> {
         use crate::rosxmlrpc::ResponseError;
-        use std::thread::sleep;
 
         let name = self.resolver.translate(service)?;
-        let now = ::std::time::Instant::now();
+        let now = std::time::Instant::now();
         loop {
             let e = match self.master.lookup_service(&name) {
                 Ok(_) => return Ok(()),
@@ -225,7 +230,7 @@ impl Ros {
                             return Err(ErrorKind::TimeoutError.into());
                         }
                     }
-                    sleep(time::Duration::from_millis(100));
+                    sleep(std::time::Duration::from_millis(100));
                     continue;
                 }
                 _ => {}
@@ -234,7 +239,7 @@ impl Ros {
         }
     }
 
-    pub fn service<T, F>(&mut self, service: &str, handler: F) -> Result<Service>
+    pub fn service<T, F>(&self, service: &str, handler: F) -> Result<Service>
     where
         T: ServicePair,
         F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
@@ -251,7 +256,7 @@ impl Ros {
     }
 
     pub fn subscribe<T, F>(
-        &mut self,
+        &self,
         topic: &str,
         mut queue_size: usize,
         callback: F,
@@ -273,7 +278,7 @@ impl Ros {
         )
     }
 
-    pub fn publish<T>(&mut self, topic: &str, mut queue_size: usize) -> Result<Publisher<T>>
+    pub fn publish<T>(&self, topic: &str, mut queue_size: usize) -> Result<Publisher<T>>
     where
         T: Message,
     {
@@ -291,9 +296,26 @@ impl Ros {
         )
     }
 
-    pub fn log(&mut self, level: i8, msg: String, file: &str, line: u32) {
-        let logger = &mut match self.logger {
-            Some(ref mut v) => v,
+    fn log_to_terminal(&self, level: i8, msg: &str, file: &str, line: u32) {
+        use colored::{Color, Colorize};
+
+        let format_string =
+            |prefix, color| format!("[{} @ {}:{}]: {}", prefix, file, line, msg).color(color);
+
+        match level {
+            Log::DEBUG => println!("{}", format_string("DEBUG", Color::White)),
+            Log::INFO => println!("{}", format_string("INFO", Color::White)),
+            Log::WARN => eprintln!("{}", format_string("WARN", Color::Yellow)),
+            Log::ERROR => eprintln!("{}", format_string("ERROR", Color::Red)),
+            Log::FATAL => eprintln!("{}", format_string("FATAL", Color::Red)),
+            _ => {}
+        }
+    }
+
+    pub fn log(&self, level: i8, msg: String, file: &str, line: u32) {
+        self.log_to_terminal(level, &msg, file, line);
+        let logger = &match self.logger {
+            Some(ref v) => v,
             None => return,
         };
         let topics = self.slave.publications.get_topic_names();
@@ -388,13 +410,13 @@ fn yaml_to_string(val: Yaml) -> Result<String> {
 }
 
 pub struct Spinner {
-    shutdown_rx: Option<Receiver<()>>,
+    shutdown_manager: Arc<ShutdownManager>,
 }
 
 impl Drop for Spinner {
     fn drop(&mut self) {
-        if let Some(ref rx) = self.shutdown_rx {
-            rx.recv().is_ok();
+        while !self.shutdown_manager.awaiting_shutdown() {
+            sleep(std::time::Duration::from_millis(100));
         }
     }
 }

@@ -30,7 +30,7 @@ impl Mapper {
 
     pub fn translate(&self, keys: &[String]) -> Option<Slice> {
         match keys.split_first() {
-            None => self.value.as_ref().map(|v| v.slice()),
+            None => self.value.as_ref().map(Path::slice),
             Some((key, child_keys)) => self.children.get(key).and_then(|v| v.translate(child_keys)),
         }
     }

@@ -81,7 +81,7 @@ impl SubscriptionsTracker {
             .lock()
             .expect(FAILED_TO_LOCK)
             .get(topic)
-            .map_or(0, |sub| sub.publisher_count())
+            .map_or(0, Subscriber::publisher_count)
     }
 }
 

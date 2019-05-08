@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 mod msg;
 
 fn main() {

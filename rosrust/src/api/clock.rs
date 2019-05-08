@@ -10,6 +10,21 @@ use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
 static BEFORE_EPOCH: &'static str = "Requested time is before UNIX epoch.";
 
+pub struct Delay {
+    clock: Arc<Clock>,
+    delay: Duration,
+}
+
+impl Delay {
+    pub fn new(clock: Arc<Clock>, delay: Duration) -> Self {
+        Self { clock, delay }
+    }
+
+    pub fn sleep(self) {
+        self.clock.sleep(self.delay);
+    }
+}
+
 pub struct Rate {
     clock: Arc<Clock>,
     next: Time,

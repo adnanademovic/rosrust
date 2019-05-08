@@ -8,8 +8,10 @@ members = [
     "examples/reservedkeywords",
     "rosrust",
     "rosrust_codegen",
+    "rosrust_diagnostics",
 ]
 
 [patch.crates-io]
 "rosrust" = { path = "rosrust" }
 "rosrust_codegen" = { path = "rosrust_codegen" }
+"rosrust_diagnostics" = { path = "rosrust_diagnostics" }

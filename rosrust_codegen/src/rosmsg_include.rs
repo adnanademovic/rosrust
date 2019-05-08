@@ -24,7 +24,7 @@ pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
         .iter()
         .chain(cmake_alt_paths.iter())
         .chain(extra_paths.iter())
-        .map(|v| v.as_str())
+        .map(String::as_str)
         .collect::<Vec<&str>>();
     let output = genmsg::depend_on_messages(paths.as_slice(), messages)
         .unwrap()
@@ -37,7 +37,7 @@ pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
 }
 
 fn append_share_folder(path: &str) -> Option<String> {
-    Path::new(path).join("share").to_str().map(|v| v.to_owned())
+    Path::new(path).join("share").to_str().map(String::from)
 }
 
 fn append_src_folder(path: &str) -> Option<String> {
@@ -45,5 +45,5 @@ fn append_src_folder(path: &str) -> Option<String> {
         .join("..")
         .join("src")
         .to_str()
-        .map(|v| v.to_owned())
+        .map(String::from)
 }

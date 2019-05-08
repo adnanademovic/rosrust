@@ -1,19 +1,18 @@
 use crate::api::raii::{Publisher, Service, Subscriber};
 use crate::api::resolve::get_unused_args;
-use crate::api::{Parameter, Rate, Ros, SystemState, Topic};
+use crate::api::{Delay, Parameter, Rate, Ros, SystemState, Topic};
 use crate::error::{ErrorKind, Result};
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
+use crossbeam::sync::ShardedLock;
 use ctrlc;
 use lazy_static::lazy_static;
-use log::info;
-use std::sync::Mutex;
 use std::time;
 
 lazy_static! {
-    static ref ROS: Mutex<Option<Ros>> = Mutex::new(None);
+    static ref ROS: ShardedLock<Option<Ros>> = ShardedLock::new(None);
 }
 
 #[inline]
@@ -27,7 +26,7 @@ pub fn try_init(name: &str) -> Result<()> {
 }
 
 pub fn try_init_with_options(name: &str, capture_sigint: bool) -> Result<()> {
-    let mut ros = ROS.lock().expect(FAILED_TO_LOCK);
+    let mut ros = ROS.write().expect(FAILED_TO_LOCK);
     if ros.is_some() {
         bail!(ErrorKind::MultipleInitialization);
     }
@@ -35,9 +34,7 @@ pub fn try_init_with_options(name: &str, capture_sigint: bool) -> Result<()> {
     if capture_sigint {
         let shutdown_sender = client.shutdown_sender();
         ctrlc::set_handler(move || {
-            if shutdown_sender.send(()).is_err() {
-                info!("ROS client is already down");
-            }
+            shutdown_sender.shutdown();
         })?;
     }
     *ros = Some(client);
@@ -46,9 +43,9 @@ pub fn try_init_with_options(name: &str, capture_sigint: bool) -> Result<()> {
 
 macro_rules! ros {
     () => {
-        ROS.lock()
+        ROS.read()
             .expect(FAILED_TO_LOCK)
-            .as_mut()
+            .as_ref()
             .expect(UNINITIALIZED)
     };
 }
@@ -79,8 +76,13 @@ pub fn now() -> Time {
 }
 
 #[inline]
+pub fn delay(d: Duration) -> Delay {
+    ros!().delay(d)
+}
+
+#[inline]
 pub fn sleep(d: Duration) {
-    ros!().sleep(d)
+    delay(d).sleep();
 }
 
 #[inline]
@@ -100,8 +102,8 @@ pub fn spin() {
 }
 
 #[inline]
-pub fn shutdown() -> bool {
-    ros!().shutdown_sender().send(()).is_ok()
+pub fn shutdown() {
+    ros!().shutdown_sender().shutdown()
 }
 
 #[inline]
