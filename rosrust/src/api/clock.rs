@@ -1,7 +1,6 @@
 use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
-use crossbeam::channel::{unbounded, Sender};
-use log::warn;
+use crossbeam::sync::{Parker, Unparker};
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
@@ -85,7 +84,13 @@ impl Clock for RealClock {
 
 struct Timeout {
     timestamp: Time,
-    tx: Sender<()>,
+    unparker: Unparker,
+}
+
+impl Drop for Timeout {
+    fn drop(&mut self) {
+        self.unparker.unpark();
+    }
 }
 
 impl cmp::PartialEq for Timeout {
@@ -131,9 +136,7 @@ impl SimulatedClock {
                 Some(next) if next.timestamp > data.current => break,
                 _ => {}
             }
-            if let Some(next) = data.timeouts.pop() {
-                next.tx.send(()).expect(SLEEPING_THREAD_MISSING);
-            }
+            data.timeouts.pop();
         }
     }
 }
@@ -155,17 +158,19 @@ impl Clock for SimulatedClock {
 
     #[inline]
     fn wait_until(&self, timestamp: Time) {
-        let (tx, rx) = unbounded();
+        let parker = Parker::new();
+        let unparker = parker.unparker().clone();
         {
             self.data
                 .lock()
                 .expect(FAILED_TO_LOCK)
                 .timeouts
-                .push(Timeout { timestamp, tx });
+                .push(Timeout {
+                    timestamp,
+                    unparker,
+                });
         }
-        if rx.recv().is_err() {
-            warn!("Sleep beyond simulated clock");
-        }
+        parker.park()
     }
 
     fn await_init(&self) {
@@ -174,5 +179,3 @@ impl Clock for SimulatedClock {
         }
     }
 }
-
-static SLEEPING_THREAD_MISSING: &'static str = "Failed to find sleeping thread";
