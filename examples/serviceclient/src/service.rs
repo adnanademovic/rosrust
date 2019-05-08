@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 use env_logger;
 use rosrust;
 
