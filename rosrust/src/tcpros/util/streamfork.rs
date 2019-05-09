@@ -71,9 +71,11 @@ impl<T: Write + Send + 'static> ForkThread<T> {
         data: &LossyReceiver<Arc<Vec<u8>>>,
     ) -> Result<(), channel::RecvError> {
         channel::select! {
-            recv(data) -> msg => {
-                let buffer = msg?.ok_or(channel::RecvError)?;
-                self.publish_buffer_and_prune_targets(&buffer);
+            recv(data.kill_rx) -> msg => {
+                return msg.and(Err(channel::RecvError));
+            }
+            recv(data.data_rx) -> msg => {
+                self.publish_buffer_and_prune_targets(&msg?);
             }
             recv(streams) -> target => {
                 self.add_target(target?);

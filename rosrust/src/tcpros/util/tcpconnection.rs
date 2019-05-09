@@ -1,4 +1,4 @@
-use crossbeam::channel::{bounded, select, unbounded, Receiver, Sender};
+use crossbeam::channel::{self, bounded, unbounded, Receiver, Sender};
 use log::error;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
@@ -41,7 +41,7 @@ impl Iterator for TcpConnectionIterator {
     type Item = TcpStream;
 
     fn next(&mut self) -> Option<Self::Item> {
-        select! {
+        channel::select! {
             recv(self.tcp_stream_rx) -> msg => msg.ok(),
             recv(self.kill_rx) -> _ => None,
         }

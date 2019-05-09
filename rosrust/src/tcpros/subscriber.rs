@@ -102,11 +102,7 @@ where
     T: Message,
     F: Fn(T) -> (),
 {
-    for buffer_option in data {
-        let buffer = match buffer_option {
-            Some(v) => v,
-            None => break, // Only the Subscriber destructor can send this signal
-        };
+    for buffer in data {
         match RosMsg::decode_slice(&buffer) {
             Ok(value) => callback(value),
             Err(err) => error!("Failed to decode message: {}", err),
