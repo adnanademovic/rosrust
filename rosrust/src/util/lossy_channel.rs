@@ -1,22 +1,18 @@
+use crate::util::killable_channel::{channel, KillMode, Killer, Receiver, SendMode, Sender};
 use crate::util::FAILED_TO_LOCK;
-use crossbeam::channel::{self, unbounded, Receiver, Sender};
+use crossbeam::channel;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[allow(clippy::mutex_atomic)]
 pub fn lossy_channel<T>(queue_size: usize) -> (LossySender<T>, LossyReceiver<T>) {
-    let (data_tx, data_rx) = unbounded();
-    let (kill_tx, kill_rx) = unbounded();
+    let (killer, data_tx, receiver) = channel(SendMode::Unbounded, KillMode::Async);
     let is_open = Arc::new(AtomicBool::new(true));
-    let receiver = LossyReceiver {
-        data_rx: data_rx.clone(),
-        kill_rx,
-    };
     let queue_size = Arc::new(Mutex::new(queue_size));
     let sender = LossySender {
         data_tx,
-        data_rx,
-        kill_tx,
+        data_rx: receiver.data_rx.clone(),
+        killer,
         is_open,
         queue_size,
     };
@@ -26,8 +22,8 @@ pub fn lossy_channel<T>(queue_size: usize) -> (LossySender<T>, LossyReceiver<T>)
 #[derive(Clone)]
 pub struct LossySender<T> {
     data_tx: Sender<T>,
-    data_rx: Receiver<T>,
-    kill_tx: Sender<()>,
+    data_rx: channel::Receiver<T>,
+    killer: Killer,
     is_open: Arc<AtomicBool>,
     pub queue_size: Arc<Mutex<usize>>,
 }
@@ -42,9 +38,9 @@ impl<T> LossySender<T> {
         Ok(())
     }
 
-    pub fn close(&self) -> Result<(), channel::SendError<()>> {
+    pub fn close(&mut self) -> Result<(), channel::SendError<()>> {
         self.is_open.store(false, Ordering::SeqCst);
-        self.kill_tx.send(())
+        self.killer.send()
     }
 
     fn remove_extra_data(&self) {
@@ -67,18 +63,4 @@ impl<T> LossySender<T> {
     }
 }
 
-pub struct LossyReceiver<T> {
-    pub data_rx: Receiver<T>,
-    pub kill_rx: Receiver<()>,
-}
-
-impl<T> Iterator for LossyReceiver<T> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        channel::select! {
-            recv(self.data_rx) -> msg => msg.ok(),
-            recv(self.kill_rx) -> _ => None,
-        }
-    }
-}
+pub type LossyReceiver<T> = Receiver<T>;

@@ -71,7 +71,7 @@ impl<T: Write + Send + 'static> ForkThread<T> {
         data: &LossyReceiver<Arc<Vec<u8>>>,
     ) -> Result<(), channel::RecvError> {
         channel::select! {
-            recv(data.kill_rx) -> msg => {
+            recv(data.kill_rx.kill_rx) -> msg => {
                 return msg.and(Err(channel::RecvError));
             }
             recv(data.data_rx) -> msg => {

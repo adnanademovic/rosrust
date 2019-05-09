@@ -2,7 +2,7 @@ use super::publications::PublicationsTracker;
 use super::subscriptions::SubscriptionsTracker;
 use crate::rosxmlrpc::{self, Response, ResponseError, Server};
 use crate::tcpros::Service;
-use crossbeam::channel::Sender;
+use crate::util::kill;
 use log::{error, info};
 use nix::unistd::getpid;
 use std::collections::HashMap;
@@ -29,7 +29,7 @@ impl SlaveHandler {
         master_uri: &str,
         hostname: &str,
         name: &str,
-        shutdown_signal: Sender<()>,
+        shutdown_signal: kill::Sender,
     ) -> SlaveHandler {
         let mut server = Server::default();
 
@@ -59,7 +59,7 @@ impl SlaveHandler {
                 _ => return Err(ResponseError::Client("Missing argument 'message'".into())),
             };
             info!("Server is shutting down because: {}", message);
-            match shutdown_signal.clone().send(()) {
+            match shutdown_signal.send() {
                 Ok(()) => Ok(Value::Int(0)),
                 Err(err) => {
                     error!("Shutdown error: {:?}", err);
