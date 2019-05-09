@@ -7,9 +7,8 @@ use crate::util::FAILED_TO_LOCK;
 use log::error;
 use std;
 use std::collections::HashMap;
-use std::net::{TcpListener, ToSocketAddrs};
-use std::sync::{Arc, Mutex};
-use std::thread;
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::{atomic, Arc, Mutex};
 
 pub struct Publisher {
     subscriptions: DataStream,
@@ -17,7 +16,13 @@ pub struct Publisher {
     pub topic: Topic,
     last_message: Arc<Mutex<Arc<Vec<u8>>>>,
     queue_size: usize,
-    _raii: tcpconnection::Raii,
+    exists: Arc<atomic::AtomicBool>,
+}
+
+impl Drop for Publisher {
+    fn drop(&mut self) {
+        self.exists.store(false, atomic::Ordering::SeqCst);
+    }
 }
 
 fn match_concrete_headers<T: Message>(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
@@ -62,42 +67,41 @@ where
     write_response::<T, U>(&mut stream)
 }
 
-fn listen_for_subscribers<T, U, V>(
+fn process_subscriber<T, U>(
     topic: &str,
-    listener: V,
+    mut stream: U,
     targets: &TargetList<U>,
     last_message: &Mutex<Arc<Vec<u8>>>,
-) where
+) -> tcpconnection::Feedback
+where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
-    V: Iterator<Item = U>,
 {
-    // This listener stream never breaks by itself since it's a TcpListener
-    for mut stream in listener {
-        let result = exchange_headers::<T, _>(&mut stream, topic)
-            .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
-        if let Err(err) = result {
-            let info = err
-                .iter()
-                .map(|v| format!("{}", v))
-                .collect::<Vec<_>>()
-                .join("\nCaused by:");
-            error!("{}", info);
-            continue;
-        }
-
-        if let Err(err) = stream.write_all(&last_message.lock().expect(FAILED_TO_LOCK)) {
-            error!("{}", err);
-            continue;
-        }
-
-        if targets.add(stream).is_err() {
-            // The TCP listener gets shut down when streamfork's thread deallocates.
-            // This happens only when all the corresponding publisher streams get deallocated,
-            // causing streamfork's data channel to shut down
-            break;
-        }
+    let result = exchange_headers::<T, _>(&mut stream, topic)
+        .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
+    if let Err(err) = result {
+        let info = err
+            .iter()
+            .map(|v| format!("{}", v))
+            .collect::<Vec<_>>()
+            .join("\nCaused by:");
+        error!("{}", info);
+        return tcpconnection::Feedback::AcceptNextStream;
     }
+
+    if let Err(err) = stream.write_all(&last_message.lock().expect(FAILED_TO_LOCK)) {
+        error!("{}", err);
+        return tcpconnection::Feedback::AcceptNextStream;
+    }
+
+    if targets.add(stream).is_err() {
+        // The TCP listener gets shut down when streamfork's thread deallocates.
+        // This happens only when all the corresponding publisher streams get deallocated,
+        // causing streamfork's data channel to shut down
+        return tcpconnection::Feedback::StopAccepting;
+    }
+
+    return tcpconnection::Feedback::AcceptNextStream;
 }
 
 impl Publisher {
@@ -108,54 +112,41 @@ impl Publisher {
     {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
-        // We will queue up to 8 connection requests to be processed before blocking the
-        // connection receiving thread.
-        let tcp_listener_queue_size = 8;
-        let (raii, listener) = tcpconnection::iterate(
-            listener,
-            format!("topic '{}'", topic),
-            Some(tcp_listener_queue_size),
-        );
-        Ok(Publisher::wrap_stream::<T, _, _>(
-            topic,
-            raii,
-            listener,
-            socket_address.port(),
-            queue_size,
-        ))
-    }
 
-    fn wrap_stream<T, U, V>(
-        topic: &str,
-        raii: tcpconnection::Raii,
-        listener: V,
-        port: u16,
-        queue_size: usize,
-    ) -> Publisher
-    where
-        T: Message,
-        U: std::io::Read + std::io::Write + Send + 'static,
-        V: Iterator<Item = U> + Send + 'static,
-    {
+        let publisher_exists = Arc::new(atomic::AtomicBool::new(true));
+
+        let port = socket_address.port();
         let (targets, data) = fork(queue_size);
-        let topic_name = String::from(topic);
         let last_message = Arc::new(Mutex::new(Arc::new(Vec::new())));
-        let last_msg_for_thread = Arc::clone(&last_message);
-        thread::spawn(move || {
-            listen_for_subscribers::<T, _, _>(&topic_name, listener, &targets, &last_msg_for_thread)
-        });
+
+        let iterate_handler = {
+            let publisher_exists = publisher_exists.clone();
+            let topic = String::from(topic);
+            let last_message = Arc::clone(&last_message);
+
+            move |stream: TcpStream| {
+                if !publisher_exists.load(atomic::Ordering::SeqCst) {
+                    return tcpconnection::Feedback::StopAccepting;
+                }
+                process_subscriber::<T, _>(&topic, stream, &targets, &last_message)
+            }
+        };
+
+        tcpconnection::iterate(listener, format!("topic '{}'", topic), iterate_handler);
+
         let topic = Topic {
             name: String::from(topic),
             msg_type: T::msg_type(),
         };
-        Publisher {
+
+        Ok(Publisher {
             subscriptions: data,
             port,
             topic,
             last_message,
             queue_size,
-            _raii: raii,
-        }
+            exists: publisher_exists,
+        })
     }
 
     pub fn stream<T: Message>(&self, queue_size: usize) -> Result<PublisherStream<T>> {

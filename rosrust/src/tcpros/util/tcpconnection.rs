@@ -1,48 +1,33 @@
-use crate::util::killable_channel::{channel, KillMode, Killer, Receiver, SendMode, Sender};
 use log::error;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-pub fn iterate(
-    listener: TcpListener,
-    tag: String,
-    queue_size: Option<usize>,
-) -> (Raii, TcpConnectionIterator) {
-    let queue_mode = match queue_size {
-        Some(queue_size) => SendMode::Bounded(queue_size),
-        None => SendMode::Unbounded,
-    };
-    let (killer, tcp_stream_tx, tcp_stream_rx) = channel(queue_mode, KillMode::Sync);
-    let killer = Raii { killer };
-    thread::spawn(move || listener_thread(&listener, &tag, &tcp_stream_tx));
-    (killer, tcp_stream_rx)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Feedback {
+    AcceptNextStream,
+    StopAccepting,
 }
 
-fn listener_thread(connections: &TcpListener, tag: &str, out: &Sender<TcpStream>) {
+pub fn iterate<F>(listener: TcpListener, tag: String, handler: F)
+where
+    F: Fn(TcpStream) -> Feedback + Send + 'static,
+{
+    thread::spawn(move || listener_thread(&listener, &tag, handler));
+}
+
+fn listener_thread<F>(connections: &TcpListener, tag: &str, handler: F)
+where
+    F: Fn(TcpStream) -> Feedback + Send + 'static,
+{
     for stream in connections.incoming() {
         match stream {
-            Ok(stream) => {
-                if out.send(stream).is_err() {
-                    break;
-                }
-            }
+            Ok(stream) => match handler(stream) {
+                Feedback::AcceptNextStream => {}
+                Feedback::StopAccepting => break,
+            },
             Err(err) => {
                 error!("TCP connection failed at {}: {}", tag, err);
             }
-        }
-    }
-}
-
-pub type TcpConnectionIterator = Receiver<TcpStream>;
-
-pub struct Raii {
-    killer: Killer,
-}
-
-impl Drop for Raii {
-    fn drop(&mut self) {
-        if self.killer.send().is_err() {
-            error!("TCP connection listener has already been killed");
         }
     }
 }
