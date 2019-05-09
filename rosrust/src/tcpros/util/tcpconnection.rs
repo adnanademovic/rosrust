@@ -3,8 +3,16 @@ use log::error;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-pub fn iterate(listener: TcpListener, tag: String) -> (Raii, TcpConnectionIterator) {
-    let (killer, tcp_stream_tx, tcp_stream_rx) = channel(SendMode::Unbounded, KillMode::Sync);
+pub fn iterate(
+    listener: TcpListener,
+    tag: String,
+    queue_size: Option<usize>,
+) -> (Raii, TcpConnectionIterator) {
+    let queue_mode = match queue_size {
+        Some(queue_size) => SendMode::Bounded(queue_size),
+        None => SendMode::Unbounded,
+    };
+    let (killer, tcp_stream_tx, tcp_stream_rx) = channel(queue_mode, KillMode::Sync);
     let killer = Raii { killer };
     thread::spawn(move || listener_thread(&listener, &tag, &tcp_stream_tx));
     (killer, tcp_stream_rx)

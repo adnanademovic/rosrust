@@ -108,7 +108,14 @@ impl Publisher {
     {
         let listener = TcpListener::bind(address)?;
         let socket_address = listener.local_addr()?;
-        let (raii, listener) = tcpconnection::iterate(listener, format!("topic '{}'", topic));
+        // We will queue up to 8 connection requests to be processed before blocking the
+        // connection receiving thread.
+        let tcp_listener_queue_size = 8;
+        let (raii, listener) = tcpconnection::iterate(
+            listener,
+            format!("topic '{}'", topic),
+            Some(tcp_listener_queue_size),
+        );
         Ok(Publisher::wrap_stream::<T, _, _>(
             topic,
             raii,

@@ -35,7 +35,14 @@ impl Service {
         let listener = TcpListener::bind((bind_address, port))?;
         let socket_address = listener.local_addr()?;
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
-        let (raii, listener) = tcpconnection::iterate(listener, format!("service '{}'", service));
+        // We will queue up to 8 connection requests to be processed before blocking the
+        // connection receiving thread.
+        let tcp_listener_queue_size = 8;
+        let (raii, listener) = tcpconnection::iterate(
+            listener,
+            format!("service '{}'", service),
+            Some(tcp_listener_queue_size),
+        );
         Ok(Service::wrap_stream::<T, _, _, _>(
             service, node_name, handler, raii, listener, &api,
         ))
