@@ -23,11 +23,13 @@ impl GoalIdGenerator {
         Self::default()
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn new_named(name: String) -> Self {
         Self { name }
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn set_name(&mut self, name: String) {
         self.name = name;

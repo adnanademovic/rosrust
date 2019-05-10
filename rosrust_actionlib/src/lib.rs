@@ -1,11 +1,14 @@
-pub use self::goal_id_generator::GoalIdGenerator;
+pub use self::action_server::ActionServer;
+use self::status_tracker::StatusTracker;
 #[doc(hidden)]
 pub use paste;
 
+mod action_server;
 mod goal_id_generator;
 #[macro_use]
 mod macros;
 pub mod msg;
+mod status_tracker;
 
 pub trait Action: rosrust::Message {
     type Goal: ActionGoal;
@@ -23,7 +26,7 @@ pub trait ActionGoal: rosrust::Message {
     fn from_goal(t: Goal<Self::Body>) -> Self;
 }
 
-pub struct Goal<T: rosrust::Message> {
+pub struct Goal<T> {
     pub header: msg::std_msgs::Header,
     pub id: msg::actionlib_msgs::GoalID,
     pub body: T,
@@ -36,7 +39,7 @@ pub trait ActionResponse: rosrust::Message {
     fn from_response(t: Response<Self::Body>) -> Self;
 }
 
-pub struct Response<T: rosrust::Message> {
+pub struct Response<T> {
     pub header: msg::std_msgs::Header,
     pub status: msg::actionlib_msgs::GoalStatus,
     pub body: T,
