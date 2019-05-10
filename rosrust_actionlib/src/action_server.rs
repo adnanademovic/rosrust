@@ -4,13 +4,21 @@ use crate::Action;
 use std::sync::{Arc, Mutex};
 
 pub struct ActionServer<T: Action> {
+    fields: Arc<Mutex<Fields<T>>>,
+    _goal_sub: rosrust::Subscriber,
+    _cancel_sub: rosrust::Subscriber,
+    _status_timer: std::thread::JoinHandle<()>,
+}
+
+struct Fields<T: Action> {
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
-    goal_sub: rosrust::Subscriber,
-    cancel_sub: rosrust::Subscriber,
+    status_pub: rosrust::Publisher<GoalStatusArray>,
+    status_list_timeout: i64,
+    status_list: Vec<StatusTracker<T>>,
     status_frequency: f64,
-    status_list: Arc<Mutex<StatusList<T>>>,
-    status_timer: std::thread::JoinHandle<()>,
+    on_goal: Box<Fn(T::Goal) + Send + Sync>,
+    on_cancel: Box<Fn(GoalID) + Send + Sync>,
 }
 
 fn decode_queue_size(param: &str, default: usize) -> usize {
@@ -33,27 +41,24 @@ fn get_status_frequency() -> Option<f64> {
     rosrust::param(&key)?.get().ok()
 }
 
-fn create_status_publisher<F: Fn()>(frequency: f64, callback: F) -> impl Fn() {
+fn create_status_publisher<F>(frequency: f64, callback: F) -> impl Fn()
+where
+    F: Fn() -> rosrust::error::Result<()>,
+{
     move || {
         let mut rate = rosrust::rate(frequency);
         rosrust::ros_debug!("Starting timer");
         while rosrust::is_ok() {
             rate.sleep();
-            callback()
+            if let Err(err) = callback() {
+                rosrust::ros_err!("Failed to publish status: {}", err);
+            }
         }
     }
 }
 
 impl<T: Action> ActionServer<T> {
-    pub fn new<Fg, Fc, Fs>(
-        namespace: &str,
-        on_goal: Fg,
-        on_cancel: Fc,
-    ) -> rosrust::error::Result<Self>
-    where
-        Fg: Fn(T::Goal) + Send + 'static,
-        Fc: Fn(GoalID) + Send + 'static,
-    {
+    pub fn new(namespace: &str) -> rosrust::error::Result<Self> {
         let pub_queue_size = decode_queue_size("actionlib_server_pub_queue_size", 50);
         let sub_queue_size = decode_queue_size("actionlib_server_sub_queue_size", 0);
 
@@ -61,66 +66,132 @@ impl<T: Action> ActionServer<T> {
         let result_pub = rosrust::publish(&format!("{}/result", namespace), pub_queue_size)?;
         let feedback_pub = rosrust::publish(&format!("{}/feedback", namespace), pub_queue_size)?;
 
-        let goal_sub = rosrust::subscribe(&format!("{}/goal", namespace), sub_queue_size, on_goal)?;
-        let cancel_sub =
-            rosrust::subscribe(&format!("{}/cancel", namespace), sub_queue_size, on_cancel)?;
-
         let status_frequency = get_status_frequency().unwrap_or(5.0);
 
         let status_list_timeout = rosrust::param(&format!("{}/status_list_timeout", namespace))
             .ok_or_else(|| "Bad actionlib namespace")?
             .get()
             .unwrap_or(5.0);
-        let status_list_timeout =
-            rosrust::Duration::from_nanos((status_list_timeout as i64) * 1_000_000_000);
+        let status_list_timeout = (status_list_timeout * 1_000_000_000.0) as i64;
 
-        let status_list = Arc::new(Mutex::new(StatusList {
-            publisher: status_pub,
-            timeout: status_list_timeout,
-            items: vec![],
+        let fields = Arc::new(Mutex::new(Fields {
+            result_pub,
+            feedback_pub,
+            status_pub,
+            status_frequency,
+            status_list: vec![],
+            status_list_timeout,
+            on_goal: Box::new(|_| {}),
+            on_cancel: Box::new(|_| {}),
         }));
 
         let on_status = {
-            let status_list = Arc::clone(&status_list);
-            move || {
-                if let Err(err) = status_list.lock().expect("Failed to lock mutex").publish() {
-                    rosrust::ros_err!("Failed to publish status: {}", err);
-                }
-            }
+            let fields = Arc::clone(&fields);
+            move || fields.lock().expect(MUTEX_LOCK_FAIL).publish_status()
         };
 
         let status_timer = std::thread::spawn(create_status_publisher(status_frequency, on_status));
 
+        let internal_on_goal = {
+            let fields = Arc::clone(&fields);
+            move |goal| fields.lock().expect(MUTEX_LOCK_FAIL).handle_on_goal(goal)
+        };
+
+        let goal_sub = rosrust::subscribe(
+            &format!("{}/goal", namespace),
+            sub_queue_size,
+            internal_on_goal,
+        )?;
+
+        let internal_on_cancel = {
+            let fields = Arc::clone(&fields);
+            move |goal_id| {
+                fields
+                    .lock()
+                    .expect(MUTEX_LOCK_FAIL)
+                    .handle_on_cancel(goal_id)
+            }
+        };
+
+        let cancel_sub = rosrust::subscribe(
+            &format!("{}/cancel", namespace),
+            sub_queue_size,
+            internal_on_cancel,
+        )?;
+
         Ok(Self {
-            result_pub,
-            feedback_pub,
-            goal_sub,
-            cancel_sub,
-            status_frequency,
-            status_list,
-            status_timer,
+            fields,
+            _goal_sub: goal_sub,
+            _cancel_sub: cancel_sub,
+            _status_timer: status_timer,
         })
     }
-}
 
-struct StatusList<T> {
-    publisher: rosrust::Publisher<GoalStatusArray>,
-    timeout: rosrust::Duration,
-    items: Vec<StatusTracker<T>>,
-}
-
-impl<T: Action> StatusList<T> {
-    fn get_status_array(&mut self) -> GoalStatusArray {
-        GoalStatusArray::default()
+    pub fn set_on_goal<F>(&mut self, on_goal: F)
+    where
+        F: Fn(T::Goal) + Send + Sync + 'static,
+    {
+        self.fields.lock().expect(MUTEX_LOCK_FAIL).on_goal = Box::new(on_goal);
     }
 
-    fn publish(&mut self) -> rosrust::error::Result<()> {
+    pub fn set_on_cancel<F>(&mut self, on_cancel: F)
+    where
+        F: Fn(GoalID) + Send + Sync + 'static,
+    {
+        self.fields.lock().expect(MUTEX_LOCK_FAIL).on_cancel = Box::new(on_cancel);
+    }
+}
+
+impl<T: Action> Fields<T> {
+    fn get_status_array(&mut self) -> GoalStatusArray {
+        let now = rosrust::now();
+        let now_nanos = now.nanos();
+        let status_list_timeout = self.status_list_timeout;
+        self.status_list.retain(|tracker| {
+            let destruction_time = tracker.handle_destruction_time.nanos();
+            if destruction_time == 0 {
+                return true;
+            }
+            if destruction_time + status_list_timeout > now_nanos {
+                return true;
+            }
+            rosrust::ros_debug!(
+                "Item {} with destruction time of {} being removed from list.  Now = {}",
+                tracker.status.goal_id.id,
+                tracker.handle_destruction_time.seconds(),
+                now.seconds()
+            );
+            return false;
+        });
+        let status_list = self
+            .status_list
+            .iter()
+            .map(|tracker| tracker.status.clone())
+            .collect();
+        GoalStatusArray {
+            header: Default::default(),
+            status_list,
+        }
+    }
+
+    fn publish_status(&mut self) -> rosrust::error::Result<()> {
         let status_array = self.get_status_array();
         if !rosrust::is_ok() {
             return Ok(());
         }
-        self.publisher.send(status_array)
+        self.status_pub.send(status_array)
+    }
+
+    fn handle_on_goal(&self, goal: T::Goal) {
+        unimplemented!();
+        (*self.on_goal)(goal);
+    }
+
+    fn handle_on_cancel(&self, goal_id: GoalID) {
+        unimplemented!();
+        (*self.on_cancel)(goal_id);
     }
 }
 
 static UNEXPECTED_FAILED_NAME_RESOLVE: &str = "Resolving this parameter name should never fail";
+static MUTEX_LOCK_FAIL: &str = "Failed to lock mutex";
