@@ -1,5 +1,4 @@
 pub use self::action_server::ActionServer;
-use self::status_tracker::StatusTracker;
 #[doc(hidden)]
 pub use paste;
 
