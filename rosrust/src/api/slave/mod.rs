@@ -6,8 +6,8 @@ use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result};
 use crate::api::ShutdownManager;
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
-use crate::util::{FAILED_TO_LOCK, MPSC_CHANNEL_UNEXPECTEDLY_CLOSED};
-use crossbeam::channel::{bounded, unbounded, Sender, TryRecvError};
+use crate::util::{kill, FAILED_TO_LOCK};
+use crossbeam::channel::TryRecvError;
 use log::error;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -19,7 +19,7 @@ pub struct Slave {
     pub publications: publications::PublicationsTracker,
     pub subscriptions: subscriptions::SubscriptionsTracker,
     pub services: Arc<Mutex<HashMap<String, Service>>>,
-    pub shutdown_tx: Sender<()>,
+    pub shutdown_tx: kill::Sender,
 }
 
 type SerdeResult<T> = Result<T>;
@@ -35,12 +35,11 @@ impl Slave {
     ) -> Result<Slave> {
         use std::net::ToSocketAddrs;
 
-        let (shutdown_tx, shutdown_rx) = bounded(0);
+        let (shutdown_tx, shutdown_rx) = kill::channel(kill::KillMode::Sync);
         let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx.clone());
         let publications = handler.publications.clone();
         let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
-        let (port_tx, port_rx) = unbounded();
         let socket_addr = match (bind_address, port).to_socket_addrs()?.next() {
             Some(socket_addr) => socket_addr,
             None => bail!(error::ErrorKind::from(error::rosxmlrpc::ErrorKind::BadUri(
@@ -48,20 +47,12 @@ impl Slave {
             ))),
         };
 
+        let bound_handler = handler.bind(&socket_addr)?;
+
+        let port = bound_handler.local_addr().port();
+        let uri = format!("http://{}:{}/", hostname, port);
+
         thread::spawn(move || {
-            let bound_handler = match handler.bind(&socket_addr) {
-                Ok(v) => v,
-                Err(err) => {
-                    port_tx
-                        .send(Err(err))
-                        .expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
-                    return;
-                }
-            };
-            let port = bound_handler.local_addr().port();
-            port_tx
-                .send(Ok(port))
-                .expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED);
             loop {
                 match shutdown_rx.try_recv() {
                     Ok(_) | Err(TryRecvError::Disconnected) => break,
@@ -73,9 +64,6 @@ impl Slave {
             }
             shutdown_manager.shutdown();
         });
-
-        let port = port_rx.recv().expect(MPSC_CHANNEL_UNEXPECTEDLY_CLOSED)?;
-        let uri = format!("http://{}:{}/", hostname, port);
 
         Ok(Slave {
             name: String::from(name),

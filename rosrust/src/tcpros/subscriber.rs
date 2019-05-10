@@ -4,7 +4,7 @@ use super::{Message, Topic};
 use crate::rosmsg::RosMsg;
 use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use crossbeam::channel::{unbounded, Receiver, Sender, TrySendError};
+use crossbeam::channel::{bounded, Receiver, Sender, TrySendError};
 use log::error;
 use std;
 use std::collections::{BTreeSet, HashMap};
@@ -25,7 +25,8 @@ impl Subscriber {
         F: Fn(T) -> () + Send + 'static,
     {
         let (data_tx, data_rx) = lossy_channel(queue_size);
-        let (pub_tx, pub_rx) = unbounded();
+        let publisher_connection_queue_size = 8;
+        let (pub_tx, pub_rx) = bounded(publisher_connection_queue_size);
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
         let data_stream = data_tx.clone();
@@ -102,11 +103,7 @@ where
     T: Message,
     F: Fn(T) -> (),
 {
-    for buffer_option in data {
-        let buffer = match buffer_option {
-            Some(v) => v,
-            None => break, // Only the Subscriber destructor can send this signal
-        };
+    for buffer in data {
         match RosMsg::decode_slice(&buffer) {
             Ok(value) => callback(value),
             Err(err) => error!("Failed to decode message: {}", err),

@@ -8,15 +8,21 @@ use log::error;
 use std;
 use std::collections::HashMap;
 use std::io;
-use std::net::TcpListener;
-use std::sync::Arc;
+use std::net::{TcpListener, TcpStream};
+use std::sync::{atomic, Arc};
 use std::thread;
 
 pub struct Service {
     pub api: String,
     pub msg_type: String,
     pub service: String,
-    _raii: tcpconnection::Raii,
+    exists: Arc<atomic::AtomicBool>,
+}
+
+impl Drop for Service {
+    fn drop(&mut self) {
+        self.exists.store(false, atomic::Ordering::SeqCst);
+    }
 }
 
 impl Service {
@@ -35,37 +41,31 @@ impl Service {
         let listener = TcpListener::bind((bind_address, port))?;
         let socket_address = listener.local_addr()?;
         let api = format!("rosrpc://{}:{}", hostname, socket_address.port());
-        let (raii, listener) = tcpconnection::iterate(listener, format!("service '{}'", service));
-        Ok(Service::wrap_stream::<T, _, _, _>(
-            service, node_name, handler, raii, listener, &api,
-        ))
-    }
 
-    fn wrap_stream<T, U, V, F>(
-        service: &str,
-        node_name: &str,
-        handler: F,
-        raii: tcpconnection::Raii,
-        listener: V,
-        api: &str,
-    ) -> Service
-    where
-        T: ServicePair,
-        U: std::io::Read + std::io::Write + Send + 'static,
-        V: Iterator<Item = U> + Send + 'static,
-        F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
-    {
-        let service_name = String::from(service);
-        let node_name = String::from(node_name);
-        thread::spawn(move || {
-            listen_for_clients::<T, _, _, _>(&service_name, &node_name, handler, listener)
-        });
-        Service {
+        let service_exists = Arc::new(atomic::AtomicBool::new(true));
+
+        let iterate_handler = {
+            let service_exists = service_exists.clone();
+            let service = String::from(service);
+            let node_name = String::from(node_name);
+            let handler = Arc::new(handler);
+            move |stream: TcpStream| {
+                if !service_exists.load(atomic::Ordering::SeqCst) {
+                    return tcpconnection::Feedback::StopAccepting;
+                }
+                consume_client::<T, _, _>(&service, &node_name, Arc::clone(&handler), stream);
+                return tcpconnection::Feedback::AcceptNextStream;
+            }
+        };
+
+        tcpconnection::iterate(listener, format!("service '{}'", service), iterate_handler);
+
+        Ok(Service {
             api: String::from(api),
             msg_type: T::msg_type(),
             service: String::from(service),
-            _raii: raii,
-        }
+            exists: service_exists,
+        })
     }
 }
 
@@ -74,34 +74,28 @@ enum RequestType {
     Action,
 }
 
-fn listen_for_clients<T, U, V, F>(service: &str, node_name: &str, handler: F, connections: V)
+fn consume_client<T, U, F>(service: &str, node_name: &str, handler: Arc<F>, mut stream: U)
 where
     T: ServicePair,
     U: std::io::Read + std::io::Write + Send + 'static,
-    V: Iterator<Item = U>,
     F: Fn(T::Request) -> ServiceResult<T::Response> + Send + Sync + 'static,
 {
-    let handler = Arc::new(handler);
-    for mut stream in connections {
-        // Service request starts by exchanging connection headers
-        match exchange_headers::<T, _>(&mut stream, service, node_name) {
-            Err(err) => {
-                // Connection can be closed when a client checks for a service.
-                if !err.is_closed_connection() {
-                    error!(
-                        "Failed to exchange headers for service '{}': {}",
-                        service, err
-                    );
-                }
-                continue;
+    // Service request starts by exchanging connection headers
+    match exchange_headers::<T, _>(&mut stream, service, node_name) {
+        Err(err) => {
+            // Connection can be closed when a client checks for a service.
+            if !err.is_closed_connection() {
+                error!(
+                    "Failed to exchange headers for service '{}': {}",
+                    service, err
+                );
             }
-
-            // Spawn a thread for handling requests
-            Ok(RequestType::Action) => {
-                spawn_request_handler::<T, U, F>(stream, Arc::clone(&handler))
-            }
-            Ok(RequestType::Probe) => (),
+            return;
         }
+
+        // Spawn a thread for handling requests
+        Ok(RequestType::Action) => spawn_request_handler::<T, U, F>(stream, Arc::clone(&handler)),
+        Ok(RequestType::Probe) => (),
     }
 }
 
@@ -174,6 +168,7 @@ where
     // TODO: validate message length
     let _length = stream.read_u32::<LittleEndian>();
     // Break out of loop in case of failure to read request
+    // TODO: handle retained connections
     if let Ok(req) = RosMsg::decode(&mut stream) {
         // Call function that handles request and returns response
         match handler(req) {
