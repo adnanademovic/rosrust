@@ -19,33 +19,25 @@ pub trait Action: rosrust::Message {
 pub trait ActionGoal: rosrust::Message {
     type Body: rosrust::Message;
 
-    fn split(
-        self,
-    ) -> (
-        msg::std_msgs::Header,
-        msg::actionlib_msgs::GoalID,
-        Self::Body,
-    );
-    fn combine(
-        header: msg::std_msgs::Header,
-        id: msg::actionlib_msgs::GoalID,
-        body: Self::Body,
-    ) -> Self;
+    fn into_goal(self) -> Goal<Self::Body>;
+    fn from_goal(t: Goal<Self::Body>) -> Self;
+}
+
+pub struct Goal<T: rosrust::Message> {
+    pub header: msg::std_msgs::Header,
+    pub id: msg::actionlib_msgs::GoalID,
+    pub body: T,
 }
 
 pub trait ActionResponse: rosrust::Message {
     type Body: rosrust::Message;
 
-    fn split(
-        self,
-    ) -> (
-        msg::std_msgs::Header,
-        msg::actionlib_msgs::GoalStatus,
-        Self::Body,
-    );
-    fn combine(
-        header: msg::std_msgs::Header,
-        status: msg::actionlib_msgs::GoalStatus,
-        body: Self::Body,
-    ) -> Self;
+    fn into_response(self) -> Response<Self::Body>;
+    fn from_response(t: Response<Self::Body>) -> Self;
+}
+
+pub struct Response<T: rosrust::Message> {
+    pub header: msg::std_msgs::Header,
+    pub status: msg::actionlib_msgs::GoalStatus,
+    pub body: T,
 }

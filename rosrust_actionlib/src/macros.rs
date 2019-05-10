@@ -31,38 +31,34 @@ macro_rules! action {
             impl $crate::ActionGoal for $root::$package::[<$action Action $sub_message>] {
                 type Body = $root::$package::[<$action $sub_message>];
 
-                fn split(self) -> (
-                    $crate::msg::std_msgs::Header,
-                    $crate::msg::actionlib_msgs::GoalID,
-                    Self::Body,
-                ) {
+                fn into_goal(self) -> $crate::Goal<Self::Body> {
                     let header = $crate::msg::std_msgs::Header {
                         seq: self.header.seq,
                         stamp: self.header.stamp,
                         frame_id: self.header.frame_id,
                     };
-                    let goal_id = $crate::msg::actionlib_msgs::GoalID {
+                    let id = $crate::msg::actionlib_msgs::GoalID {
                         stamp: self.goal_id.stamp,
                         id: self.goal_id.id,
                     };
-                    (header, goal_id, self.$body_key)
+                    $crate::Goal {
+                        header,
+                        id,
+                        body: self.$body_key,
+                    }
                 }
 
-                fn combine(
-                    header: $crate::msg::std_msgs::Header,
-                    goal_id: $crate::msg::actionlib_msgs::GoalID,
-                    body: Self::Body,
-                ) -> Self {
+                fn from_goal(t: $crate::Goal<Self::Body>) -> Self {
                     let header = $root::std_msgs::Header {
-                        seq: header.seq,
-                        stamp: header.stamp,
-                        frame_id: header.frame_id,
+                        seq: t.header.seq,
+                        stamp: t.header.stamp,
+                        frame_id: t.header.frame_id,
                     };
                     let goal_id = $root::actionlib_msgs::GoalID {
-                        stamp: goal_id.stamp,
-                        id: goal_id.id,
+                        stamp: t.id.stamp,
+                        id: t.id.id,
                     };
-                    Self { header, goal_id, $body_key: body }
+                    Self { header, goal_id, $body_key: t.body }
                 }
             }
         }
@@ -72,11 +68,7 @@ macro_rules! action {
             impl $crate::ActionResponse for $root::$package::[<$action Action $sub_message>] {
                 type Body = $root::$package::[<$action $sub_message>];
 
-                fn split(self) -> (
-                    $crate::msg::std_msgs::Header,
-                    $crate::msg::actionlib_msgs::GoalStatus,
-                    Self::Body,
-                ) {
+                fn into_response(self) -> $crate::Response<Self::Body> {
                     let header = $crate::msg::std_msgs::Header {
                         seq: self.header.seq,
                         stamp: self.header.stamp,
@@ -91,32 +83,32 @@ macro_rules! action {
                         status: self.status.status,
                         text: self.status.text,
                     };
-                    (header, status, self.$body_key)
+                    $crate::Response {
+                        header,
+                        status,
+                        body: self.$body_key,
+                    }
                 }
 
-                fn combine(
-                    header: $crate::msg::std_msgs::Header,
-                    status: $crate::msg::actionlib_msgs::GoalStatus,
-                    body: Self::Body,
-                ) -> Self {
+                fn from_response(t: $crate::Response<Self::Body>) -> Self {
                     let header = $root::std_msgs::Header {
-                        seq: header.seq,
-                        stamp: header.stamp,
-                        frame_id: header.frame_id,
+                        seq: t.header.seq,
+                        stamp: t.header.stamp,
+                        frame_id: t.header.frame_id,
                     };
                     let goal_id = $root::actionlib_msgs::GoalID {
-                        stamp: status.goal_id.stamp,
-                        id: status.goal_id.id,
+                        stamp: t.status.goal_id.stamp,
+                        id: t.status.goal_id.id,
                     };
                     let status = $root::actionlib_msgs::GoalStatus {
                         goal_id,
-                        status: status.status,
-                        text: status.text,
+                        status: t.status.status,
+                        text: t.status.text,
                     };
                     Self {
                         header,
-                        status: status.into(),
-                        $body_key: body,
+                        status,
+                        $body_key: t.body,
                     }
                 }
             }
