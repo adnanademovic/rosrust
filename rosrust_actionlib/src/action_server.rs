@@ -2,6 +2,7 @@ use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
 use crate::status_tracker::StatusTracker;
 use crate::{Action, ActionGoal, ActionResponse, Goal, Response};
 use rosrust::error::Result;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
 
 pub struct ActionServer<T: Action> {
@@ -70,7 +71,7 @@ impl<T: Action> ActionServer<T> {
             feedback_pub,
             status_pub,
             status_frequency,
-            status_list: vec![],
+            status_list: BTreeMap::new(),
             status_list_timeout,
             on_goal: Box::new(|_| Ok(())),
             on_cancel: Box::new(|_| Ok(())),
@@ -164,7 +165,7 @@ pub struct ActionServerState<T: Action> {
     feedback_pub: rosrust::Publisher<T::Feedback>,
     status_pub: rosrust::Publisher<GoalStatusArray>,
     status_list_timeout: i64,
-    status_list: Vec<StatusTracker<GoalBody<T>>>,
+    status_list: BTreeMap<String, StatusTracker<GoalBody<T>>>,
     status_frequency: f64,
     on_goal: ActionServerOnRequest<T>,
     on_cancel: ActionServerOnRequest<T>,
@@ -180,25 +181,34 @@ impl<T: Action> ActionServerState<T> {
         let now = rosrust::now();
         let now_nanos = now.nanos();
         let status_list_timeout = self.status_list_timeout;
-        self.status_list.retain(|tracker| {
-            let destruction_time = tracker.handle_destruction_time.nanos();
-            if destruction_time == 0 {
-                return true;
-            }
-            if destruction_time + status_list_timeout > now_nanos {
-                return true;
-            }
-            rosrust::ros_debug!(
-                "Item {} with destruction time of {} being removed from list.  Now = {}",
-                tracker.status.goal_id.id,
-                tracker.handle_destruction_time.seconds(),
-                now.seconds()
-            );
-            false
-        });
-        let status_list = self
+        let dead_keys = self
             .status_list
             .iter()
+            .filter_map(|(key, tracker)| {
+                let destruction_time = tracker.handle_destruction_time.nanos();
+                if destruction_time == 0 {
+                    return None;
+                }
+                if destruction_time + status_list_timeout > now_nanos {
+                    return None;
+                }
+                rosrust::ros_debug!(
+                    "Item {} with destruction time of {} being removed from list.  Now = {}",
+                    tracker.status.goal_id.id,
+                    tracker.handle_destruction_time.seconds(),
+                    now.seconds()
+                );
+                Some(key)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        for key in dead_keys {
+            self.status_list.remove(&key);
+        }
+
+        let status_list = self
+            .status_list
+            .values()
             .map(|tracker| tracker.status.clone())
             .collect();
         GoalStatusArray {
@@ -246,10 +256,7 @@ impl<T: Action> ActionServerState<T> {
 
         let goal_id = goal.id.id.clone();
 
-        let existing_tracker = self
-            .status_list
-            .iter_mut()
-            .find(|tracker| goal_id == tracker.status.goal_id.id);
+        let existing_tracker = self.status_list.get_mut(&goal_id);
 
         if let Some(mut tracker) = existing_tracker {
             rosrust::ros_debug!(
@@ -278,7 +285,7 @@ impl<T: Action> ActionServerState<T> {
         let tracker = StatusTracker::from_goal(goal);
         let goal_timestamp = tracker.status.goal_id.stamp.nanos();
 
-        self.status_list.push(tracker);
+        self.add_status_tracker(tracker);
 
         let goal_handle = ServerGoalHandle::new(fields, goal_id);
 
@@ -305,7 +312,7 @@ impl<T: Action> ActionServerState<T> {
 
         let mut goal_id_found = false;
 
-        for tracker in &mut self.status_list {
+        for tracker in self.status_list.values_mut() {
             let cancel_this = filter_id == &tracker.status.goal_id.id;
             let cancel_before_stamp =
                 filter_stamp != 0 && tracker.status.goal_id.stamp.nanos() <= filter_stamp;
@@ -326,13 +333,18 @@ impl<T: Action> ActionServerState<T> {
         if filter_id != "" && !goal_id_found {
             let mut tracker = StatusTracker::from_status(goal_id, GoalStatus::RECALLING);
             tracker.handle_destruction_time = rosrust::now();
-            self.status_list.push(tracker);
+            self.add_status_tracker(tracker);
         }
 
         if filter_stamp > self.last_cancel_ns {
             self.last_cancel_ns = filter_stamp;
         }
         Ok(())
+    }
+
+    fn add_status_tracker(&mut self, tracker: StatusTracker<GoalBody<T>>) {
+        self.status_list
+            .insert(tracker.status.goal_id.id.clone(), tracker);
     }
 }
 
