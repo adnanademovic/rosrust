@@ -136,25 +136,29 @@ impl<T: Action> ActionServer<T> {
     }
 
     #[inline]
+    pub fn state(&self) -> &Arc<Mutex<ActionServerState<T>>> {
+        &self.fields
+    }
+
+    #[inline]
     pub fn publish_status(&self) -> Result<()> {
         self.fields.lock().expect(MUTEX_LOCK_FAIL).publish_status()
     }
 
     #[inline]
-    pub fn set_on_goal(&mut self, on_goal: ActionServerOnGoal<T>) {
+    pub fn set_on_goal(&mut self, on_goal: ActionServerOnRequest<T>) {
         self.fields.lock().expect(MUTEX_LOCK_FAIL).on_goal = on_goal;
     }
 
     #[inline]
-    pub fn set_on_cancel(&mut self, on_cancel: ActionServerOnCancel) {
+    pub fn set_on_cancel(&mut self, on_cancel: ActionServerOnRequest<T>) {
         self.fields.lock().expect(MUTEX_LOCK_FAIL).on_cancel = on_cancel;
     }
 }
 
-pub type ActionServerOnGoal<T> = Box<Fn(ServerGoalHandle<T>) -> Result<()> + Send + Sync>;
-pub type ActionServerOnCancel = Box<Fn(GoalID) -> Result<()> + Send + Sync>;
+pub type ActionServerOnRequest<T> = Box<Fn(ServerGoalHandle<T>) -> Result<()> + Send + Sync>;
 
-struct ActionServerState<T: Action> {
+pub struct ActionServerState<T: Action> {
     last_cancel_ns: i64,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
@@ -162,12 +166,16 @@ struct ActionServerState<T: Action> {
     status_list_timeout: i64,
     status_list: Vec<StatusTracker<GoalBody<T>>>,
     status_frequency: f64,
-    on_goal: ActionServerOnGoal<T>,
-    on_cancel: ActionServerOnCancel,
+    on_goal: ActionServerOnRequest<T>,
+    on_cancel: ActionServerOnRequest<T>,
     self_reference: Weak<Mutex<Self>>,
 }
 
 impl<T: Action> ActionServerState<T> {
+    pub fn status_frequency(&self) -> f64 {
+        self.status_frequency
+    }
+
     fn get_status_array(&mut self) -> GoalStatusArray {
         let now = rosrust::now();
         let now_nanos = now.nanos();
@@ -250,7 +258,7 @@ impl<T: Action> ActionServerState<T> {
                 tracker.status.status
             );
 
-            tracker.handle_destruction_time = rosrust::now();
+            tracker.refresh_destruction_time();
 
             if tracker.status.status == GoalStatus::RECALLING {
                 tracker.status.status = GoalStatus::RECALLED;
@@ -272,7 +280,7 @@ impl<T: Action> ActionServerState<T> {
 
         self.status_list.push(tracker);
 
-        let goal_handle = ServerGoalHandle { fields, goal_id };
+        let goal_handle = ServerGoalHandle::new(fields, goal_id);
 
         if goal_timestamp != 0 && goal_timestamp <= self.last_cancel_ns {
             goal_handle.set_canceled(None, "This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request")?;
@@ -282,20 +290,71 @@ impl<T: Action> ActionServerState<T> {
         (*self.on_goal)(goal_handle)
     }
 
-    fn handle_on_cancel(&self, goal_id: GoalID) -> Result<()> {
-        unimplemented!();
-        (*self.on_cancel)(goal_id)
+    fn handle_on_cancel(&mut self, goal_id: GoalID) -> Result<()> {
+        rosrust::ros_debug!("The action server has received a new cancel request");
+
+        let fields = self
+            .self_reference
+            .upgrade()
+            .ok_or_else(|| "Action Server was deconstructed before action was handled")?;
+
+        let filter_id = &goal_id.id;
+        let filter_stamp = goal_id.stamp.nanos();
+
+        let cancel_everything = filter_id == "" && filter_stamp == 0;
+
+        let mut goal_id_found = false;
+
+        for tracker in &mut self.status_list {
+            let cancel_this = filter_id == &tracker.status.goal_id.id;
+            let cancel_before_stamp =
+                filter_stamp != 0 && tracker.status.goal_id.stamp.nanos() <= filter_stamp;
+            if !cancel_everything && !cancel_this && !cancel_before_stamp {
+                continue;
+            }
+            goal_id_found = goal_id_found || filter_id == &tracker.status.goal_id.id;
+            tracker.refresh_destruction_time();
+
+            let goal_handle =
+                ServerGoalHandle::new(Arc::clone(&fields), tracker.status.goal_id.id.clone());
+
+            if goal_handle.set_cancel_requested()? {
+                (*self.on_cancel)(goal_handle)?;
+            }
+        }
+
+        if filter_id != "" && !goal_id_found {
+            let mut tracker = StatusTracker::from_status(goal_id, GoalStatus::RECALLING);
+            tracker.handle_destruction_time = rosrust::now();
+            self.status_list.push(tracker);
+        }
+
+        if filter_stamp > self.last_cancel_ns {
+            self.last_cancel_ns = filter_stamp;
+        }
+        Ok(())
     }
 }
 
 pub struct ServerGoalHandle<T: Action> {
-    fields: Arc<Mutex<ActionServerState<T>>>,
-    goal_id: String,
+    _fields: Arc<Mutex<ActionServerState<T>>>,
+    _goal_id: String,
 }
 
 impl<T: Action> ServerGoalHandle<T> {
-    pub fn set_canceled(&self, result: Option<ResultBody<T>>, text: &str) -> Result<()> {
+    fn new(fields: Arc<Mutex<ActionServerState<T>>>, goal_id: String) -> Self {
+        Self {
+            _fields: fields,
+            _goal_id: goal_id,
+        }
+    }
+
+    pub fn set_canceled(&self, _result: Option<ResultBody<T>>, _text: &str) -> Result<()> {
         unimplemented!()
+    }
+
+    pub fn set_cancel_requested(&self) -> Result<bool> {
+        unimplemented!();
     }
 }
 
@@ -305,6 +364,6 @@ static MUTEX_LOCK_FAIL: &str = "Failed to lock mutex";
 type GoalBody<T> = <<T as Action>::Goal as ActionGoal>::Body;
 type GoalType<T> = Goal<GoalBody<T>>;
 type ResultBody<T> = <<T as Action>::Result as ActionResponse>::Body;
-type ResultType<T> = Response<ResultBody<T>>;
+// type ResultType<T> = Response<ResultBody<T>>;
 type FeedbackBody<T> = <<T as Action>::Feedback as ActionResponse>::Body;
-type FeedbackType<T> = Response<FeedbackBody<T>>;
+// type FeedbackType<T> = Response<FeedbackBody<T>>;

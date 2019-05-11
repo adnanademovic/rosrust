@@ -6,6 +6,7 @@ use rosrust;
 pub struct StatusTracker<T> {
     pub goal: Option<Goal<T>>,
     pub status: GoalStatus,
+    pub destruction_time_set: bool,
     pub handle_destruction_time: rosrust::Time,
     pub id_generator: GoalIdGenerator,
 }
@@ -25,6 +26,7 @@ impl<T: rosrust::Message> StatusTracker<T> {
         Self {
             goal,
             status,
+            destruction_time_set: false,
             handle_destruction_time,
             id_generator,
         }
@@ -53,8 +55,17 @@ impl<T: rosrust::Message> StatusTracker<T> {
         Self {
             goal: Some(goal),
             status,
+            destruction_time_set: false,
             handle_destruction_time,
             id_generator,
         }
+    }
+
+    pub fn refresh_destruction_time(&mut self) {
+        if self.destruction_time_set {
+            return;
+        }
+        self.destruction_time_set = true;
+        self.handle_destruction_time = rosrust::now();
     }
 }
