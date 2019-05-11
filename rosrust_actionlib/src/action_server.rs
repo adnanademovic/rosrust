@@ -194,7 +194,7 @@ impl<T: Action> ActionServerState<T> {
                 tracker.handle_destruction_time.seconds(),
                 now.seconds()
             );
-            return false;
+            false
         });
         let status_list = self
             .status_list

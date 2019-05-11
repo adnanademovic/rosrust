@@ -101,7 +101,7 @@ where
         return tcpconnection::Feedback::StopAccepting;
     }
 
-    return tcpconnection::Feedback::AcceptNextStream;
+    tcpconnection::Feedback::AcceptNextStream
 }
 
 impl Publisher {

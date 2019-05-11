@@ -54,14 +54,14 @@ impl Service {
                     return tcpconnection::Feedback::StopAccepting;
                 }
                 consume_client::<T, _, _>(&service, &node_name, Arc::clone(&handler), stream);
-                return tcpconnection::Feedback::AcceptNextStream;
+                tcpconnection::Feedback::AcceptNextStream
             }
         };
 
         tcpconnection::iterate(listener, format!("service '{}'", service), iterate_handler);
 
         Ok(Service {
-            api: String::from(api),
+            api,
             msg_type: T::msg_type(),
             service: String::from(service),
             exists: service_exists,

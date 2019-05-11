@@ -1,4 +1,6 @@
-pub use self::action_server::ActionServer;
+pub use self::action_server::{
+    ActionServer, ActionServerOnRequest, ActionServerState, ServerGoalHandle,
+};
 #[doc(hidden)]
 pub use paste;
 
