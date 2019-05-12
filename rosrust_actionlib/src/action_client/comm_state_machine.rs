@@ -1,29 +1,30 @@
+use crate::action_client::ClientGoalHandle;
 use crate::goal_status::{GoalState, GoalStatus, GoalStatusArray};
 use crate::{Action, FeedbackBody, FeedbackType, GoalType, ResultType};
+use std::sync::{Mutex, Weak};
 
-type OnFeedback<T> = Box<Fn(ClientGoalHandle, FeedbackBody<T>)>;
-type OnTransition = Box<Fn(ClientGoalHandle)>;
+type OnFeedback<T> = Box<Fn(ClientGoalHandle<T>, FeedbackBody<T>)>;
+type OnTransition<T> = Box<Fn(ClientGoalHandle<T>)>;
 type SendGoal = Box<Fn()>;
 type SendCancel = Box<Fn()>;
-
-pub struct ClientGoalHandle;
 
 pub struct CommStateMachine<T: Action> {
     action_goal: GoalType<T>,
     on_feedback: Option<OnFeedback<T>>,
-    on_transition: Option<OnTransition>,
+    on_transition: Option<OnTransition<T>>,
     send_goal: SendGoal,
     send_cancel: SendCancel,
     state: State,
     latest_goal_status: GoalStatus,
     latest_result: Option<ResultType<T>>,
+    self_reference: Weak<Mutex<Self>>,
 }
 
 impl<T: Action> CommStateMachine<T> {
     pub fn new(
         action_goal: GoalType<T>,
         on_feedback: Option<OnFeedback<T>>,
-        on_transition: Option<OnTransition>,
+        on_transition: Option<OnTransition<T>>,
         send_goal: SendGoal,
         send_cancel: SendCancel,
     ) -> Self {
@@ -39,7 +40,12 @@ impl<T: Action> CommStateMachine<T> {
                 ..Default::default()
             },
             latest_result: None,
+            self_reference: Weak::new(),
         }
+    }
+
+    pub fn create_self_reference(&mut self, self_reference: Weak<Mutex<Self>>) {
+        self.self_reference = self_reference;
     }
 
     pub fn set_state(&mut self, state: State) {
@@ -62,7 +68,9 @@ impl<T: Action> CommStateMachine<T> {
         self.state = state;
 
         if let Some(on_transition) = &self.on_transition {
-            on_transition(ClientGoalHandle);
+            if let Some(self_reference) = self.self_reference.upgrade() {
+                on_transition(ClientGoalHandle::new(self_reference))
+            }
         }
     }
 
@@ -76,7 +84,9 @@ impl<T: Action> CommStateMachine<T> {
         }
 
         if let Some(on_feedback) = &self.on_feedback {
-            on_feedback(ClientGoalHandle, action_feedback.body)
+            if let Some(self_reference) = self.self_reference.upgrade() {
+                on_feedback(ClientGoalHandle::new(self_reference), action_feedback.body)
+            }
         }
     }
 
@@ -112,21 +122,17 @@ impl<T: Action> CommStateMachine<T> {
         };
     }
 
-    // TODO: implement using a helper function that returns a result to be displayed in log
-    pub fn update_status(&mut self, status_array: GoalStatusArray) {
+    fn update_status_inner(&mut self, status_array: GoalStatusArray) -> Result<(), Option<String>> {
         use std::convert::TryInto;
 
         if self.state == State::Done {
-            return;
+            return Err(None);
         }
-        let status_option = status_array
+        let status = status_array
             .status_list
             .into_iter()
-            .find(|status| status.goal_id.id == self.action_goal.id.id);
-
-        let status = match status_option {
-            Some(status) => status,
-            None => {
+            .find(|status| status.goal_id.id == self.action_goal.id.id)
+            .ok_or_else(|| {
                 match self.state {
                     State::Pending
                     | State::Active
@@ -136,44 +142,32 @@ impl<T: Action> CommStateMachine<T> {
                     | State::Lost => self.mark_as_lost(),
                     State::WaitingForGoalAck | State::WaitingForResult | State::Done => {}
                 }
-                return;
-            }
-        };
+                return None;
+            })?;
 
-        let goal_state = match status.status.try_into() {
-            Ok(s) => s,
-            Err(err) => {
-                rosrust::ros_err!("Got an unknown status from the ActionServer: {}", err);
-                return;
-            }
-        };
+        let goal_state = status
+            .status
+            .try_into()
+            .map_err(|err| format!("Got an unknown status from the ActionServer: {}", err))?;
+
         self.latest_goal_status = status;
 
-        match self.state.transition_to(goal_state) {
-            Transition::NoTransition => {}
-            Transition::Invalid => {
-                rosrust::ros_err!(
-                    "Invalid goal status transition from {:?} to {:?}",
-                    self.state,
-                    goal_state,
-                );
-            }
-            Transition::FunnyState(state) => {
-                rosrust::ros_err!("CommStateMachine is in a funny state: {:?}", state);
-            }
-            Transition::UnknownStatus(goal_status) => {
-                rosrust::ros_err!(
-                    "Got an unknown status from the ActionServer: {:?}",
-                    goal_status
-                );
-            }
-            Transition::Step(step) => self.transition_to(step),
-            Transition::Steps(steps) => {
-                for step in steps {
-                    self.transition_to(*step);
-                }
-            }
-        };
+        let steps = self
+            .state
+            .transition_to(goal_state)
+            .into_update_status_steps()?;
+
+        for step in steps {
+            self.transition_to(*step);
+        }
+
+        Ok(())
+    }
+
+    pub fn update_status(&mut self, status_array: GoalStatusArray) {
+        if let Err(Some(err)) = self.update_status_inner(status_array) {
+            rosrust::ros_err!("{}", err);
+        }
     }
 
     fn mark_as_lost(&mut self) {
@@ -199,19 +193,38 @@ pub enum State {
 #[derive(Clone, Debug)]
 pub enum Transition {
     NoTransition,
-    Invalid,
+    Invalid(State, GoalState),
     FunnyState(State),
     UnknownStatus(GoalState),
-    Step(State),
     Steps(&'static [State]),
+}
+
+impl Transition {
+    fn into_update_status_steps(self) -> Result<&'static [State], String> {
+        match self {
+            Transition::NoTransition => Ok(&[]),
+            Transition::Invalid(state, goal_state) => Err(format!(
+                "Invalid goal status transition from {:?} to {:?}",
+                state, goal_state,
+            )),
+            Transition::FunnyState(state) => {
+                Err(format!("CommStateMachine is in a funny state: {:?}", state))
+            }
+            Transition::UnknownStatus(goal_state) => Err(format!(
+                "Got an unknown status from the ActionServer: {:?}",
+                goal_state,
+            )),
+            Transition::Steps(steps) => Ok(steps),
+        }
+    }
 }
 
 impl State {
     pub fn transition_to(self, goal: GoalState) -> Transition {
         match self {
             State::WaitingForGoalAck => match goal {
-                GoalState::Pending => Transition::Step(State::Pending),
-                GoalState::Active => Transition::Step(State::Active),
+                GoalState::Pending => Transition::Steps(&[State::Pending]),
+                GoalState::Active => Transition::Steps(&[State::Active]),
                 GoalState::Rejected => {
                     Transition::Steps(&[State::Pending, State::WaitingForResult])
                 }
@@ -231,9 +244,9 @@ impl State {
             },
             State::Pending => match goal {
                 GoalState::Pending => Transition::NoTransition,
-                GoalState::Active => Transition::Step(State::Active),
-                GoalState::Rejected => Transition::Step(State::WaitingForResult),
-                GoalState::Recalling => Transition::Step(State::Recalling),
+                GoalState::Active => Transition::Steps(&[State::Active]),
+                GoalState::Rejected => Transition::Steps(&[State::WaitingForResult]),
+                GoalState::Recalling => Transition::Steps(&[State::Recalling]),
                 GoalState::Recalled => {
                     Transition::Steps(&[State::Recalling, State::WaitingForResult])
                 }
@@ -248,36 +261,36 @@ impl State {
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::Active => match goal {
-                GoalState::Pending => Transition::Invalid,
+                GoalState::Pending => Transition::Invalid(self, goal),
                 GoalState::Active => Transition::NoTransition,
-                GoalState::Rejected => Transition::Invalid,
-                GoalState::Recalling => Transition::Invalid,
-                GoalState::Recalled => Transition::Invalid,
+                GoalState::Rejected => Transition::Invalid(self, goal),
+                GoalState::Recalling => Transition::Invalid(self, goal),
+                GoalState::Recalled => Transition::Invalid(self, goal),
                 GoalState::Preempted => {
                     Transition::Steps(&[State::Preempting, State::WaitingForResult])
                 }
-                GoalState::Succeeded => Transition::Step(State::WaitingForResult),
-                GoalState::Aborted => Transition::Step(State::WaitingForResult),
-                GoalState::Preempting => Transition::Step(State::Preempting),
+                GoalState::Succeeded => Transition::Steps(&[State::WaitingForResult]),
+                GoalState::Aborted => Transition::Steps(&[State::WaitingForResult]),
+                GoalState::Preempting => Transition::Steps(&[State::Preempting]),
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::WaitingForResult => match goal {
-                GoalState::Pending => Transition::Invalid,
+                GoalState::Pending => Transition::Invalid(self, goal),
                 GoalState::Active => Transition::NoTransition,
                 GoalState::Rejected => Transition::NoTransition,
-                GoalState::Recalling => Transition::Invalid,
+                GoalState::Recalling => Transition::Invalid(self, goal),
                 GoalState::Recalled => Transition::NoTransition,
                 GoalState::Preempted => Transition::NoTransition,
                 GoalState::Succeeded => Transition::NoTransition,
                 GoalState::Aborted => Transition::NoTransition,
-                GoalState::Preempting => Transition::Invalid,
+                GoalState::Preempting => Transition::Invalid(self, goal),
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::WaitingForCancelAck => match goal {
                 GoalState::Pending => Transition::NoTransition,
                 GoalState::Active => Transition::NoTransition,
-                GoalState::Rejected => Transition::Step(State::WaitingForResult),
-                GoalState::Recalling => Transition::Step(State::Recalling),
+                GoalState::Rejected => Transition::Steps(&[State::WaitingForResult]),
+                GoalState::Recalling => Transition::Steps(&[State::Recalling]),
                 GoalState::Recalled => {
                     Transition::Steps(&[State::Recalling, State::WaitingForResult])
                 }
@@ -290,15 +303,15 @@ impl State {
                 GoalState::Aborted => {
                     Transition::Steps(&[State::Preempting, State::WaitingForResult])
                 }
-                GoalState::Preempting => Transition::Step(State::Preempting),
+                GoalState::Preempting => Transition::Steps(&[State::Preempting]),
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::Recalling => match goal {
-                GoalState::Pending => Transition::Invalid,
-                GoalState::Active => Transition::Invalid,
-                GoalState::Rejected => Transition::Step(State::WaitingForResult),
+                GoalState::Pending => Transition::Invalid(self, goal),
+                GoalState::Active => Transition::Invalid(self, goal),
+                GoalState::Rejected => Transition::Steps(&[State::WaitingForResult]),
                 GoalState::Recalling => Transition::NoTransition,
-                GoalState::Recalled => Transition::Step(State::WaitingForResult),
+                GoalState::Recalled => Transition::Steps(&[State::WaitingForResult]),
                 GoalState::Preempted => {
                     Transition::Steps(&[State::Preempting, State::WaitingForResult])
                 }
@@ -308,31 +321,31 @@ impl State {
                 GoalState::Aborted => {
                     Transition::Steps(&[State::Preempting, State::WaitingForResult])
                 }
-                GoalState::Preempting => Transition::Step(State::Preempting),
+                GoalState::Preempting => Transition::Steps(&[State::Preempting]),
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::Preempting => match goal {
-                GoalState::Pending => Transition::Invalid,
-                GoalState::Active => Transition::Invalid,
-                GoalState::Rejected => Transition::Invalid,
-                GoalState::Recalling => Transition::Invalid,
-                GoalState::Recalled => Transition::Invalid,
-                GoalState::Preempted => Transition::Step(State::WaitingForResult),
-                GoalState::Succeeded => Transition::Step(State::WaitingForResult),
-                GoalState::Aborted => Transition::Step(State::WaitingForResult),
+                GoalState::Pending => Transition::Invalid(self, goal),
+                GoalState::Active => Transition::Invalid(self, goal),
+                GoalState::Rejected => Transition::Invalid(self, goal),
+                GoalState::Recalling => Transition::Invalid(self, goal),
+                GoalState::Recalled => Transition::Invalid(self, goal),
+                GoalState::Preempted => Transition::Steps(&[State::WaitingForResult]),
+                GoalState::Succeeded => Transition::Steps(&[State::WaitingForResult]),
+                GoalState::Aborted => Transition::Steps(&[State::WaitingForResult]),
                 GoalState::Preempting => Transition::NoTransition,
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::Done => match goal {
-                GoalState::Pending => Transition::Invalid,
-                GoalState::Active => Transition::Invalid,
+                GoalState::Pending => Transition::Invalid(self, goal),
+                GoalState::Active => Transition::Invalid(self, goal),
                 GoalState::Rejected => Transition::NoTransition,
-                GoalState::Recalling => Transition::Invalid,
+                GoalState::Recalling => Transition::Invalid(self, goal),
                 GoalState::Recalled => Transition::NoTransition,
                 GoalState::Preempted => Transition::NoTransition,
                 GoalState::Succeeded => Transition::NoTransition,
                 GoalState::Aborted => Transition::NoTransition,
-                GoalState::Preempting => Transition::Invalid,
+                GoalState::Preempting => Transition::Invalid(self, goal),
                 GoalState::Lost => Transition::UnknownStatus(GoalState::Lost),
             },
             State::Lost => Transition::FunnyState(State::Lost),
