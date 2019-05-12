@@ -1,4 +1,5 @@
 use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
+use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
 use crate::status_tracker::StatusTracker;
 use crate::{
     Action, ActionGoal, ActionResponse, FeedbackBody, GoalBody, GoalType, Response, ResultBody,
@@ -372,6 +373,3 @@ impl<T: Action> ServerGoalHandle<T> {
         unimplemented!();
     }
 }
-
-static UNEXPECTED_FAILED_NAME_RESOLVE: &str = "Resolving this parameter name should never fail";
-static MUTEX_LOCK_FAIL: &str = "Failed to lock mutex";

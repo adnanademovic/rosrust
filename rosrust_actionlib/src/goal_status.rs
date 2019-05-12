@@ -1,4 +1,4 @@
-pub use crate::msg::actionlib_msgs::{GoalStatus, GoalStatusArray};
+pub use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
 use std::convert::TryFrom;
 
 // TODO: consider removing "Lost"

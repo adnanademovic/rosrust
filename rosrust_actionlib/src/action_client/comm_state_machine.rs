@@ -1,19 +1,19 @@
 use crate::action_client::ClientGoalHandle;
-use crate::goal_status::{GoalState, GoalStatus, GoalStatusArray};
+use crate::goal_status::{GoalID, GoalState, GoalStatus, GoalStatusArray};
 use crate::{Action, FeedbackBody, FeedbackType, GoalType, ResultType};
 use std::sync::{Mutex, Weak};
 
 type OnFeedback<T> = Box<Fn(ClientGoalHandle<T>, FeedbackBody<T>)>;
 type OnTransition<T> = Box<Fn(ClientGoalHandle<T>)>;
 type SendGoal = Box<Fn()>;
-type SendCancel = Box<Fn()>;
+type SendCancel = Box<Fn(GoalID)>;
 
 pub struct CommStateMachine<T: Action> {
     action_goal: GoalType<T>,
     on_feedback: Option<OnFeedback<T>>,
     on_transition: Option<OnTransition<T>>,
-    send_goal: SendGoal,
-    send_cancel: SendCancel,
+    send_goal_handler: SendGoal,
+    send_cancel_handler: SendCancel,
     state: State,
     latest_goal_status: GoalStatus,
     latest_result: Option<ResultType<T>>,
@@ -25,15 +25,15 @@ impl<T: Action> CommStateMachine<T> {
         action_goal: GoalType<T>,
         on_feedback: Option<OnFeedback<T>>,
         on_transition: Option<OnTransition<T>>,
-        send_goal: SendGoal,
-        send_cancel: SendCancel,
+        send_goal_handler: SendGoal,
+        send_cancel_handler: SendCancel,
     ) -> Self {
         Self {
             action_goal,
             on_feedback,
             on_transition,
-            send_goal,
-            send_cancel,
+            send_goal_handler,
+            send_cancel_handler,
             state: State::WaitingForGoalAck,
             latest_goal_status: GoalStatus {
                 status: GoalState::Pending as u8,
@@ -44,10 +44,37 @@ impl<T: Action> CommStateMachine<T> {
         }
     }
 
+    #[inline]
+    pub fn send_cancel(&self, msg: GoalID) {
+        (*self.send_cancel_handler)(msg);
+    }
+
+    #[inline]
+    pub fn action_goal(&self) -> &GoalType<T> {
+        &self.action_goal
+    }
+
+    #[inline]
+    pub fn state(&self) -> State {
+        self.state
+    }
+
+    #[inline]
+    pub fn latest_goal_status(&self) -> &GoalStatus {
+        &self.latest_goal_status
+    }
+
+    #[inline]
+    pub fn latest_result(&self) -> &Option<ResultType<T>> {
+        &self.latest_result
+    }
+
+    #[inline]
     pub fn create_self_reference(&mut self, self_reference: Weak<Mutex<Self>>) {
         self.self_reference = self_reference;
     }
 
+    #[inline]
     pub fn set_state(&mut self, state: State) {
         rosrust::ros_debug!(
             "Transitioning client State from {:?} to {:?}",

@@ -12,6 +12,7 @@ pub mod msg;
 mod status_tracker;
 #[macro_use]
 mod macros;
+mod static_messages;
 
 pub trait Action: rosrust::Message {
     type Goal: ActionGoal;
