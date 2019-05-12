@@ -4,12 +4,14 @@ pub use self::action_server::{
 #[doc(hidden)]
 pub use paste;
 
+mod action_client;
 mod action_server;
 mod goal_id_generator;
-#[macro_use]
-mod macros;
+mod goal_status;
 pub mod msg;
 mod status_tracker;
+#[macro_use]
+mod macros;
 
 pub trait Action: rosrust::Message {
     type Goal: ActionGoal;
@@ -45,3 +47,10 @@ pub struct Response<T> {
     pub status: msg::actionlib_msgs::GoalStatus,
     pub body: T,
 }
+
+type GoalBody<T> = <<T as Action>::Goal as ActionGoal>::Body;
+type GoalType<T> = Goal<GoalBody<T>>;
+type ResultBody<T> = <<T as Action>::Result as ActionResponse>::Body;
+type ResultType<T> = Response<ResultBody<T>>;
+type FeedbackBody<T> = <<T as Action>::Feedback as ActionResponse>::Body;
+type FeedbackType<T> = Response<FeedbackBody<T>>;

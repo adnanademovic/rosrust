@@ -1,6 +1,8 @@
 use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
 use crate::status_tracker::StatusTracker;
-use crate::{Action, ActionGoal, ActionResponse, Goal, Response};
+use crate::{
+    Action, ActionGoal, ActionResponse, FeedbackBody, GoalBody, GoalType, Response, ResultBody,
+};
 use rosrust::error::Result;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
@@ -353,6 +355,7 @@ pub struct ServerGoalHandle<T: Action> {
     _goal_id: String,
 }
 
+// TODO: implement all missing methods
 impl<T: Action> ServerGoalHandle<T> {
     fn new(fields: Arc<Mutex<ActionServerState<T>>>, goal_id: String) -> Self {
         Self {
@@ -372,10 +375,3 @@ impl<T: Action> ServerGoalHandle<T> {
 
 static UNEXPECTED_FAILED_NAME_RESOLVE: &str = "Resolving this parameter name should never fail";
 static MUTEX_LOCK_FAIL: &str = "Failed to lock mutex";
-
-type GoalBody<T> = <<T as Action>::Goal as ActionGoal>::Body;
-type GoalType<T> = Goal<GoalBody<T>>;
-type ResultBody<T> = <<T as Action>::Result as ActionResponse>::Body;
-// type ResultType<T> = Response<ResultBody<T>>;
-type FeedbackBody<T> = <<T as Action>::Feedback as ActionResponse>::Body;
-// type FeedbackType<T> = Response<FeedbackBody<T>>;
