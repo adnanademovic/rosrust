@@ -220,9 +220,7 @@ impl<'a> Updater<'a> {
 
 fn get_diagnostic_period() -> Option<f64> {
     let diag_per = rosrust::param("~diagnostic_period")?;
-    println!("FOO");
     let val = diag_per.get().ok()?;
-    println!("BAR {}", val);
     Some(val)
 }
 
