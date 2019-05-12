@@ -41,6 +41,10 @@ pub fn try_init_with_options(name: &str, capture_sigint: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn is_initialized() -> bool {
+    ROS.read().expect(FAILED_TO_LOCK).is_some()
+}
+
 macro_rules! ros {
     () => {
         ROS.read()
