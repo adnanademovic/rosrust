@@ -221,15 +221,16 @@ impl<T: Action> ActionServerState<T> {
     }
 
     pub fn publish_status(&mut self) -> Result<()> {
-        let status_array = self.get_status_array();
+        let mut status_array = self.get_status_array();
         if !rosrust::is_ok() {
             return Ok(());
         }
+        status_array.header.stamp = rosrust::now();
         self.status_pub.send(status_array)
     }
 
     pub fn publish_feedback(&self, status: GoalStatus, body: FeedbackBody<T>) -> Result<()> {
-        let action_feedback = Response {
+        let mut action_feedback = Response {
             header: Default::default(),
             status,
             body,
@@ -237,12 +238,13 @@ impl<T: Action> ActionServerState<T> {
         if !rosrust::is_ok() {
             return Ok(());
         }
+        action_feedback.header.stamp = rosrust::now();
         self.feedback_pub
             .send(T::Feedback::from_response(action_feedback))
     }
 
     pub fn publish_result(&self, status: GoalStatus, body: ResultBody<T>) -> Result<()> {
-        let action_result = Response {
+        let mut action_result = Response {
             header: Default::default(),
             status,
             body,
@@ -250,6 +252,7 @@ impl<T: Action> ActionServerState<T> {
         if !rosrust::is_ok() {
             return Ok(());
         }
+        action_result.header.stamp = rosrust::now();
         self.result_pub
             .send(T::Result::from_response(action_result))
     }

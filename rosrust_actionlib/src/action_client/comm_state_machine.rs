@@ -1,36 +1,32 @@
 use crate::goal_status::{GoalID, GoalState, GoalStatus, GoalStatusArray};
 use crate::{Action, FeedbackBody, FeedbackType, GoalType, ResultType};
 
-type OnFeedback<T> = Box<Fn(FeedbackBody<T>)>;
-type OnTransition = Box<Fn()>;
-type SendGoal = Box<Fn()>;
-type SendCancel = Box<Fn(GoalID)>;
+type OnFeedback<T> = Box<dyn Fn(FeedbackBody<T>) + Send + Sync + 'static>;
+type OnTransition = Box<dyn Fn() + Send + Sync + 'static>;
 
 pub struct CommStateMachine<T: Action> {
     action_goal: GoalType<T>,
     on_feedback: Option<OnFeedback<T>>,
     on_transition: Option<OnTransition>,
-    send_goal_handler: SendGoal,
-    send_cancel_handler: SendCancel,
+    send_goal_handler: Box<dyn Fn() + Send + Sync + 'static>,
+    send_cancel_handler: Box<dyn Fn(GoalID) + Send + Sync + 'static>,
     state: State,
     latest_goal_status: GoalStatus,
     latest_result: Option<ResultType<T>>,
 }
 
 impl<T: Action> CommStateMachine<T> {
-    pub fn new(
+    pub(crate) fn new(
         action_goal: GoalType<T>,
         on_feedback: Option<OnFeedback<T>>,
         on_transition: Option<OnTransition>,
-        send_goal_handler: SendGoal,
-        send_cancel_handler: SendCancel,
     ) -> Self {
         Self {
             action_goal,
             on_feedback,
             on_transition,
-            send_goal_handler,
-            send_cancel_handler,
+            send_goal_handler: Box::new(|| {}),
+            send_cancel_handler: Box::new(|_| {}),
             state: State::WaitingForGoalAck,
             latest_goal_status: GoalStatus {
                 status: GoalState::Pending as u8,
@@ -38,6 +34,14 @@ impl<T: Action> CommStateMachine<T> {
             },
             latest_result: None,
         }
+    }
+
+    pub(crate) fn register_send_goal<F: Fn() + Send + Sync + 'static>(&mut self, f: F) {
+        self.send_goal_handler = Box::new(f);
+    }
+
+    pub(crate) fn register_send_cancel<F: Fn(GoalID) + Send + Sync + 'static>(&mut self, f: F) {
+        self.send_cancel_handler = Box::new(f);
     }
 
     #[inline]
