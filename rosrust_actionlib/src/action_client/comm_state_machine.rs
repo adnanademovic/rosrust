@@ -1,30 +1,27 @@
-use crate::action_client::ClientGoalHandle;
 use crate::goal_status::{GoalID, GoalState, GoalStatus, GoalStatusArray};
 use crate::{Action, FeedbackBody, FeedbackType, GoalType, ResultType};
-use std::sync::{Mutex, Weak};
 
-type OnFeedback<T> = Box<Fn(ClientGoalHandle<T>, FeedbackBody<T>)>;
-type OnTransition<T> = Box<Fn(ClientGoalHandle<T>)>;
+type OnFeedback<T> = Box<Fn(FeedbackBody<T>)>;
+type OnTransition = Box<Fn()>;
 type SendGoal = Box<Fn()>;
 type SendCancel = Box<Fn(GoalID)>;
 
 pub struct CommStateMachine<T: Action> {
     action_goal: GoalType<T>,
     on_feedback: Option<OnFeedback<T>>,
-    on_transition: Option<OnTransition<T>>,
+    on_transition: Option<OnTransition>,
     send_goal_handler: SendGoal,
     send_cancel_handler: SendCancel,
     state: State,
     latest_goal_status: GoalStatus,
     latest_result: Option<ResultType<T>>,
-    self_reference: Weak<Mutex<Self>>,
 }
 
 impl<T: Action> CommStateMachine<T> {
     pub fn new(
         action_goal: GoalType<T>,
         on_feedback: Option<OnFeedback<T>>,
-        on_transition: Option<OnTransition<T>>,
+        on_transition: Option<OnTransition>,
         send_goal_handler: SendGoal,
         send_cancel_handler: SendCancel,
     ) -> Self {
@@ -40,7 +37,6 @@ impl<T: Action> CommStateMachine<T> {
                 ..Default::default()
             },
             latest_result: None,
-            self_reference: Weak::new(),
         }
     }
 
@@ -70,11 +66,6 @@ impl<T: Action> CommStateMachine<T> {
     }
 
     #[inline]
-    pub fn create_self_reference(&mut self, self_reference: Weak<Mutex<Self>>) {
-        self.self_reference = self_reference;
-    }
-
-    #[inline]
     pub fn set_state(&mut self, state: State) {
         rosrust::ros_debug!(
             "Transitioning client State from {:?} to {:?}",
@@ -95,9 +86,7 @@ impl<T: Action> CommStateMachine<T> {
         self.state = state;
 
         if let Some(on_transition) = &self.on_transition {
-            if let Some(self_reference) = self.self_reference.upgrade() {
-                on_transition(ClientGoalHandle::new(self_reference))
-            }
+            on_transition()
         }
     }
 
@@ -111,9 +100,7 @@ impl<T: Action> CommStateMachine<T> {
         }
 
         if let Some(on_feedback) = &self.on_feedback {
-            if let Some(self_reference) = self.self_reference.upgrade() {
-                on_feedback(ClientGoalHandle::new(self_reference), action_feedback.body)
-            }
+            on_feedback(action_feedback.body)
         }
     }
 
