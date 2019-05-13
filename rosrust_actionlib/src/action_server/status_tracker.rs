@@ -2,9 +2,10 @@ use super::goal_id_generator::GoalIdGenerator;
 use crate::msg::actionlib_msgs::{GoalID, GoalStatus};
 use crate::Goal;
 use rosrust;
+use std::sync::Arc;
 
 pub struct StatusTracker<T> {
-    pub goal: Option<Goal<T>>,
+    pub goal: Option<Arc<Goal<T>>>,
     pub status: GoalStatus,
     pub destruction_time_set: bool,
     pub handle_destruction_time: rosrust::Time,
@@ -53,7 +54,7 @@ impl<T: rosrust::Message> StatusTracker<T> {
 
         let handle_destruction_time = rosrust::Time::default();
         Self {
-            goal: Some(goal),
+            goal: Some(Arc::new(goal)),
             status,
             destruction_time_set: false,
             handle_destruction_time,
