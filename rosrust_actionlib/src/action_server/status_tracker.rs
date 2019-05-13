@@ -1,4 +1,4 @@
-use crate::goal_id_generator::GoalIdGenerator;
+use super::goal_id_generator::GoalIdGenerator;
 use crate::msg::actionlib_msgs::{GoalID, GoalStatus};
 use crate::Goal;
 use rosrust;

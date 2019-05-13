@@ -7,10 +7,8 @@ pub use paste;
 
 pub mod action_client;
 mod action_server;
-mod goal_id_generator;
 mod goal_status;
 pub mod msg;
-mod status_tracker;
 #[macro_use]
 mod macros;
 mod static_messages;

@@ -1,12 +1,15 @@
+use self::status_tracker::StatusTracker;
 use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
-use crate::status_tracker::StatusTracker;
 use crate::{
     Action, ActionGoal, ActionResponse, FeedbackBody, GoalBody, GoalType, Response, ResultBody,
 };
 use rosrust::error::Result;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
+
+mod goal_id_generator;
+mod status_tracker;
 
 pub struct ActionServer<T: Action> {
     fields: Arc<Mutex<ActionServerState<T>>>,
