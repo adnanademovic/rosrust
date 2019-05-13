@@ -41,6 +41,16 @@ impl<T: Action> ClientGoalHandle<T> {
     }
 
     #[inline]
+    pub fn goal_status_text(&self) -> String {
+        self.state_machine
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
+            .latest_goal_status()
+            .text
+            .clone()
+    }
+
+    #[inline]
     pub fn result(&self) -> Option<ResultBody<T>> {
         self.state_machine
             .lock()
