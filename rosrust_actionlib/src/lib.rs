@@ -30,6 +30,7 @@ pub trait ActionGoal: rosrust::Message {
     fn from_goal(t: Goal<Self::Body>) -> Self;
 }
 
+#[derive(Clone, Default)]
 pub struct Goal<T> {
     pub header: msg::std_msgs::Header,
     pub id: msg::actionlib_msgs::GoalID,
@@ -43,6 +44,7 @@ pub trait ActionResponse: rosrust::Message {
     fn from_response(t: Response<Self::Body>) -> Self;
 }
 
+#[derive(Clone, Default)]
 pub struct Response<T> {
     pub header: msg::std_msgs::Header,
     pub status: msg::actionlib_msgs::GoalStatus,
