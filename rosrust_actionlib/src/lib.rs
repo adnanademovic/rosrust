@@ -1,3 +1,4 @@
+pub use self::action_client::{ActionClient, ClientGoalHandle};
 pub use self::action_server::{
     ActionServer, ActionServerOnRequest, ActionServerState, ServerGoalHandle,
 };

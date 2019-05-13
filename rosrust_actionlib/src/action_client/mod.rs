@@ -125,6 +125,19 @@ impl<T: Action> ActionClient<T> {
     }
 
     #[inline]
+    pub fn build_goal_sender<'a>(
+        &'a self,
+        goal: GoalBody<T>,
+    ) -> SendGoalBuilder<
+        'a,
+        T,
+        impl Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
+        impl Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
+    > {
+        SendGoalBuilder::new(self, goal, |_| {}, |_, _| {})
+    }
+
+    #[inline]
     pub fn cancel_all_goals(&self) -> rosrust::error::Result<()> {
         self.cancel_goals_at_and_before_time(rosrust::Time::new())
     }
@@ -156,5 +169,59 @@ fn decode_queue_size(param: &str, default: usize) -> usize {
         None => default,
         Some(v) if v < 0 => default,
         Some(v) => v as usize,
+    }
+}
+
+pub struct SendGoalBuilder<'a, T: Action, Ft, Ff> {
+    client: &'a ActionClient<T>,
+    goal: GoalBody<T>,
+    on_transition: Option<Ft>,
+    on_feedback: Option<Ff>,
+}
+
+impl<'a, T: Action, Ft, Ff> SendGoalBuilder<'a, T, Ft, Ff>
+where
+    Ft: Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
+    Ff: Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
+{
+    fn new(client: &'a ActionClient<T>, goal: GoalBody<T>, _: Ft, _: Ff) -> Self {
+        Self {
+            client,
+            goal,
+            on_transition: None,
+            on_feedback: None,
+        }
+    }
+
+    #[inline]
+    pub fn on_transition<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Fnew, Ff>
+    where
+        Fnew: Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
+    {
+        SendGoalBuilder {
+            client: self.client,
+            goal: self.goal,
+            on_transition: Some(callback),
+            on_feedback: self.on_feedback,
+        }
+    }
+
+    #[inline]
+    pub fn on_feedback<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Ft, Fnew>
+    where
+        Fnew: Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
+    {
+        SendGoalBuilder {
+            client: self.client,
+            goal: self.goal,
+            on_transition: self.on_transition,
+            on_feedback: Some(callback),
+        }
+    }
+
+    #[inline]
+    pub fn send(self) -> ClientGoalHandle<T> {
+        self.client
+            .send_goal(self.goal, self.on_transition, self.on_feedback)
     }
 }
