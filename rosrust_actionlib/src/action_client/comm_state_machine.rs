@@ -11,7 +11,6 @@ pub struct CommStateMachine<T: Action> {
     action_goal: GoalType<T>,
     on_feedback: Option<OnFeedback<T>>,
     on_transition: Option<OnTransition>,
-    send_goal_handler: OnSendGoal<T>,
     send_cancel_handler: OnSendCancel,
     state: State,
     latest_goal_status: GoalStatus,
@@ -19,14 +18,9 @@ pub struct CommStateMachine<T: Action> {
 }
 
 impl<T: Action> CommStateMachine<T> {
-    pub(crate) fn new(
-        action_goal: GoalType<T>,
-        send_goal_handler: OnSendGoal<T>,
-        send_cancel_handler: OnSendCancel,
-    ) -> Self {
+    pub(crate) fn new(action_goal: GoalType<T>, send_cancel_handler: OnSendCancel) -> Self {
         Self {
             action_goal,
-            send_goal_handler,
             send_cancel_handler,
             state: State::WaitingForGoalAck,
             latest_goal_status: GoalStatus {
@@ -73,16 +67,6 @@ impl<T: Action> CommStateMachine<T> {
     #[inline]
     pub fn latest_result(&self) -> &Option<ResultType<T>> {
         &self.latest_result
-    }
-
-    #[inline]
-    pub fn set_state(&mut self, state: State) {
-        rosrust::ros_debug!(
-            "Transitioning client State from {:?} to {:?}",
-            self.state,
-            state
-        );
-        self.state = state;
     }
 
     pub fn transition_to(&mut self, state: State) {
@@ -170,7 +154,7 @@ impl<T: Action> CommStateMachine<T> {
                     | State::Lost => self.mark_as_lost(),
                     State::WaitingForGoalAck | State::WaitingForResult | State::Done => {}
                 }
-                return None;
+                None
             })?;
 
         let goal_state = status

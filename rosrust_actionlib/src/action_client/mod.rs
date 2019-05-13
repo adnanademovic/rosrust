@@ -11,11 +11,9 @@ mod comm_state_machine;
 mod goal_manager;
 
 pub struct ActionClient<T: Action> {
-    namespace: String,
-    pub_goal: rosrust::Publisher<T::Goal>,
     pub_cancel: rosrust::Publisher<actionlib_msgs::GoalID>,
     manager: Arc<Mutex<goal_manager::GoalManager<T>>>,
-    last_status_message: Arc<Mutex<Option<actionlib_msgs::GoalStatusArray>>>,
+    _last_status_message: Arc<Mutex<Option<actionlib_msgs::GoalStatusArray>>>,
     _status_sub: rosrust::Subscriber,
     _result_sub: rosrust::Subscriber,
     _feedback_sub: rosrust::Subscriber,
@@ -95,18 +93,15 @@ impl<T: Action> ActionClient<T> {
         )?;
 
         Ok(Self {
-            namespace: namespace.into(),
-            pub_goal,
             pub_cancel,
             manager,
-            last_status_message,
+            _last_status_message: last_status_message,
             _status_sub: status_sub,
             _result_sub: result_sub,
             _feedback_sub: feedback_sub,
         })
     }
 
-    // TODO: make more ergonomic, probably with a builder
     #[inline]
     pub fn send_goal<Ft, Ff>(
         &self,

@@ -59,7 +59,6 @@ impl<T: Action> GoalManager<T> {
 
         let comm_state_machine = Arc::new(Mutex::new(CommStateMachine::new(
             action_goal,
-            Arc::clone(&self.on_send_goal),
             Arc::clone(&self.on_cancel),
         )));
 
@@ -93,7 +92,7 @@ impl<T: Action> GoalManager<T> {
 
         (*self.on_send_goal)(init_action_goal);
 
-        return ClientGoalHandle::new(comm_state_machine);
+        ClientGoalHandle::new(comm_state_machine)
     }
 
     fn for_each_status(&self, handler: impl Fn(&mut CommStateMachine<T>)) {
