@@ -306,7 +306,7 @@ impl<T: Action> ActionServerState<T> {
         let goal_handle = ServerGoalHandle::new(fields, tracker);
 
         if goal_timestamp != 0 && goal_timestamp <= self.last_cancel_ns {
-            goal_handle.set_canceled(None, "This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request")?;
+            goal_handle.set_canceled(None, "This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request");
             return Ok(());
         };
 
