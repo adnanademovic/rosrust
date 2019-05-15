@@ -342,7 +342,7 @@ impl<T: Action> ActionServerState<T> {
 
             let goal_handle = ServerGoalHandle::new(Arc::clone(&fields), tracker_ref);
 
-            if goal_handle.set_cancel_requested()? {
+            if goal_handle.set_cancel_requested() {
                 (*self.on_cancel)(goal_handle)?;
             }
         }
