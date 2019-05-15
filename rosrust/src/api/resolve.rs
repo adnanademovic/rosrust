@@ -81,16 +81,10 @@ fn find_with_prefix(prefix: &str) -> Option<String> {
 
 #[cfg(not(test))]
 fn system_hostname() -> String {
-    use nix::unistd::gethostname;
-    let mut hostname = [0u8; 256];
-    gethostname(&mut hostname)
-        .expect("Hostname is either unavailable or too long to fit into buffer");
-    let hostname = hostname
-        .iter()
-        .take_while(|&v| *v != 0u8)
-        .cloned()
-        .collect::<Vec<_>>();
-    String::from_utf8(hostname).expect("Hostname is not legal UTF-8")
+    ::hostname::get()
+        .expect("Unable to retrieve hostname from the system.")
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[cfg(test)]
