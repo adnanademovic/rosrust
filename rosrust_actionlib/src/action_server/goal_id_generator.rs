@@ -1,4 +1,4 @@
-use crate::msg::actionlib_msgs::GoalID;
+use crate::GoalID;
 use rosrust;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

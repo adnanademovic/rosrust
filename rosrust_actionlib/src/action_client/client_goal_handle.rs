@@ -1,8 +1,7 @@
 use crate::action_client::comm_state_machine::{CommStateMachine, State};
-use crate::goal_status::{GoalID, GoalState};
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, ResultBody};
-use std::convert::TryInto;
+use crate::{GoalID, GoalState};
 use std::sync::{Arc, Mutex};
 
 pub struct ClientGoalHandle<T: Action> {
@@ -30,14 +29,12 @@ impl<T: Action> ClientGoalHandle<T> {
     }
 
     #[inline]
-    pub fn goal_status(&self) -> GoalState {
+    pub fn goal_state(&self) -> GoalState {
         self.state_machine
             .lock()
             .expect(MUTEX_LOCK_FAIL)
             .latest_goal_status()
-            .status
-            .try_into()
-            .unwrap_or(GoalState::Lost)
+            .state
     }
 
     #[inline]
@@ -69,11 +66,7 @@ impl<T: Action> ClientGoalHandle<T> {
                 state_machine.state(),
             );
         }
-        let goal_state: GoalState = state_machine
-            .latest_goal_status()
-            .status
-            .try_into()
-            .unwrap_or(GoalState::Lost);
+        let goal_state = state_machine.latest_goal_status().state;
         match goal_state {
             GoalState::Preempted
             | GoalState::Succeeded

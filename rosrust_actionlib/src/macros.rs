@@ -32,12 +32,12 @@ macro_rules! action {
                 type Body = $root::$package::[<$action $sub_message>];
 
                 fn into_goal(self) -> $crate::Goal<Self::Body> {
-                    let header = $crate::msg::std_msgs::Header {
+                    let header = $crate::Header {
                         seq: self.header.seq,
                         stamp: self.header.stamp,
                         frame_id: self.header.frame_id,
                     };
-                    let id = $crate::msg::actionlib_msgs::GoalID {
+                    let id = $crate::GoalID {
                         stamp: self.goal_id.stamp,
                         id: self.goal_id.id,
                     };
@@ -69,18 +69,19 @@ macro_rules! action {
                 type Body = $root::$package::[<$action $sub_message>];
 
                 fn into_response(self) -> $crate::Response<Self::Body> {
-                    let header = $crate::msg::std_msgs::Header {
+                    use std::convert::TryInto;
+                    let header = $crate::Header {
                         seq: self.header.seq,
                         stamp: self.header.stamp,
                         frame_id: self.header.frame_id,
                     };
-                    let goal_id = $crate::msg::actionlib_msgs::GoalID {
+                    let goal_id = $crate::GoalID {
                         stamp: self.status.goal_id.stamp,
                         id: self.status.goal_id.id,
                     };
-                    let status = $crate::msg::actionlib_msgs::GoalStatus {
+                    let status = $crate::GoalStatus {
                         goal_id,
-                        status: self.status.status,
+                        state: self.status.status.try_into().unwrap_or($crate::GoalState::Lost),
                         text: self.status.text,
                     };
                     $crate::Response {
@@ -102,7 +103,7 @@ macro_rules! action {
                     };
                     let status = $root::actionlib_msgs::GoalStatus {
                         goal_id,
-                        status: t.status.status,
+                        status: t.status.state as u8,
                         text: t.status.text,
                     };
                     Self {

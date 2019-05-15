@@ -1,9 +1,10 @@
 pub use self::server_goal_handle::ServerGoalHandle;
 use self::status_tracker::StatusTracker;
-use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
+use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
 use crate::{
-    Action, ActionGoal, ActionResponse, FeedbackBody, GoalBody, GoalType, Response, ResultBody,
+    Action, ActionGoal, ActionResponse, FeedbackBody, GoalBody, GoalID, GoalState, GoalStatus,
+    GoalType, Response, ResultBody,
 };
 use rosrust::error::Result;
 use std::collections::BTreeMap;
@@ -115,7 +116,7 @@ impl<T: Action> ActionServer<T> {
 
         let internal_on_cancel = {
             let fields = Arc::clone(&fields);
-            move |goal_id| {
+            move |goal_id: GoalID| {
                 if let Err(err) = fields
                     .lock()
                     .expect(MUTEX_LOCK_FAIL)
@@ -218,7 +219,7 @@ impl<T: Action> ActionServerState<T> {
         let status_list = self
             .status_list
             .values()
-            .map(|tracker| tracker.lock().expect(MUTEX_LOCK_FAIL).status.clone())
+            .map(|tracker| tracker.lock().expect(MUTEX_LOCK_FAIL).status.clone().into())
             .collect();
         GoalStatusArray {
             header: Default::default(),
@@ -274,15 +275,15 @@ impl<T: Action> ActionServerState<T> {
             let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
 
             rosrust::ros_debug!(
-                "Goal {} was already in the status list with status {}",
+                "Goal {} was already in the status list with status {:?}",
                 goal.id.id,
-                tracker.status.status
+                tracker.status.state
             );
 
             tracker.refresh_destruction_time();
 
-            if tracker.status.status == GoalStatus::RECALLING {
-                tracker.status.status = GoalStatus::RECALLED;
+            if tracker.status.state == GoalState::Recalling {
+                tracker.status.state = GoalState::Recalled;
                 let status = tracker.status.clone();
 
                 self.publish_result(status, Default::default())?;
@@ -348,7 +349,7 @@ impl<T: Action> ActionServerState<T> {
         }
 
         if filter_id != "" && !goal_id_found {
-            let mut tracker = StatusTracker::from_status(goal_id, GoalStatus::RECALLING);
+            let mut tracker = StatusTracker::from_state(goal_id, GoalState::Recalling);
             tracker.handle_destruction_time = rosrust::now();
             let key = tracker.status.goal_id.id.clone();
             self.add_status_tracker(key, Arc::new(Mutex::new(tracker)));

@@ -1,7 +1,9 @@
 use crate::action_server::status_tracker::StatusTracker;
-use crate::goal_status::{GoalID, GoalState, GoalStatus};
 use crate::static_messages::MUTEX_LOCK_FAIL;
-use crate::{Action, ActionServerState, FeedbackBody, GoalBody, GoalType, ResultBody};
+use crate::{
+    Action, ActionServerState, FeedbackBody, GoalBody, GoalID, GoalState, GoalStatus, GoalType,
+    ResultBody,
+};
 use std::sync::{Arc, Mutex};
 
 pub struct ServerGoalHandle<T: Action> {
@@ -47,23 +49,15 @@ impl<T: Action> ServerGoalHandle<T> {
         text: Option<&str>,
         action: ActionCommand,
     ) -> Result<(), Error> {
-        use std::convert::TryInto;
-
         self.log_action(action.precise_description());
 
         self.check_goal_presence("set_status")?;
 
         let mut status_tracker = self.status_tracker.lock().expect(MUTEX_LOCK_FAIL);
 
-        status_tracker.status.status = action
-            .do_transition(
-                status_tracker
-                    .status
-                    .status
-                    .try_into()
-                    .unwrap_or(GoalState::Lost),
-            )
-            .map_err(Into::into)? as u8;
+        status_tracker.status.state = action
+            .do_transition(status_tracker.status.state)
+            .map_err(Into::into)?;
 
         if let Some(text) = text {
             status_tracker.status.text = text.into();

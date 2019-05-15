@@ -2,7 +2,7 @@ pub use self::client_goal_handle::ClientGoalHandle;
 pub use self::comm_state_machine::State;
 use crate::msg::actionlib_msgs;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
-use crate::{Action, ActionResponse, FeedbackBody, GoalBody};
+use crate::{Action, ActionResponse, FeedbackBody, GoalBody, GoalID};
 use rosrust::error::Result;
 use std::sync::{Arc, Mutex};
 
@@ -13,7 +13,6 @@ mod goal_manager;
 pub struct ActionClient<T: Action> {
     pub_cancel: rosrust::Publisher<actionlib_msgs::GoalID>,
     manager: Arc<Mutex<goal_manager::GoalManager<T>>>,
-    _last_status_message: Arc<Mutex<Option<actionlib_msgs::GoalStatusArray>>>,
     _status_sub: rosrust::Subscriber,
     _result_sub: rosrust::Subscriber,
     _feedback_sub: rosrust::Subscriber,
@@ -38,7 +37,7 @@ impl<T: Action> ActionClient<T> {
 
         let on_cancel = {
             let publisher = pub_cancel.clone();
-            move |data| {
+            move |data: GoalID| {
                 if let Err(err) = publisher.send(data) {
                     rosrust::ros_err!("Failed to publish cancel: {}", err);
                 }
@@ -50,13 +49,9 @@ impl<T: Action> ActionClient<T> {
             on_cancel,
         )));
 
-        let last_status_message = Arc::new(Mutex::new(None));
-
         let on_status = {
-            let last_status_message = Arc::clone(&last_status_message);
             let manager = Arc::clone(&manager);
             move |message: actionlib_msgs::GoalStatusArray| {
-                (*last_status_message.lock().expect(MUTEX_LOCK_FAIL)) = Some(message.clone());
                 manager
                     .lock()
                     .expect(MUTEX_LOCK_FAIL)
@@ -95,7 +90,6 @@ impl<T: Action> ActionClient<T> {
         Ok(Self {
             pub_cancel,
             manager,
-            _last_status_message: last_status_message,
             _status_sub: status_sub,
             _result_sub: result_sub,
             _feedback_sub: feedback_sub,

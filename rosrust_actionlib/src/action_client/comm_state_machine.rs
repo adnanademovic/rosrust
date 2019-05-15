@@ -1,5 +1,6 @@
-use crate::goal_status::{GoalID, GoalState, GoalStatus, GoalStatusArray};
+use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::{Action, FeedbackBody, FeedbackType, GoalType, ResultType};
+use crate::{GoalID, GoalState, GoalStatus};
 use std::sync::Arc;
 
 type OnFeedback<T> = Box<dyn Fn(FeedbackBody<T>) + Send + Sync + 'static>;
@@ -23,10 +24,7 @@ impl<T: Action> CommStateMachine<T> {
             action_goal,
             send_cancel_handler,
             state: State::WaitingForGoalAck,
-            latest_goal_status: GoalStatus {
-                status: GoalState::Pending as u8,
-                ..Default::default()
-            },
+            latest_goal_status: GoalStatus::default(),
             on_feedback: None,
             on_transition: None,
             latest_result: None,
@@ -117,7 +115,7 @@ impl<T: Action> CommStateMachine<T> {
             | State::Recalling
             | State::Preempting => {
                 let mut status_array = GoalStatusArray::default();
-                status_array.status_list.push(status);
+                status_array.status_list.push(status.into());
                 self.update_status(&status_array);
                 self.transition_to(State::Done);
             }
@@ -162,7 +160,7 @@ impl<T: Action> CommStateMachine<T> {
             .try_into()
             .map_err(|err| format!("Got an unknown status from the ActionServer: {}", err))?;
 
-        self.latest_goal_status = status;
+        self.latest_goal_status = status.into();
 
         let steps = self
             .state
@@ -183,7 +181,7 @@ impl<T: Action> CommStateMachine<T> {
     }
 
     fn mark_as_lost(&mut self) {
-        self.latest_goal_status.status = GoalState::Lost as u8;
+        self.latest_goal_status.state = GoalState::Lost;
         self.transition_to(State::Done);
     }
 }

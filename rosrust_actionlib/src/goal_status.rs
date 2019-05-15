@@ -1,20 +1,26 @@
-pub use crate::msg::actionlib_msgs::{GoalID, GoalStatus, GoalStatusArray};
-use std::convert::TryFrom;
+use crate::msg::actionlib_msgs::{GoalID, GoalStatus as GoalStatusRaw};
+use std::convert::{TryFrom, TryInto};
 
 // TODO: consider removing "Lost"
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GoalState {
-    Pending = GoalStatus::PENDING,
-    Active = GoalStatus::ACTIVE,
-    Preempted = GoalStatus::PREEMPTED,
-    Succeeded = GoalStatus::SUCCEEDED,
-    Aborted = GoalStatus::ABORTED,
-    Rejected = GoalStatus::REJECTED,
-    Preempting = GoalStatus::PREEMPTING,
-    Recalling = GoalStatus::RECALLING,
-    Recalled = GoalStatus::RECALLED,
-    Lost = GoalStatus::LOST,
+    Pending = GoalStatusRaw::PENDING,
+    Active = GoalStatusRaw::ACTIVE,
+    Preempted = GoalStatusRaw::PREEMPTED,
+    Succeeded = GoalStatusRaw::SUCCEEDED,
+    Aborted = GoalStatusRaw::ABORTED,
+    Rejected = GoalStatusRaw::REJECTED,
+    Preempting = GoalStatusRaw::PREEMPTING,
+    Recalling = GoalStatusRaw::RECALLING,
+    Recalled = GoalStatusRaw::RECALLED,
+    Lost = GoalStatusRaw::LOST,
+}
+
+impl Default for GoalState {
+    fn default() -> Self {
+        GoalState::Pending
+    }
 }
 
 impl TryFrom<u8> for GoalState {
@@ -22,17 +28,44 @@ impl TryFrom<u8> for GoalState {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            GoalStatus::PENDING => Ok(GoalState::Pending),
-            GoalStatus::ACTIVE => Ok(GoalState::Active),
-            GoalStatus::PREEMPTED => Ok(GoalState::Preempted),
-            GoalStatus::SUCCEEDED => Ok(GoalState::Succeeded),
-            GoalStatus::ABORTED => Ok(GoalState::Aborted),
-            GoalStatus::REJECTED => Ok(GoalState::Rejected),
-            GoalStatus::PREEMPTING => Ok(GoalState::Preempting),
-            GoalStatus::RECALLING => Ok(GoalState::Recalling),
-            GoalStatus::RECALLED => Ok(GoalState::Recalled),
-            GoalStatus::LOST => Ok(GoalState::Lost),
+            GoalStatusRaw::PENDING => Ok(GoalState::Pending),
+            GoalStatusRaw::ACTIVE => Ok(GoalState::Active),
+            GoalStatusRaw::PREEMPTED => Ok(GoalState::Preempted),
+            GoalStatusRaw::SUCCEEDED => Ok(GoalState::Succeeded),
+            GoalStatusRaw::ABORTED => Ok(GoalState::Aborted),
+            GoalStatusRaw::REJECTED => Ok(GoalState::Rejected),
+            GoalStatusRaw::PREEMPTING => Ok(GoalState::Preempting),
+            GoalStatusRaw::RECALLING => Ok(GoalState::Recalling),
+            GoalStatusRaw::RECALLED => Ok(GoalState::Recalled),
+            GoalStatusRaw::LOST => Ok(GoalState::Lost),
             v => Err(v),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct GoalStatus {
+    pub goal_id: GoalID,
+    pub state: GoalState,
+    pub text: String,
+}
+
+impl From<GoalStatus> for GoalStatusRaw {
+    fn from(status: GoalStatus) -> Self {
+        Self {
+            goal_id: status.goal_id,
+            status: status.state as u8,
+            text: status.text,
+        }
+    }
+}
+
+impl From<GoalStatusRaw> for GoalStatus {
+    fn from(status: GoalStatusRaw) -> Self {
+        Self {
+            goal_id: status.goal_id,
+            state: status.status.try_into().unwrap_or(GoalState::Lost),
+            text: status.text,
         }
     }
 }

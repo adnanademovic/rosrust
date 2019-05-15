@@ -1,7 +1,8 @@
 use super::comm_state_machine::{CommStateMachine, OnSendCancel, OnSendGoal};
 use super::ClientGoalHandle;
-use crate::goal_status::{GoalID, GoalStatusArray};
+use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::static_messages::MUTEX_LOCK_FAIL;
+use crate::GoalID;
 use crate::{Action, FeedbackBody, FeedbackType, GoalBody, GoalType, ResultType};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};

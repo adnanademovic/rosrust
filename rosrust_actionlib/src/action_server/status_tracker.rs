@@ -1,6 +1,5 @@
 use super::goal_id_generator::GoalIdGenerator;
-use crate::msg::actionlib_msgs::{GoalID, GoalStatus};
-use crate::Goal;
+use crate::{Goal, GoalID, GoalState, GoalStatus};
 use rosrust;
 use std::sync::Arc;
 
@@ -13,13 +12,13 @@ pub struct StatusTracker<T> {
 }
 
 impl<T: rosrust::Message> StatusTracker<T> {
-    pub fn from_status(goal_id: GoalID, status: u8) -> Self {
+    pub fn from_state(goal_id: GoalID, state: GoalState) -> Self {
         let goal = None;
         let id_generator = GoalIdGenerator::new();
 
         let status = GoalStatus {
             goal_id,
-            status,
+            state,
             text: String::new(),
         };
 
@@ -48,7 +47,7 @@ impl<T: rosrust::Message> StatusTracker<T> {
 
         let status = GoalStatus {
             goal_id,
-            status: GoalStatus::PENDING,
+            state: GoalState::Pending,
             text: String::new(),
         };
 
