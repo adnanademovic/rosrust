@@ -50,7 +50,7 @@ impl Subscriber {
     }
 
     #[inline]
-    pub fn publisher_names(&self) -> Vec<String> {
+    pub fn publisher_uris(&self) -> Vec<String> {
         self.connected_publishers.iter().cloned().collect()
     }
 

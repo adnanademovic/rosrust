@@ -138,11 +138,11 @@ impl Subscriber {
     }
 
     #[inline]
-    pub fn publisher_names(&self) -> Vec<String> {
+    pub fn publisher_uris(&self) -> Vec<String> {
         self.info
             .interactor
             .slave
-            .get_publisher_names_of_subscription(&self.info.interactor.name)
+            .get_publisher_uris_of_subscription(&self.info.interactor.name)
     }
 }
 

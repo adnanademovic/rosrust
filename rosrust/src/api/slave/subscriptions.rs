@@ -85,12 +85,12 @@ impl SubscriptionsTracker {
     }
 
     #[inline]
-    pub fn publisher_names(&self, topic: &str) -> Vec<String> {
+    pub fn publisher_uris(&self, topic: &str) -> Vec<String> {
         self.mapping
             .lock()
             .expect(FAILED_TO_LOCK)
             .get(topic)
-            .map_or_else(Vec::new, Subscriber::publisher_names)
+            .map_or_else(Vec::new, Subscriber::publisher_uris)
     }
 }
 

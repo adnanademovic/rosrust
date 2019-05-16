@@ -164,7 +164,7 @@ impl Slave {
     }
 
     #[inline]
-    pub fn get_publisher_names_of_subscription(&self, topic: &str) -> Vec<String> {
-        self.subscriptions.publisher_names(topic)
+    pub fn get_publisher_uris_of_subscription(&self, topic: &str) -> Vec<String> {
+        self.subscriptions.publisher_uris(topic)
     }
 }

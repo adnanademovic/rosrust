@@ -22,7 +22,7 @@ fn main() {
     if log_names {
         let mut rate = rosrust::rate(1.0);
         while rosrust::is_ok() {
-            rosrust::ros_info!("Publisher names: {:?}", subscriber_info.publisher_names());
+            rosrust::ros_info!("Publisher uris: {:?}", subscriber_info.publisher_uris());
             rate.sleep();
         }
     } else {
