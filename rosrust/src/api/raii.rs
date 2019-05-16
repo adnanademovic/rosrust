@@ -95,7 +95,7 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub(crate) fn new<T: Message, F: Fn(T) -> () + Send + 'static>(
+    pub(crate) fn new<T: Message, F: Fn(T, &str) + Send + 'static>(
         master: Arc<Master>,
         slave: Arc<Slave>,
         name: &str,

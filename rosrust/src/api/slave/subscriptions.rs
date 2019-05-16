@@ -49,7 +49,7 @@ impl SubscriptionsTracker {
     pub fn add<T, F>(&self, name: &str, topic: &str, queue_size: usize, callback: F) -> Result<()>
     where
         T: Message,
-        F: Fn(T) -> () + Send + 'static,
+        F: Fn(T, &str) + Send + 'static,
     {
         use std::collections::hash_map::Entry;
         match self

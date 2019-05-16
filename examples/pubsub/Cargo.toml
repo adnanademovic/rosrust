@@ -24,5 +24,9 @@ name = "subscriber"
 path = "src/subscriber.rs"
 
 [[bin]]
+name = "subscriber_with_ids"
+path = "src/subscriber_with_ids.rs"
+
+[[bin]]
 name = "loopback"
 path = "src/loopback.rs"

@@ -50,21 +50,25 @@ fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -
     Ok(caller_id.clone())
 }
 
-fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<()> {
+fn write_response<T: Message, U: std::io::Write>(
+    mut stream: &mut U,
+    caller_id: &str,
+) -> Result<()> {
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
+    fields.insert(String::from("callerid"), caller_id.into());
     header::encode(&mut stream, &fields)?;
     Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<String>
+fn exchange_headers<T, U>(mut stream: &mut U, topic: &str, pub_caller_id: &str) -> Result<String>
 where
     T: Message,
     U: std::io::Write + std::io::Read,
 {
     let caller_id = read_request::<T, U>(&mut stream, topic)?;
-    write_response::<T, U>(&mut stream)?;
+    write_response::<T, U>(&mut stream, pub_caller_id)?;
     Ok(caller_id)
 }
 
@@ -73,12 +77,13 @@ fn process_subscriber<T, U>(
     mut stream: U,
     targets: &TargetList<U>,
     last_message: &Mutex<Arc<Vec<u8>>>,
+    pub_caller_id: &str,
 ) -> tcpconnection::Feedback
 where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
 {
-    let result = exchange_headers::<T, _>(&mut stream, topic)
+    let result = exchange_headers::<T, _>(&mut stream, topic, pub_caller_id)
         .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
     let caller_id = match result {
         Ok(caller_id) => caller_id,
@@ -109,7 +114,12 @@ where
 }
 
 impl Publisher {
-    pub fn new<T, U>(address: U, topic: &str, queue_size: usize) -> Result<Publisher>
+    pub fn new<T, U>(
+        address: U,
+        topic: &str,
+        queue_size: usize,
+        caller_id: &str,
+    ) -> Result<Publisher>
     where
         T: Message,
         U: ToSocketAddrs,
@@ -127,12 +137,13 @@ impl Publisher {
             let publisher_exists = publisher_exists.clone();
             let topic = String::from(topic);
             let last_message = Arc::clone(&last_message);
+            let caller_id = String::from(caller_id);
 
             move |stream: TcpStream| {
                 if !publisher_exists.load(atomic::Ordering::SeqCst) {
                     return tcpconnection::Feedback::StopAccepting;
                 }
-                process_subscriber::<T, _>(&topic, stream, &targets, &last_message)
+                process_subscriber::<T, _>(&topic, stream, &targets, &last_message, &caller_id)
             }
         };
 
