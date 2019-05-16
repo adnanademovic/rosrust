@@ -11,11 +11,13 @@ mod comm_state_machine;
 mod goal_manager;
 
 pub struct ActionClient<T: Action> {
-    pub_cancel: rosrust::Publisher<actionlib_msgs::GoalID>,
+    pub_goal: rosrust::Publisher<T::Goal>,
+    pub_cancel: rosrust::Publisher<GoalID>,
     manager: Arc<Mutex<goal_manager::GoalManager<T>>>,
-    _status_sub: rosrust::Subscriber,
-    _result_sub: rosrust::Subscriber,
-    _feedback_sub: rosrust::Subscriber,
+    last_caller_id: Arc<Mutex<Option<String>>>,
+    status_sub: rosrust::Subscriber,
+    result_sub: rosrust::Subscriber,
+    feedback_sub: rosrust::Subscriber,
 }
 
 impl<T: Action> ActionClient<T> {
@@ -49,9 +51,13 @@ impl<T: Action> ActionClient<T> {
             on_cancel,
         )));
 
+        let last_caller_id = Arc::new(Mutex::new(None));
+
         let on_status = {
             let manager = Arc::clone(&manager);
-            move |message: actionlib_msgs::GoalStatusArray| {
+            let last_caller_id = Arc::clone(&last_caller_id);
+            move |message: actionlib_msgs::GoalStatusArray, caller_id: &str| {
+                (*last_caller_id.lock().expect(MUTEX_LOCK_FAIL)) = Some(caller_id.into());
                 manager
                     .lock()
                     .expect(MUTEX_LOCK_FAIL)
@@ -77,8 +83,11 @@ impl<T: Action> ActionClient<T> {
             }
         };
 
-        let status_sub =
-            rosrust::subscribe(&format!("{}/status", namespace), sub_queue_size, on_status)?;
+        let status_sub = rosrust::subscribe_with_ids(
+            &format!("{}/status", namespace),
+            sub_queue_size,
+            on_status,
+        )?;
         let result_sub =
             rosrust::subscribe(&format!("{}/result", namespace), sub_queue_size, on_result)?;
         let feedback_sub = rosrust::subscribe(
@@ -88,11 +97,13 @@ impl<T: Action> ActionClient<T> {
         )?;
 
         Ok(Self {
+            pub_goal,
             pub_cancel,
             manager,
-            _status_sub: status_sub,
-            _result_sub: result_sub,
-            _feedback_sub: feedback_sub,
+            last_caller_id,
+            status_sub,
+            result_sub,
+            feedback_sub,
         })
     }
 
@@ -136,17 +147,54 @@ impl<T: Action> ActionClient<T> {
         &self,
         stamp: rosrust::Time,
     ) -> rosrust::error::Result<()> {
-        self.pub_cancel.send(actionlib_msgs::GoalID {
+        self.pub_cancel.send(GoalID {
             id: String::new(),
             stamp,
         })
     }
 
-    /*
-    TODO: this needs certain pub/sub internals present to be implemented
-    pub fn wait_for_server(&self, timeout: Option<rosrust::Duration>) -> bool {
+    pub fn wait_for_server(&self, timeout: rosrust::Duration) -> bool {
+        let timeout_time = rosrust::now() + timeout;
+
+        let mut rate = rosrust::rate(100.0);
+        while rosrust::is_ok() && timeout_time > rosrust::now() {
+            if self.wait_for_server_iteration() {
+                return true;
+            }
+            rate.sleep();
+        }
+
+        false
     }
-    */
+
+    fn wait_for_server_iteration(&self) -> bool {
+        let last_caller_id = match self.last_caller_id.lock().expect(MUTEX_LOCK_FAIL).clone() {
+            Some(caller_id) => caller_id,
+            None => return false,
+        };
+
+        let is_in_goals = self
+            .pub_goal
+            .subscriber_names()
+            .into_iter()
+            .any(|caller_id| caller_id == last_caller_id);
+        if !is_in_goals {
+            return false;
+        }
+
+        let is_in_cancels = self
+            .pub_cancel
+            .subscriber_names()
+            .into_iter()
+            .any(|caller_id| caller_id == last_caller_id);
+        if !is_in_cancels {
+            return false;
+        }
+
+        self.status_sub.publisher_count() > 0
+            && self.result_sub.publisher_count() > 0
+            && self.feedback_sub.publisher_count() > 0
+    }
 }
 
 fn decode_queue_size(param: &str, default: usize) -> usize {
