@@ -162,4 +162,9 @@ impl Slave {
     pub fn get_publisher_count_of_subscription(&self, topic: &str) -> usize {
         self.subscriptions.publisher_count(topic)
     }
+
+    #[inline]
+    pub fn get_publisher_names_of_subscription(&self, topic: &str) -> Vec<String> {
+        self.subscriptions.publisher_names(topic)
+    }
 }

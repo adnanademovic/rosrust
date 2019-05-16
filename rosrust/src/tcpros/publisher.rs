@@ -39,15 +39,15 @@ fn match_wildcard_headers(fields: &HashMap<String, String>, topic: &str) -> Resu
     Ok(())
 }
 
-fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<()> {
+fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<String> {
     let fields = header::decode(&mut stream)?;
     if let Err(err) = match_concrete_headers::<T>(&fields, topic) {
         match_wildcard_headers(&fields, topic).map_err(|_| err)?;
     }
-    if fields.get("callerid").is_none() {
-        bail!(ErrorKind::HeaderMissingField("callerid".into()));
-    }
-    Ok(())
+    let caller_id = fields
+        .get("callerid")
+        .ok_or_else(|| ErrorKind::HeaderMissingField("callerid".into()))?;
+    Ok(caller_id.clone())
 }
 
 fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<()> {
@@ -58,13 +58,14 @@ fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<(
     Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<()>
+fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<String>
 where
     T: Message,
     U: std::io::Write + std::io::Read,
 {
-    read_request::<T, U>(&mut stream, topic)?;
-    write_response::<T, U>(&mut stream)
+    let caller_id = read_request::<T, U>(&mut stream, topic)?;
+    write_response::<T, U>(&mut stream)?;
+    Ok(caller_id)
 }
 
 fn process_subscriber<T, U>(
@@ -79,22 +80,25 @@ where
 {
     let result = exchange_headers::<T, _>(&mut stream, topic)
         .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
-    if let Err(err) = result {
-        let info = err
-            .iter()
-            .map(|v| format!("{}", v))
-            .collect::<Vec<_>>()
-            .join("\nCaused by:");
-        error!("{}", info);
-        return tcpconnection::Feedback::AcceptNextStream;
-    }
+    let caller_id = match result {
+        Ok(caller_id) => caller_id,
+        Err(err) => {
+            let info = err
+                .iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<_>>()
+                .join("\nCaused by:");
+            error!("{}", info);
+            return tcpconnection::Feedback::AcceptNextStream;
+        }
+    };
 
     if let Err(err) = stream.write_all(&last_message.lock().expect(FAILED_TO_LOCK)) {
         error!("{}", err);
         return tcpconnection::Feedback::AcceptNextStream;
     }
 
-    if targets.add(stream).is_err() {
+    if targets.add(caller_id, stream).is_err() {
         // The TCP listener gets shut down when streamfork's thread deallocates.
         // This happens only when all the corresponding publisher streams get deallocated,
         // causing streamfork's data channel to shut down
@@ -193,7 +197,12 @@ impl<T: Message> PublisherStream<T> {
 
     #[inline]
     pub fn subscriber_count(&self) -> usize {
-        self.stream.get_target_count()
+        self.stream.target_count()
+    }
+
+    #[inline]
+    pub fn subscriber_names(&self) -> Vec<String> {
+        self.stream.target_names()
     }
 
     #[inline]

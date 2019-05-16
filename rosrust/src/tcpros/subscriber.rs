@@ -49,6 +49,11 @@ impl Subscriber {
         self.connected_publishers.len()
     }
 
+    #[inline]
+    pub fn publisher_names(&self) -> Vec<String> {
+        self.connected_publishers.iter().cloned().collect()
+    }
+
     pub fn connect_to<U: ToSocketAddrs>(
         &mut self,
         publisher: &str,

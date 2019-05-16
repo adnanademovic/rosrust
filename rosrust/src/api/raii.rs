@@ -55,6 +55,11 @@ impl<T: Message> Publisher<T> {
     }
 
     #[inline]
+    pub fn subscriber_names(&self) -> Vec<String> {
+        self.stream.subscriber_names()
+    }
+
+    #[inline]
     pub fn set_latching(&mut self, latching: bool) {
         self.stream.set_latching(latching);
     }
@@ -130,6 +135,14 @@ impl Subscriber {
             .interactor
             .slave
             .get_publisher_count_of_subscription(&self.info.interactor.name)
+    }
+
+    #[inline]
+    pub fn publisher_names(&self) -> Vec<String> {
+        self.info
+            .interactor
+            .slave
+            .get_publisher_names_of_subscription(&self.info.interactor.name)
     }
 }
 

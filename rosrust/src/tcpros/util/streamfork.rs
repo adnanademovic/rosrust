@@ -1,8 +1,8 @@
 use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
+use crate::util::FAILED_TO_LOCK;
 use crossbeam::channel::{self, unbounded, Receiver, Sender};
 use std::io::Write;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub fn fork<T: Write + Send + 'static>(queue_size: usize) -> (TargetList<T>, DataStream) {
@@ -10,7 +10,7 @@ pub fn fork<T: Write + Send + 'static>(queue_size: usize) -> (TargetList<T>, Dat
     let (data_sender, data) = lossy_channel(queue_size);
 
     let mut fork_thread = ForkThread::new();
-    let target_count = fork_thread.clone_target_count();
+    let target_names = Arc::clone(&fork_thread.target_names);
 
     thread::spawn(move || fork_thread.run(&streams, &data));
 
@@ -18,32 +18,30 @@ pub fn fork<T: Write + Send + 'static>(queue_size: usize) -> (TargetList<T>, Dat
         TargetList(streams_sender),
         DataStream {
             sender: data_sender,
-            target_count,
+            target_names,
         },
     )
 }
 
 struct ForkThread<T: Write + Send + 'static> {
-    targets: Vec<T>,
-    target_count: Arc<AtomicUsize>,
+    targets: Vec<SubscriberInfo<T>>,
+    target_names: Arc<Mutex<TargetNames>>,
 }
 
 impl<T: Write + Send + 'static> ForkThread<T> {
     pub fn new() -> Self {
         Self {
             targets: vec![],
-            target_count: Arc::new(AtomicUsize::new(0)),
+            target_names: Arc::new(Mutex::new(TargetNames {
+                targets: Vec::new(),
+            })),
         }
-    }
-
-    pub fn clone_target_count(&self) -> Arc<AtomicUsize> {
-        Arc::clone(&self.target_count)
     }
 
     fn publish_buffer_and_prune_targets(&mut self, buffer: &[u8]) {
         let mut dropped_targets = vec![];
         for (idx, target) in self.targets.iter_mut().enumerate() {
-            if target.write_all(&buffer).is_err() {
+            if target.stream.write_all(&buffer).is_err() {
                 dropped_targets.push(idx);
             }
         }
@@ -53,21 +51,27 @@ impl<T: Write + Send + 'static> ForkThread<T> {
             for idx in dropped_targets.into_iter().rev() {
                 self.targets.swap_remove(idx);
             }
-
-            self.target_count
-                .store(self.targets.len(), Ordering::SeqCst);
+            self.update_target_names();
         }
     }
 
-    fn add_target(&mut self, target: T) {
+    fn add_target(&mut self, target: SubscriberInfo<T>) {
         self.targets.push(target);
-        self.target_count
-            .store(self.targets.len(), Ordering::SeqCst);
+        self.update_target_names();
+    }
+
+    fn update_target_names(&self) {
+        let targets = self
+            .targets
+            .iter()
+            .map(|target| target.caller_id.clone())
+            .collect();
+        *self.target_names.lock().expect(FAILED_TO_LOCK) = TargetNames { targets };
     }
 
     fn step(
         &mut self,
-        streams: &Receiver<T>,
+        streams: &Receiver<SubscriberInfo<T>>,
         data: &LossyReceiver<Arc<Vec<u8>>>,
     ) -> Result<(), channel::RecvError> {
         channel::select! {
@@ -84,25 +88,36 @@ impl<T: Write + Send + 'static> ForkThread<T> {
         Ok(())
     }
 
-    pub fn run(&mut self, streams: &Receiver<T>, data: &LossyReceiver<Arc<Vec<u8>>>) {
+    pub fn run(
+        &mut self,
+        streams: &Receiver<SubscriberInfo<T>>,
+        data: &LossyReceiver<Arc<Vec<u8>>>,
+    ) {
         while self.step(streams, data).is_ok() {}
     }
 }
 
 pub type ForkResult = Result<(), ()>;
 
-pub struct TargetList<T: Write + Send + 'static>(Sender<T>);
+pub struct TargetList<T: Write + Send + 'static>(Sender<SubscriberInfo<T>>);
 
 impl<T: Write + Send + 'static> TargetList<T> {
-    pub fn add(&self, stream: T) -> ForkResult {
-        self.0.send(stream).or(Err(()))
+    pub fn add(&self, caller_id: String, stream: T) -> ForkResult {
+        self.0
+            .send(SubscriberInfo { caller_id, stream })
+            .or(Err(()))
     }
+}
+
+struct SubscriberInfo<T> {
+    caller_id: String,
+    stream: T,
 }
 
 #[derive(Clone)]
 pub struct DataStream {
     sender: LossySender<Arc<Vec<u8>>>,
-    target_count: Arc<AtomicUsize>,
+    target_names: Arc<Mutex<TargetNames>>,
 }
 
 impl DataStream {
@@ -111,8 +126,13 @@ impl DataStream {
     }
 
     #[inline]
-    pub fn get_target_count(&self) -> usize {
-        self.target_count.load(Ordering::SeqCst)
+    pub fn target_count(&self) -> usize {
+        self.target_names.lock().expect(FAILED_TO_LOCK).count()
+    }
+
+    #[inline]
+    pub fn target_names(&self) -> Vec<String> {
+        self.target_names.lock().expect(FAILED_TO_LOCK).names()
     }
 
     #[inline]
@@ -123,5 +143,22 @@ impl DataStream {
     #[inline]
     pub fn set_queue_size_max(&self, queue_size: usize) {
         self.sender.set_queue_size_max(queue_size);
+    }
+}
+
+#[derive(Debug)]
+pub struct TargetNames {
+    targets: Vec<String>,
+}
+
+impl TargetNames {
+    #[inline]
+    pub fn count(&self) -> usize {
+        self.targets.len()
+    }
+
+    #[inline]
+    pub fn names(&self) -> Vec<String> {
+        self.targets.clone()
     }
 }

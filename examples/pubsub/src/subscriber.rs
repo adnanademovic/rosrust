@@ -11,12 +11,22 @@ fn main() {
 
     // Create subscriber
     // The subscriber is stopped when the returned object is destroyed
-    let _subscriber_raii = rosrust::subscribe("chatter", 2, |v: msg::std_msgs::String| {
+    let subscriber_info = rosrust::subscribe("chatter", 2, |v: msg::std_msgs::String| {
         // Callback for handling received messages
         rosrust::ros_info!("Received: {}", v.data);
     })
     .unwrap();
 
-    // Block the thread until a shutdown signal is received
-    rosrust::spin();
+    let log_names = rosrust::param("~log_names").unwrap().get().unwrap_or(false);
+
+    if log_names {
+        let mut rate = rosrust::rate(1.0);
+        while rosrust::is_ok() {
+            rosrust::ros_info!("Publisher names: {:?}", subscriber_info.publisher_names());
+            rate.sleep();
+        }
+    } else {
+        // Block the thread until a shutdown signal is received
+        rosrust::spin();
+    }
 }
