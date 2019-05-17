@@ -5,20 +5,24 @@ use crate::{
 };
 use rosrust::error::Result;
 use rosrust::{Duration, Time};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SimpleGoalState {
     Pending,
     Active,
     Done,
 }
 
+type DoneCondition = (Mutex<()>, Condvar);
+
 #[allow(dead_code)]
 pub struct SimpleActionClient<T: Action> {
     action_client: ActionClient<T>,
     goal_handle: Option<ClientGoalHandle<T>>,
     callback_handle: Option<Arc<Mutex<CallbackStatus<T>>>>,
+    done_condition: Arc<DoneCondition>,
+    simple_state: Arc<Mutex<SimpleGoalState>>,
 }
 
 impl<T: Action> SimpleActionClient<T> {
@@ -27,6 +31,8 @@ impl<T: Action> SimpleActionClient<T> {
             action_client: ActionClient::new(namespace)?,
             goal_handle: None,
             callback_handle: None,
+            done_condition: Arc::new((Mutex::new(()), Condvar::new())),
+            simple_state: Arc::new(Mutex::new(SimpleGoalState::Done)),
         })
     }
 
@@ -65,13 +71,16 @@ impl<T: Action> SimpleActionClient<T> {
     {
         self.stop_tracking_goal();
 
+        self.simple_state = Arc::new(Mutex::new(SimpleGoalState::Pending));
+
         let callback_handle = Arc::new(Mutex::new(CallbackStatus {
             expired: false,
             namespace: self.action_client.namespace().into(),
-            state: SimpleGoalState::Pending,
+            state: Arc::clone(&self.simple_state),
             on_done: on_done.map(|f| Box::new(f) as Box<_>),
             on_active: on_active.map(|f| Box::new(f) as Box<_>),
             on_feedback: on_feedback.map(|f| Box::new(f) as Box<_>),
+            done_condition: Arc::clone(&self.done_condition),
         }));
 
         let handle_transition = {
@@ -135,8 +144,44 @@ impl<T: Action> SimpleActionClient<T> {
         self.state()
     }
 
-    pub fn wait_for_result(&self, _timeout: Option<Duration>) -> bool {
-        unimplemented!()
+    pub fn wait_for_result(&self, timeout: Option<Duration>) -> bool {
+        if self.goal_handle.is_none() {
+            rosrust::ros_err!("Called wait_for_result when no goal exists");
+            return false;
+        }
+        let timeout_time = timeout.map(|timeout| (rosrust::now() + timeout).seconds());
+        let loop_period_seconds = 0.1;
+
+        let (ref lock, ref condition) = *self.done_condition;
+        let mut condition_lock_guard = lock.lock().expect(MUTEX_LOCK_FAIL);
+        while rosrust::is_ok() {
+            let time_left = match timeout_time {
+                None => loop_period_seconds,
+                Some(tt) => (tt - rosrust::now().seconds()).min(loop_period_seconds),
+            };
+
+            if self.simple_state() == SimpleGoalState::Done {
+                return true;
+            }
+
+            if time_left < 0.0 {
+                return false;
+            }
+
+            condition_lock_guard = condition
+                .wait_timeout(
+                    condition_lock_guard,
+                    std::time::Duration::from_millis((time_left * 1000.0) as u64),
+                )
+                .expect(MUTEX_LOCK_FAIL)
+                .0;
+        }
+
+        false
+    }
+
+    fn simple_state(&self) -> SimpleGoalState {
+        *self.simple_state.lock().expect(MUTEX_LOCK_FAIL)
     }
 
     pub fn result(&self) -> Option<ResultBody<T>> {
@@ -195,17 +240,18 @@ impl<T: Action> SimpleActionClient<T> {
 struct CallbackStatus<T: Action> {
     expired: bool,
     namespace: String,
-    state: SimpleGoalState,
+    state: Arc<Mutex<SimpleGoalState>>,
     on_done: Option<Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Send>>,
     on_active: Option<Box<dyn Fn() + Send>>,
     on_feedback: Option<Box<dyn Fn(FeedbackBody<T>) + Send>>,
+    done_condition: Arc<DoneCondition>,
 }
 
 impl<T: Action> CallbackStatus<T> {
     fn handle_transition(&mut self, gh: ClientGoalHandle<T>) {
         let comm_state = gh.comm_state();
 
-        match (comm_state, self.state) {
+        match (comm_state, self.state()) {
             (State::Active, SimpleGoalState::Done)
             | (State::Recalling, SimpleGoalState::Active)
             | (State::Recalling, SimpleGoalState::Done)
@@ -217,20 +263,30 @@ impl<T: Action> CallbackStatus<T> {
             }
             (State::Active, SimpleGoalState::Pending)
             | (State::Preempting, SimpleGoalState::Pending) => {
-                self.state = SimpleGoalState::Active;
+                self.set_state(SimpleGoalState::Active);
                 if let Some(ref on_active) = self.on_active {
                     (*on_active)();
                 }
             }
             (State::Done, SimpleGoalState::Pending) | (State::Done, SimpleGoalState::Active) => {
-                self.state = SimpleGoalState::Done;
+                self.set_state(SimpleGoalState::Done);
                 if let Some(ref on_done) = self.on_done {
                     (*on_done)(gh.goal_state(), gh.result());
                 }
-                // TODO: trigger done notification
+                let (ref lock, ref condition) = *self.done_condition;
+                let mut _condition_lock_guard = lock.lock().expect(MUTEX_LOCK_FAIL);
+                condition.notify_all();
             }
             _ => {}
         }
+    }
+
+    fn state(&self) -> SimpleGoalState {
+        *self.state.lock().expect(MUTEX_LOCK_FAIL)
+    }
+
+    fn set_state(&mut self, value: SimpleGoalState) {
+        *self.state.lock().expect(MUTEX_LOCK_FAIL) = value;
     }
 
     fn handle_feedback(&mut self, _gh: ClientGoalHandle<T>, feedback: FeedbackBody<T>) {
