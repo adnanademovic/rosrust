@@ -3,6 +3,7 @@ pub use self::action_server::{
     ActionServer, ActionServerOnRequest, ActionServerState, ServerGoalHandle,
 };
 pub use self::goal_status::{GoalState, GoalStatus};
+pub use self::simple_action_client::{SimpleActionClient, SimpleGoalState};
 pub use msg::actionlib_msgs::GoalID;
 pub use msg::std_msgs::Header;
 #[doc(hidden)]
@@ -12,6 +13,7 @@ pub mod action_client;
 mod action_server;
 mod goal_status;
 mod msg;
+mod simple_action_client;
 #[macro_use]
 mod macros;
 mod static_messages;

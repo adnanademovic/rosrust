@@ -29,6 +29,16 @@ impl<T: Action> ClientGoalHandle<T> {
     }
 
     #[inline]
+    pub fn goal_id(&self) -> GoalID {
+        self.state_machine
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
+            .action_goal()
+            .id
+            .clone()
+    }
+
+    #[inline]
     pub fn goal_state(&self) -> GoalState {
         self.state_machine
             .lock()

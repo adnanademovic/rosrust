@@ -11,6 +11,7 @@ mod comm_state_machine;
 mod goal_manager;
 
 pub struct ActionClient<T: Action> {
+    namespace: String,
     pub_goal: rosrust::Publisher<T::Goal>,
     pub_cancel: rosrust::Publisher<GoalID>,
     manager: Arc<Mutex<goal_manager::GoalManager<T>>>,
@@ -97,6 +98,7 @@ impl<T: Action> ActionClient<T> {
         )?;
 
         Ok(Self {
+            namespace: namespace.into(),
             pub_goal,
             pub_cancel,
             manager,
@@ -105,6 +107,11 @@ impl<T: Action> ActionClient<T> {
             result_sub,
             feedback_sub,
         })
+    }
+
+    #[inline]
+    pub fn namespace(&self) -> &str {
+        &self.namespace
     }
 
     #[inline]
@@ -165,6 +172,16 @@ impl<T: Action> ActionClient<T> {
         }
 
         false
+    }
+
+    pub fn wait_for_server_forever(&self) {
+        let mut rate = rosrust::rate(100.0);
+        while rosrust::is_ok() {
+            if self.wait_for_server_iteration() {
+                break;
+            }
+            rate.sleep();
+        }
     }
 
     fn wait_for_server_iteration(&self) -> bool {
