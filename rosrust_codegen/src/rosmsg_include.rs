@@ -27,7 +27,7 @@ pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
         .map(String::as_str)
         .collect::<Vec<&str>>();
     let output = genmsg::depend_on_messages(paths.as_slice(), messages)
-        .unwrap()
+        .unwrap_or_else(|r| panic!("{}", r))
         .token_stream(&if internal {
             quote! { crate:: }
         } else {
