@@ -11,7 +11,7 @@ version = "0.8.1"
 [dependencies]
 byteorder = "1.2.3"
 ctrlc = "3.0.3"
-error-chain = "0.11.0"
+error-chain = "0.12"
 lazy_static = "1.0.0"
 log = "0.4.0"
 nix = "0.9.0"

@@ -21,6 +21,6 @@ pub mod msg;
 pub mod rosmsg;
 mod rosxmlrpc;
 pub mod singleton;
-mod tcpros;
+pub mod tcpros;
 mod time;
 mod util;
