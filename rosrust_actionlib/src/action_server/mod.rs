@@ -58,7 +58,11 @@ where
 }
 
 impl<T: Action> ActionServer<T> {
-    pub fn new(namespace: &str) -> Result<Self> {
+    pub fn new(
+        namespace: &str,
+        on_goal: ActionServerOnRequest<T>,
+        on_cancel: ActionServerOnRequest<T>,
+    ) -> Result<Self> {
         let pub_queue_size = decode_queue_size("actionlib_server_pub_queue_size", 50);
         let sub_queue_size = decode_queue_size("actionlib_server_sub_queue_size", 0);
 
@@ -82,8 +86,8 @@ impl<T: Action> ActionServer<T> {
             status_frequency,
             status_list: BTreeMap::new(),
             status_list_timeout,
-            on_goal: Box::new(|_| Ok(())),
-            on_cancel: Box::new(|_| Ok(())),
+            on_goal,
+            on_cancel,
             self_reference: Weak::new(),
         }));
         fields.lock().expect(MUTEX_LOCK_FAIL).self_reference = Arc::downgrade(&fields);
