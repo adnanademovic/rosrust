@@ -1,6 +1,7 @@
 pub use self::action_client::{ActionClient, ClientGoalHandle};
 pub use self::action_server::{
     ActionServer, ActionServerOnRequest, ActionServerState, ServerGoalHandle,
+    ServerGoalHandleMessageBuilder, ServerSimpleGoalHandle,
 };
 pub use self::goal_status::{GoalState, GoalStatus};
 pub use self::simple_action_client::{SimpleActionClient, SimpleGoalState};

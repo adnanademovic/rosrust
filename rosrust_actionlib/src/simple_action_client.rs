@@ -185,7 +185,7 @@ impl<T: Action> SimpleActionClient<T> {
     }
 
     pub fn result(&self) -> Option<ResultBody<T>> {
-        let result = self.goal_handle.as_ref().and_then(|gh| gh.result());
+        let result = self.goal_handle.as_ref().and_then(ClientGoalHandle::result);
         if result.is_none() {
             rosrust::ros_err!("Called result when no goal is running");
         }
@@ -196,7 +196,7 @@ impl<T: Action> SimpleActionClient<T> {
         let inner_goal_state = self
             .goal_handle
             .as_ref()
-            .map(|gh| gh.goal_state())
+            .map(ClientGoalHandle::goal_state)
             .unwrap_or(GoalState::Lost);
         match inner_goal_state {
             GoalState::Recalling => GoalState::Pending,
@@ -206,7 +206,10 @@ impl<T: Action> SimpleActionClient<T> {
     }
 
     pub fn goal_status_text(&self) -> Option<String> {
-        let status_text = self.goal_handle.as_ref().map(|gh| gh.goal_status_text());
+        let status_text = self
+            .goal_handle
+            .as_ref()
+            .map(ClientGoalHandle::goal_status_text);
         if status_text.is_none() {
             rosrust::ros_err!("Called goal_status_text when no goal is running");
         }
@@ -236,12 +239,14 @@ impl<T: Action> SimpleActionClient<T> {
     }
 }
 
+type CallbackStatusOnDone<T> = Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Send>;
+
 #[allow(dead_code)]
 struct CallbackStatus<T: Action> {
     expired: bool,
     namespace: String,
     state: Arc<Mutex<SimpleGoalState>>,
-    on_done: Option<Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Send>>,
+    on_done: Option<CallbackStatusOnDone<T>>,
     on_active: Option<Box<dyn Fn() + Send>>,
     on_feedback: Option<Box<dyn Fn(FeedbackBody<T>) + Send>>,
     done_condition: Arc<DoneCondition>,

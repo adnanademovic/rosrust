@@ -97,6 +97,14 @@ impl<T: Action> ServerGoalHandle<T> {
         }
     }
 
+    pub fn build_message(&self) -> ServerGoalHandleMessageBuilder<T> {
+        ServerGoalHandleMessageBuilder {
+            gh: self,
+            text: "",
+            result: None,
+        }
+    }
+
     pub fn set_accepted(&self, text: &str) -> bool {
         self.set_general(None, Some(text), ActionCommand::Accepted)
             .map_err(Error::log)
@@ -158,6 +166,10 @@ impl<T: Action> ServerGoalHandle<T> {
             .is_ok()
     }
 
+    pub fn goal_message(&self) -> Option<Arc<GoalType<T>>> {
+        self.goal.clone()
+    }
+
     pub fn goal(&self) -> Option<&GoalBody<T>> {
         Some(&self.goal.as_ref()?.body)
     }
@@ -197,6 +209,44 @@ impl<T: Action> ServerGoalHandle<T> {
                 .status
                 .clone(),
         )
+    }
+}
+
+pub struct ServerGoalHandleMessageBuilder<'a, T: Action> {
+    gh: &'a ServerGoalHandle<T>,
+    text: &'a str,
+    result: Option<ResultBody<T>>,
+}
+
+impl<'a, T: Action> ServerGoalHandleMessageBuilder<'a, T> {
+    pub fn text(&mut self, text: &'a str) -> &mut Self {
+        self.text = text;
+        self
+    }
+
+    pub fn result(&mut self, result: ResultBody<T>) -> &mut Self {
+        self.result = Some(result);
+        self
+    }
+
+    pub fn send_accepted(&mut self) -> bool {
+        self.gh.set_accepted(self.text)
+    }
+
+    pub fn send_canceled(&mut self) -> bool {
+        self.gh.set_canceled(self.result.take(), self.text)
+    }
+
+    pub fn send_rejected(&mut self) -> bool {
+        self.gh.set_rejected(self.result.take(), self.text)
+    }
+
+    pub fn send_aborted(&mut self) -> bool {
+        self.gh.set_aborted(self.result.take(), self.text)
+    }
+
+    pub fn send_succeeded(&mut self) -> bool {
+        self.gh.set_succeeded(self.result.take(), self.text)
     }
 }
 

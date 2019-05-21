@@ -1,4 +1,4 @@
-pub use self::server_goal_handle::ServerGoalHandle;
+pub use self::server_goal_handle::{ServerGoalHandle, ServerGoalHandleMessageBuilder};
 use self::status_tracker::StatusTracker;
 use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
@@ -7,8 +7,10 @@ use crate::{
     GoalType, Response, ResultBody,
 };
 use rosrust::error::Result;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
+use std::thread;
 
 mod goal_id_generator;
 mod server_goal_handle;
@@ -149,6 +151,72 @@ impl<T: Action> ActionServer<T> {
         Ok(action_server)
     }
 
+    pub fn new_simple<F>(namespace: &str, handler: F) -> Result<Self>
+    where
+        F: Fn(ServerSimpleGoalHandle<T>) + Send + Sync + 'static,
+    {
+        let active_goals = Arc::new(Mutex::new(HashMap::new()));
+
+        let on_goal = {
+            let active_goals = Arc::clone(&active_goals);
+            let handler = Arc::new(handler);
+
+            move |server_goal_handle: ServerGoalHandle<T>| {
+                let (id, goal_message) = match (
+                    server_goal_handle.goal_id(),
+                    server_goal_handle.goal_message(),
+                ) {
+                    (Some(goal_id), Some(goal_message)) => (goal_id.id, goal_message),
+                    _ => return Ok(()),
+                };
+
+                let canceled = Arc::new(AtomicBool::new(false));
+
+                active_goals
+                    .lock()
+                    .expect(MUTEX_LOCK_FAIL)
+                    .insert(id.clone(), Arc::clone(&canceled));
+
+                {
+                    let handler = Arc::clone(&handler);
+                    let active_goals = Arc::clone(&active_goals);
+
+                    thread::spawn(move || {
+                        let goal_handle = ServerSimpleGoalHandle {
+                            goal_handle: server_goal_handle,
+                            goal_message,
+                            canceled,
+                        };
+                        goal_handle
+                            .build_message()
+                            .text("This goal has been accepted by the simple action server")
+                            .send_accepted();
+                        handler(goal_handle);
+                        active_goals.lock().expect(MUTEX_LOCK_FAIL).remove(&id);
+                    });
+                }
+
+                Ok(())
+            }
+        };
+
+        let on_cancel = {
+            let active_goals = Arc::clone(&active_goals);
+            move |server_goal_handle: ServerGoalHandle<T>| {
+                let id = match server_goal_handle.goal_id() {
+                    None => return Ok(()),
+                    Some(goal_id) => goal_id.id,
+                };
+                if let Some(flag) = active_goals.lock().expect(MUTEX_LOCK_FAIL).remove(&id) {
+                    flag.store(true, Ordering::SeqCst);
+                }
+                Ok(())
+            }
+        };
+
+        Self::new(namespace, Box::new(on_goal), Box::new(on_cancel))
+    }
+
     #[inline]
     pub fn state(&self) -> &Arc<Mutex<ActionServerState<T>>> {
         &self.fields
@@ -167,6 +235,34 @@ impl<T: Action> ActionServer<T> {
     #[inline]
     pub fn set_on_cancel(&mut self, on_cancel: ActionServerOnRequest<T>) {
         self.fields.lock().expect(MUTEX_LOCK_FAIL).on_cancel = on_cancel;
+    }
+}
+
+pub struct ServerSimpleGoalHandle<T: Action> {
+    goal_handle: ServerGoalHandle<T>,
+    goal_message: Arc<GoalType<T>>,
+    canceled: Arc<AtomicBool>,
+}
+
+impl<T: Action> ServerSimpleGoalHandle<T> {
+    pub fn build_message(&self) -> ServerGoalHandleMessageBuilder<T> {
+        self.goal_handle.build_message()
+    }
+
+    pub fn handle(&self) -> &ServerGoalHandle<T> {
+        &self.goal_handle
+    }
+
+    pub fn handle_mut(&mut self) -> &ServerGoalHandle<T> {
+        &self.goal_handle
+    }
+
+    pub fn goal(&self) -> &GoalBody<T> {
+        &self.goal_message.body
+    }
+
+    pub fn canceled(&self) -> bool {
+        self.canceled.load(Ordering::SeqCst)
     }
 }
 
