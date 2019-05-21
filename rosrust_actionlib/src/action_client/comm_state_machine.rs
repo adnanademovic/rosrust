@@ -1,19 +1,19 @@
+use crate::action_client::{OnFeedback, OnTransition};
 use crate::msg::actionlib_msgs::GoalStatusArray;
-use crate::{Action, FeedbackBody, FeedbackType, GoalType, ResultType};
+use crate::static_messages::MUTEX_LOCK_FAIL;
+use crate::{Action, FeedbackType, GoalType, ResultType, SyncClientGoalHandle};
 use crate::{GoalID, GoalState, GoalStatus};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-type OnFeedback<T> = Box<dyn Fn(FeedbackBody<T>) + Send + Sync + 'static>;
-type OnTransition = Box<dyn Fn() + Send + Sync + 'static>;
 pub type OnSendGoal<T> = Arc<dyn Fn(<T as Action>::Goal) + Send + Sync + 'static>;
 pub type OnSendCancel = Arc<dyn Fn(GoalID) + Send + Sync + 'static>;
 
 pub struct CommStateMachine<T: Action> {
     action_goal: GoalType<T>,
     on_feedback: Option<OnFeedback<T>>,
-    on_transition: Option<OnTransition>,
+    on_transition: Option<OnTransition<T>>,
     send_cancel_handler: OnSendCancel,
-    state: State,
+    state: Arc<Mutex<State>>,
     latest_goal_status: GoalStatus,
     latest_result: Option<ResultType<T>>,
 }
@@ -23,7 +23,7 @@ impl<T: Action> CommStateMachine<T> {
         Self {
             action_goal,
             send_cancel_handler,
-            state: State::WaitingForGoalAck,
+            state: Arc::new(Mutex::new(State::WaitingForGoalAck)),
             latest_goal_status: GoalStatus::default(),
             on_feedback: None,
             on_transition: None,
@@ -31,15 +31,12 @@ impl<T: Action> CommStateMachine<T> {
         }
     }
 
-    pub(crate) fn register_on_feedback<F: Fn(FeedbackBody<T>) + Send + Sync + 'static>(
-        &mut self,
-        f: F,
-    ) {
-        self.on_feedback = Some(Box::new(f));
+    pub(crate) fn register_on_feedback(&mut self, f: OnFeedback<T>) {
+        self.on_feedback = Some(f);
     }
 
-    pub(crate) fn register_on_transition<F: Fn() + Send + Sync + 'static>(&mut self, f: F) {
-        self.on_transition = Some(Box::new(f));
+    pub(crate) fn register_on_transition(&mut self, f: OnTransition<T>) {
+        self.on_transition = Some(f);
     }
 
     #[inline]
@@ -54,7 +51,7 @@ impl<T: Action> CommStateMachine<T> {
 
     #[inline]
     pub fn state(&self) -> State {
-        self.state
+        *self.state.lock().expect(MUTEX_LOCK_FAIL)
     }
 
     #[inline]
@@ -67,32 +64,37 @@ impl<T: Action> CommStateMachine<T> {
         &self.latest_result
     }
 
-    pub fn transition_to(&mut self, state: State) {
-        rosrust::ros_debug!(
-            "Transitioning to {:?} (from {:?}, goal: {})",
-            state,
-            self.state,
-            self.action_goal.id.id,
-        );
-
-        self.state = state;
+    pub fn transition_to(&self, state: State) {
+        {
+            let mut state_lock = self.state.lock().expect(MUTEX_LOCK_FAIL);
+            rosrust::ros_debug!(
+                "Transitioning to {:?} (from {:?}, goal: {})",
+                state,
+                *state_lock,
+                self.action_goal.id.id,
+            );
+            *state_lock = state;
+        }
 
         if let Some(on_transition) = &self.on_transition {
-            on_transition()
+            on_transition(SyncClientGoalHandle::new(self))
         }
     }
 
-    pub fn update_feedback(&self, action_feedback: &FeedbackType<T>) {
+    pub fn update_feedback(&mut self, action_feedback: &FeedbackType<T>) {
         if self.action_goal.id.id != action_feedback.status.goal_id.id {
             return;
         }
 
-        if self.state == State::Done {
+        if self.state() == State::Done {
             return;
         }
 
         if let Some(on_feedback) = &self.on_feedback {
-            on_feedback(action_feedback.body.clone())
+            on_feedback(
+                SyncClientGoalHandle::new(self),
+                action_feedback.body.clone(),
+            )
         }
     }
 
@@ -106,7 +108,7 @@ impl<T: Action> CommStateMachine<T> {
         self.latest_goal_status = status.clone();
         self.latest_result = Some(action_result.clone());
 
-        match self.state {
+        match self.state() {
             State::WaitingForGoalAck
             | State::Pending
             | State::Active
@@ -134,7 +136,7 @@ impl<T: Action> CommStateMachine<T> {
     ) -> Result<(), Option<String>> {
         use std::convert::TryInto;
 
-        if self.state == State::Done {
+        if self.state() == State::Done {
             return Err(None);
         }
         let status = status_array
@@ -143,7 +145,7 @@ impl<T: Action> CommStateMachine<T> {
             .find(|status| status.goal_id.id == self.action_goal.id.id)
             .cloned()
             .ok_or_else(|| {
-                match self.state {
+                match self.state() {
                     State::Pending
                     | State::Active
                     | State::WaitingForCancelAck
@@ -164,6 +166,8 @@ impl<T: Action> CommStateMachine<T> {
 
         let steps = self
             .state
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
             .transition_to(goal_state)
             .into_update_status_steps()?;
 

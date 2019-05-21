@@ -1,4 +1,4 @@
-pub use self::client_goal_handle::ClientGoalHandle;
+pub use self::client_goal_handle::{AsyncClientGoalHandle, SyncClientGoalHandle};
 pub use self::comm_state_machine::State;
 use crate::msg::actionlib_msgs;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
@@ -52,7 +52,7 @@ impl<T: Action> ActionClient<T> {
             on_cancel,
         )));
 
-        let last_caller_id = Arc::new(Mutex::new(None));
+        let last_caller_id: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
         let on_status = {
             let manager = Arc::clone(&manager);
@@ -115,16 +115,12 @@ impl<T: Action> ActionClient<T> {
     }
 
     #[inline]
-    pub fn send_goal<Ft, Ff>(
-        &self,
+    pub fn send_goal<'a>(
+        &'a self,
         goal: GoalBody<T>,
-        on_transition: Option<Ft>,
-        on_feedback: Option<Ff>,
-    ) -> ClientGoalHandle<T>
-    where
-        Ft: Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
-        Ff: Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
-    {
+        on_transition: Option<OnTransition<T>>,
+        on_feedback: Option<OnFeedback<T>>,
+    ) -> AsyncClientGoalHandle<T> {
         self.manager
             .lock()
             .expect(MUTEX_LOCK_FAIL)
@@ -132,16 +128,8 @@ impl<T: Action> ActionClient<T> {
     }
 
     #[inline]
-    pub fn build_goal_sender<'a>(
-        &'a self,
-        goal: GoalBody<T>,
-    ) -> SendGoalBuilder<
-        'a,
-        T,
-        impl Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
-        impl Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
-    > {
-        SendGoalBuilder::new(self, goal, |_| {}, |_, _| {})
+    pub fn build_goal_sender(&self, goal: GoalBody<T>) -> SendGoalBuilder<T> {
+        SendGoalBuilder::new(self, goal)
     }
 
     #[inline]
@@ -226,19 +214,15 @@ fn decode_queue_size(param: &str, default: usize) -> usize {
     }
 }
 
-pub struct SendGoalBuilder<'a, T: Action, Ft, Ff> {
+pub struct SendGoalBuilder<'a, T: Action> {
     client: &'a ActionClient<T>,
     goal: GoalBody<T>,
-    on_transition: Option<Ft>,
-    on_feedback: Option<Ff>,
+    on_transition: Option<OnTransition<T>>,
+    on_feedback: Option<OnFeedback<T>>,
 }
 
-impl<'a, T: Action, Ft, Ff> SendGoalBuilder<'a, T, Ft, Ff>
-where
-    Ft: Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
-    Ff: Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
-{
-    fn new(client: &'a ActionClient<T>, goal: GoalBody<T>, _: Ft, _: Ff) -> Self {
+impl<'a, T: Action> SendGoalBuilder<'a, T> {
+    fn new(client: &'a ActionClient<T>, goal: GoalBody<T>) -> Self {
         Self {
             client,
             goal,
@@ -248,34 +232,29 @@ where
     }
 
     #[inline]
-    pub fn on_transition<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Fnew, Ff>
+    pub fn on_transition<Fnew>(mut self, callback: Fnew) -> Self
     where
-        Fnew: Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
+        Fnew: Fn(SyncClientGoalHandle<T>) + Send + 'static,
     {
-        SendGoalBuilder {
-            client: self.client,
-            goal: self.goal,
-            on_transition: Some(callback),
-            on_feedback: self.on_feedback,
-        }
+        self.on_transition = Some(Box::new(callback));
+        self
     }
 
     #[inline]
-    pub fn on_feedback<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Ft, Fnew>
+    pub fn on_feedback<Fnew>(mut self, callback: Fnew) -> Self
     where
-        Fnew: Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
+        Fnew: Fn(SyncClientGoalHandle<T>, FeedbackBody<T>) + Send + 'static,
     {
-        SendGoalBuilder {
-            client: self.client,
-            goal: self.goal,
-            on_transition: self.on_transition,
-            on_feedback: Some(callback),
-        }
+        self.on_feedback = Some(Box::new(callback));
+        self
     }
 
     #[inline]
-    pub fn send(self) -> ClientGoalHandle<T> {
+    pub fn send(self) -> AsyncClientGoalHandle<T> {
         self.client
             .send_goal(self.goal, self.on_transition, self.on_feedback)
     }
 }
+
+type OnTransition<T> = Box<dyn Fn(SyncClientGoalHandle<T>) + Send + 'static>;
+type OnFeedback<T> = Box<dyn Fn(SyncClientGoalHandle<T>, FeedbackBody<T>) + Send + 'static>;

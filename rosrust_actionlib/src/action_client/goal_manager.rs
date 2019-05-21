@@ -1,9 +1,10 @@
 use super::comm_state_machine::{CommStateMachine, OnSendCancel, OnSendGoal};
-use super::ClientGoalHandle;
+use super::AsyncClientGoalHandle;
+use crate::action_client::{OnFeedback, OnTransition};
 use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::GoalID;
-use crate::{Action, FeedbackBody, FeedbackType, GoalBody, GoalType, ResultType};
+use crate::{Action, FeedbackType, GoalBody, GoalType, ResultType};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
@@ -38,16 +39,12 @@ impl<T: Action> GoalManager<T> {
         }
     }
 
-    pub fn init_goal<Ft, Ff>(
-        &mut self,
+    pub fn init_goal<'a>(
+        &'a mut self,
         goal: GoalBody<T>,
-        on_transition: Option<Ft>,
-        on_feedback: Option<Ff>,
-    ) -> ClientGoalHandle<T>
-    where
-        Ft: Fn(ClientGoalHandle<T>) + Send + Sync + 'static,
-        Ff: Fn(ClientGoalHandle<T>, FeedbackBody<T>) + Send + Sync + 'static,
-    {
+        on_transition: Option<OnTransition<T>>,
+        on_feedback: Option<OnFeedback<T>>,
+    ) -> AsyncClientGoalHandle<T> {
         use crate::ActionGoal;
 
         let mut action_goal = GoalType::<T> {
@@ -66,25 +63,11 @@ impl<T: Action> GoalManager<T> {
         let mut csm_lock = comm_state_machine.lock().expect(MUTEX_LOCK_FAIL);
 
         if let Some(callback) = on_feedback {
-            csm_lock.register_on_feedback({
-                let csm = Arc::downgrade(&comm_state_machine);
-                move |feedback_body| {
-                    if let Some(csm) = Weak::upgrade(&csm) {
-                        callback(ClientGoalHandle::new(csm), feedback_body)
-                    }
-                }
-            });
+            csm_lock.register_on_feedback(callback);
         }
 
         if let Some(callback) = on_transition {
-            csm_lock.register_on_transition({
-                let csm = Arc::downgrade(&comm_state_machine);
-                move || {
-                    if let Some(csm) = Weak::upgrade(&csm) {
-                        callback(ClientGoalHandle::new(csm))
-                    }
-                }
-            });
+            csm_lock.register_on_transition(callback);
         }
 
         drop(csm_lock);
@@ -93,7 +76,7 @@ impl<T: Action> GoalManager<T> {
 
         (*self.on_send_goal)(init_action_goal);
 
-        ClientGoalHandle::new(comm_state_machine)
+        AsyncClientGoalHandle::new(comm_state_machine)
     }
 
     fn for_each_status(&self, handler: impl Fn(&mut CommStateMachine<T>)) {

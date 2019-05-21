@@ -1,7 +1,8 @@
 use crate::action_client::State;
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{
-    Action, ActionClient, ClientGoalHandle, FeedbackBody, GoalBody, GoalState, ResultBody,
+    Action, ActionClient, AsyncClientGoalHandle, FeedbackBody, GoalBody, GoalState, ResultBody,
+    SyncClientGoalHandle,
 };
 use rosrust::error::Result;
 use rosrust::{Duration, Time};
@@ -19,7 +20,7 @@ type DoneCondition = (Mutex<()>, Condvar);
 #[allow(dead_code)]
 pub struct SimpleActionClient<T: Action> {
     action_client: ActionClient<T>,
-    goal_handle: Option<ClientGoalHandle<T>>,
+    goal_handle: Option<AsyncClientGoalHandle<T>>,
     callback_handle: Option<Arc<Mutex<CallbackStatus<T>>>>,
     done_condition: Arc<DoneCondition>,
     simple_state: Arc<Mutex<SimpleGoalState>>,
@@ -52,9 +53,9 @@ impl<T: Action> SimpleActionClient<T> {
     pub fn send_goal(
         &mut self,
         goal: GoalBody<T>,
-        on_done: Option<Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Send + 'static>>,
-        on_active: Option<Box<dyn Fn() + Send + 'static>>,
-        on_feedback: Option<Box<dyn Fn(FeedbackBody<T>) + Send + 'static>>,
+        on_done: Option<CallbackStatusOnDone<T>>,
+        on_active: Option<CallbackStatusOnActive>,
+        on_feedback: Option<CallbackStatusOnFeedback<T>>,
     ) {
         self.stop_tracking_goal();
 
@@ -70,25 +71,8 @@ impl<T: Action> SimpleActionClient<T> {
             done_condition: Arc::clone(&self.done_condition),
         }));
 
-        let handle_transition = {
-            let callback_handle = Arc::clone(&callback_handle);
-            move |gh| {
-                callback_handle
-                    .lock()
-                    .expect(MUTEX_LOCK_FAIL)
-                    .handle_transition(gh)
-            }
-        };
-
-        let handle_feedback = {
-            let callback_handle = Arc::clone(&callback_handle);
-            move |gh, fb| {
-                callback_handle
-                    .lock()
-                    .expect(MUTEX_LOCK_FAIL)
-                    .handle_feedback(gh, fb)
-            }
-        };
+        let handle_transition = CallbackStatus::create_transition_handler(&callback_handle);
+        let handle_feedback = CallbackStatus::create_feedback_handler(&callback_handle);
 
         self.callback_handle = Some(callback_handle);
 
@@ -175,7 +159,10 @@ impl<T: Action> SimpleActionClient<T> {
     }
 
     pub fn result(&self) -> Option<ResultBody<T>> {
-        let result = self.goal_handle.as_ref().and_then(ClientGoalHandle::result);
+        let result = self
+            .goal_handle
+            .as_ref()
+            .and_then(AsyncClientGoalHandle::result);
         if result.is_none() {
             rosrust::ros_err!("Called result when no goal is running");
         }
@@ -186,7 +173,7 @@ impl<T: Action> SimpleActionClient<T> {
         let inner_goal_state = self
             .goal_handle
             .as_ref()
-            .map(ClientGoalHandle::goal_state)
+            .map(AsyncClientGoalHandle::goal_state)
             .unwrap_or(GoalState::Lost);
         match inner_goal_state {
             GoalState::Recalling => GoalState::Pending,
@@ -199,7 +186,7 @@ impl<T: Action> SimpleActionClient<T> {
         let status_text = self
             .goal_handle
             .as_ref()
-            .map(ClientGoalHandle::goal_status_text);
+            .map(AsyncClientGoalHandle::goal_status_text);
         if status_text.is_none() {
             rosrust::ros_err!("Called goal_status_text when no goal is running");
         }
@@ -245,7 +232,7 @@ struct CallbackStatus<T: Action> {
 }
 
 impl<T: Action> CallbackStatus<T> {
-    fn handle_transition(&mut self, gh: ClientGoalHandle<T>) {
+    fn handle_transition(&mut self, gh: SyncClientGoalHandle<T>) {
         let comm_state = gh.comm_state();
 
         match (comm_state, self.state()) {
@@ -286,12 +273,36 @@ impl<T: Action> CallbackStatus<T> {
         *self.state.lock().expect(MUTEX_LOCK_FAIL) = value;
     }
 
-    fn handle_feedback(&mut self, _gh: ClientGoalHandle<T>, feedback: FeedbackBody<T>) {
+    fn handle_feedback(&mut self, _gh: SyncClientGoalHandle<T>, feedback: FeedbackBody<T>) {
         if self.expired {
             return;
         }
         if let Some(ref on_feedback) = self.on_feedback {
             (*on_feedback)(feedback);
+        }
+    }
+
+    fn create_transition_handler(
+        callback_status: &Arc<Mutex<Self>>,
+    ) -> impl for<'a> Fn(SyncClientGoalHandle<'a, T>) {
+        let callback_status = Arc::clone(callback_status);
+        move |gh| {
+            callback_status
+                .lock()
+                .expect(MUTEX_LOCK_FAIL)
+                .handle_transition(gh)
+        }
+    }
+
+    fn create_feedback_handler(
+        callback_status: &Arc<Mutex<Self>>,
+    ) -> impl for<'a> Fn(SyncClientGoalHandle<'a, T>, FeedbackBody<T>) {
+        let callback_status = Arc::clone(callback_status);
+        move |gh, fb| {
+            callback_status
+                .lock()
+                .expect(MUTEX_LOCK_FAIL)
+                .handle_feedback(gh, fb)
         }
     }
 }
