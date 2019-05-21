@@ -45,30 +45,17 @@ impl<T: Action> SimpleActionClient<T> {
         }
     }
 
-    pub fn build_goal_sender<'a>(
-        &'a mut self,
-        goal: GoalBody<T>,
-    ) -> SendGoalBuilder<
-        'a,
-        T,
-        impl Fn(GoalState, Option<ResultBody<T>>) + Send + 'static,
-        impl Fn() + Send + 'static,
-        impl Fn(FeedbackBody<T>) + Send + 'static,
-    > {
-        SendGoalBuilder::new(self, goal, |_, _| {}, || {}, |_| {})
+    pub fn build_goal_sender<'a>(&'a mut self, goal: GoalBody<T>) -> SendGoalBuilder<'a, T> {
+        SendGoalBuilder::new(self, goal)
     }
 
-    pub fn send_goal<Fdone, Factive, Ffeedback>(
+    pub fn send_goal(
         &mut self,
         goal: GoalBody<T>,
-        on_done: Option<Fdone>,
-        on_active: Option<Factive>,
-        on_feedback: Option<Ffeedback>,
-    ) where
-        Fdone: Fn(GoalState, Option<ResultBody<T>>) + Send + 'static,
-        Factive: Fn() + Send + 'static,
-        Ffeedback: Fn(FeedbackBody<T>) + Send + 'static,
-    {
+        on_done: Option<Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Send + 'static>>,
+        on_active: Option<Box<dyn Fn() + Send + 'static>>,
+        on_feedback: Option<Box<dyn Fn(FeedbackBody<T>) + Send + 'static>>,
+    ) {
         self.stop_tracking_goal();
 
         self.simple_state = Arc::new(Mutex::new(SimpleGoalState::Pending));
@@ -77,9 +64,9 @@ impl<T: Action> SimpleActionClient<T> {
             expired: false,
             namespace: self.action_client.namespace().into(),
             state: Arc::clone(&self.simple_state),
-            on_done: on_done.map(|f| Box::new(f) as Box<_>),
-            on_active: on_active.map(|f| Box::new(f) as Box<_>),
-            on_feedback: on_feedback.map(|f| Box::new(f) as Box<_>),
+            on_done,
+            on_active,
+            on_feedback,
             done_condition: Arc::clone(&self.done_condition),
         }));
 
@@ -105,9 +92,12 @@ impl<T: Action> SimpleActionClient<T> {
 
         self.callback_handle = Some(callback_handle);
 
-        let goal_handle =
-            self.action_client
-                .send_goal(goal, Some(handle_transition), Some(handle_feedback));
+        let goal_handle = self
+            .action_client
+            .build_goal_sender(goal)
+            .on_transition(handle_transition)
+            .on_feedback(handle_feedback)
+            .send();
 
         self.goal_handle = Some(goal_handle);
     }
@@ -240,6 +230,8 @@ impl<T: Action> SimpleActionClient<T> {
 }
 
 type CallbackStatusOnDone<T> = Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Send>;
+type CallbackStatusOnActive = Box<dyn Fn() + Send>;
+type CallbackStatusOnFeedback<T> = Box<dyn Fn(FeedbackBody<T>) + Send>;
 
 #[allow(dead_code)]
 struct CallbackStatus<T: Action> {
@@ -247,8 +239,8 @@ struct CallbackStatus<T: Action> {
     namespace: String,
     state: Arc<Mutex<SimpleGoalState>>,
     on_done: Option<CallbackStatusOnDone<T>>,
-    on_active: Option<Box<dyn Fn() + Send>>,
-    on_feedback: Option<Box<dyn Fn(FeedbackBody<T>) + Send>>,
+    on_active: Option<CallbackStatusOnActive>,
+    on_feedback: Option<CallbackStatusOnFeedback<T>>,
     done_condition: Arc<DoneCondition>,
 }
 
@@ -304,21 +296,16 @@ impl<T: Action> CallbackStatus<T> {
     }
 }
 
-pub struct SendGoalBuilder<'a, T: Action, Fd, Fa, Ff> {
+pub struct SendGoalBuilder<'a, T: Action> {
     client: &'a mut SimpleActionClient<T>,
     goal: GoalBody<T>,
-    on_done: Option<Fd>,
-    on_active: Option<Fa>,
-    on_feedback: Option<Ff>,
+    on_done: Option<CallbackStatusOnDone<T>>,
+    on_active: Option<CallbackStatusOnActive>,
+    on_feedback: Option<CallbackStatusOnFeedback<T>>,
 }
 
-impl<'a, T: Action, Fd, Fa, Ff> SendGoalBuilder<'a, T, Fd, Fa, Ff>
-where
-    Fd: Fn(GoalState, Option<ResultBody<T>>) + Send + 'static,
-    Fa: Fn() + Send + 'static,
-    Ff: Fn(FeedbackBody<T>) + Send + 'static,
-{
-    fn new(client: &'a mut SimpleActionClient<T>, goal: GoalBody<T>, _: Fd, _: Fa, _: Ff) -> Self {
+impl<'a, T: Action> SendGoalBuilder<'a, T> {
+    fn new(client: &'a mut SimpleActionClient<T>, goal: GoalBody<T>) -> Self {
         Self {
             client,
             goal,
@@ -329,45 +316,30 @@ where
     }
 
     #[inline]
-    pub fn on_done<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Fnew, Fa, Ff>
+    pub fn on_done<Fnew>(mut self, callback: Fnew) -> Self
     where
         Fnew: Fn(GoalState, Option<ResultBody<T>>) + Send + 'static,
     {
-        SendGoalBuilder {
-            client: self.client,
-            goal: self.goal,
-            on_done: Some(callback),
-            on_active: self.on_active,
-            on_feedback: self.on_feedback,
-        }
+        self.on_done = Some(Box::new(callback));
+        self
     }
 
     #[inline]
-    pub fn on_active<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Fd, Fnew, Ff>
+    pub fn on_active<Fnew>(mut self, callback: Fnew) -> Self
     where
         Fnew: Fn() + Send + 'static,
     {
-        SendGoalBuilder {
-            client: self.client,
-            goal: self.goal,
-            on_done: self.on_done,
-            on_active: Some(callback),
-            on_feedback: self.on_feedback,
-        }
+        self.on_active = Some(Box::new(callback));
+        self
     }
 
     #[inline]
-    pub fn on_feedback<Fnew>(self, callback: Fnew) -> SendGoalBuilder<'a, T, Fd, Fa, Fnew>
+    pub fn on_feedback<Fnew>(mut self, callback: Fnew) -> Self
     where
         Fnew: Fn(FeedbackBody<T>) + Send + 'static,
     {
-        SendGoalBuilder {
-            client: self.client,
-            goal: self.goal,
-            on_done: self.on_done,
-            on_active: self.on_active,
-            on_feedback: Some(callback),
-        }
+        self.on_feedback = Some(Box::new(callback));
+        self
     }
 
     #[inline]
