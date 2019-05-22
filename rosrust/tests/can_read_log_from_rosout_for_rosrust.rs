@@ -29,7 +29,7 @@ fn can_read_log_from_rosout_for_rosrust() {
         })
         .unwrap();
 
-    let mut rate = rosrust::rate(1.0);
+    let rate = rosrust::rate(1.0);
 
     for _ in 0..10 {
         for (level, message) in rx.try_iter() {

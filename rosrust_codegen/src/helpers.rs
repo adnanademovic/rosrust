@@ -1,4 +1,4 @@
-use crate::error::{Result, ResultExt};
+use crate::error::{ErrorKind, Result, ResultExt};
 use crate::msg::Msg;
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
@@ -201,9 +201,9 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
     if let Some(contents) = IN_MEMORY_MESSAGES.get(format!("{}/{}", package, name).as_str()) {
         return Msg::new(package, name, contents).map(MessageCase::Message);
     }
-    bail!(format!(
-        "Could not find requested message in provided folders: {}/{}",
-        package, name
+    bail!(ErrorKind::MessageNotFound(
+        format!("{}/{}", package, name),
+        folders.join("\n")
     ));
 }
 

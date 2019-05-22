@@ -30,7 +30,7 @@ fn main() {
     })
     .into_task("my_task2");
 
-    let mut rate = rosrust::rate(1.0);
+    let rate = rosrust::rate(1.0);
 
     while rosrust::is_ok() {
         // Publish diagnostic update

@@ -55,7 +55,7 @@ fn main() {
         }
     });
 
-    let mut rate = rosrust::rate(100.0);
+    let rate = rosrust::rate(100.0);
 
     while rosrust::is_ok() {
         updater.update().unwrap();

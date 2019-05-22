@@ -89,7 +89,7 @@ fn main() {
 
     updater.add_task(&bounds).unwrap();
 
-    let mut rate = rosrust::rate(10.0);
+    let rate = rosrust::rate(10.0);
 
     while rosrust::is_ok() {
         updater.force_update_with_extra(&[&dummy_task2]).unwrap();

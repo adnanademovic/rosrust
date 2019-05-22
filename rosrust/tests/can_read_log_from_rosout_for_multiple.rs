@@ -52,7 +52,7 @@ fn can_read_log_from_rosout_for_multiple() {
         })
         .unwrap();
 
-    let mut rate = rosrust::rate(1.0);
+    let rate = rosrust::rate(1.0);
 
     let mut expected_messages = BTreeSet::new();
     expected_messages.insert((true, "/talker_cpp".to_owned()));

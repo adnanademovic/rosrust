@@ -231,7 +231,7 @@ impl Task for FrequencyStatus {
         let history_end = HistoryEntry::new(tracker.count);
 
         let end_count = history_end.count;
-        let end_time = history_end.time.clone();
+        let end_time = history_end.time;
 
         let history_start = match tracker.history.pop_front() {
             Some(value) => value,
