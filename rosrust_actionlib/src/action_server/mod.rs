@@ -48,7 +48,7 @@ where
     F: Fn() -> Result<()>,
 {
     move || {
-        let mut rate = rosrust::rate(frequency);
+        let rate = rosrust::rate(frequency);
         rosrust::ros_debug!("Starting timer");
         while rosrust::is_ok() {
             rate.sleep();

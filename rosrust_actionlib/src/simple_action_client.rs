@@ -100,10 +100,7 @@ impl<T: Action> SimpleActionClient<T> {
 
         rosrust::ros_debug!("Canceling goal");
         self.cancel_goal();
-        let timeout_time = preempt_timeout
-            .as_ref()
-            .map(Duration::seconds)
-            .unwrap_or_default();
+        let timeout_time = preempt_timeout.map(Duration::seconds).unwrap_or_default();
         let finished = self.wait_for_result(preempt_timeout);
         rosrust::ros_debug!(
             "Preempt {} within specified preempt_timeout [{}]",

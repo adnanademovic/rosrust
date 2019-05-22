@@ -21,7 +21,7 @@ fn main() {
     let log_names = rosrust::param("~log_names").unwrap().get().unwrap_or(false);
 
     if log_names {
-        let mut rate = rosrust::rate(1.0);
+        let rate = rosrust::rate(1.0);
         while rosrust::is_ok() {
             rosrust::ros_info!("Publisher uris: {:?}", subscriber_info.publisher_uris());
             rate.sleep();
