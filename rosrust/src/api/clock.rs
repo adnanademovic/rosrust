@@ -146,7 +146,7 @@ impl SimulatedClock {
 impl Clock for SimulatedClock {
     #[inline]
     fn now(&self) -> Time {
-        self.data.lock().expect(FAILED_TO_LOCK).current.clone()
+        self.data.lock().expect(FAILED_TO_LOCK).current
     }
 
     #[inline]
@@ -154,7 +154,7 @@ impl Clock for SimulatedClock {
         if d.sec < 0 || d.nsec < 0 {
             return;
         }
-        let current = { self.data.lock().expect(FAILED_TO_LOCK).current.clone() };
+        let current = { self.data.lock().expect(FAILED_TO_LOCK).current };
         self.wait_until(current + d);
     }
 

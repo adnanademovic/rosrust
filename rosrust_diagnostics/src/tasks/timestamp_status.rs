@@ -110,7 +110,7 @@ impl TimestampStatus {
 
     /// Signals an event.
     #[inline]
-    pub fn tick(&self, timestamp: &Time) {
+    pub fn tick(&self, timestamp: Time) {
         self.tick_float(timestamp.seconds())
     }
 }
