@@ -5,7 +5,7 @@ use std::time;
 
 const BILLION: i64 = 1_000_000_000;
 
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Time {
     pub sec: u32,
     pub nsec: u32,
@@ -56,7 +56,7 @@ impl cmp::Ord for Time {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Duration {
     pub sec: i32,
     pub nsec: i32,
