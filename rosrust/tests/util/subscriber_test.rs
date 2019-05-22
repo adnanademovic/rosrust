@@ -49,7 +49,7 @@ pub fn test_publisher<T: Clone + rosrust::Message>(
 ) {
     let regex = regex::Regex::new(regex_string).unwrap();
 
-    let mut rate = rosrust::rate(10.0);
+    let rate = rosrust::rate(10.0);
 
     for _ in 0..attempts {
         publisher.send(message.clone()).unwrap();

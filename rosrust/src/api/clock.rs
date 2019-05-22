@@ -1,6 +1,7 @@
 use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
 use crossbeam::sync::{Parker, Unparker};
+use std::cell::Cell;
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
@@ -26,7 +27,7 @@ impl Delay {
 
 pub struct Rate {
     clock: Arc<Clock>,
-    next: Time,
+    next: Cell<Time>,
     delay: Duration,
 }
 
@@ -35,14 +36,15 @@ impl Rate {
         let start = clock.now();
         Rate {
             clock,
-            next: start,
+            next: Cell::new(start),
             delay,
         }
     }
 
-    pub fn sleep(&mut self) {
-        self.next = self.next.clone() + self.delay.clone();
-        self.clock.wait_until(self.next.clone());
+    pub fn sleep(&self) {
+        let new_time = self.next.get() + self.delay;
+        self.next.set(new_time);
+        self.clock.wait_until(new_time);
     }
 }
 
