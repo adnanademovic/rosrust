@@ -9,7 +9,7 @@ mod msg {
 use msg::actionlib_tutorials as alt;
 
 fn handler(gh: ServerSimpleGoalHandle<alt::FibonacciAction>) {
-    let mut rate = rosrust::rate(1.0);
+    let rate = rosrust::rate(1.0);
 
     let mut val1 = 0;
     let mut val2 = 1;
