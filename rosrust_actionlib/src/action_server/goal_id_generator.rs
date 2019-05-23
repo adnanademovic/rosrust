@@ -23,18 +23,6 @@ impl GoalIdGenerator {
         Self::default()
     }
 
-    #[allow(dead_code)]
-    #[inline]
-    pub fn new_named(name: String) -> Self {
-        Self { name }
-    }
-
-    #[allow(dead_code)]
-    #[inline]
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
-
     #[inline]
     pub fn generate_id(&self) -> GoalID {
         let seq_id = GOAL_COUNT.fetch_add(1, Ordering::SeqCst);

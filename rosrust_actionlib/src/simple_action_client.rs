@@ -17,7 +17,6 @@ pub enum SimpleGoalState {
 
 type DoneCondition = (Mutex<()>, Condvar);
 
-#[allow(dead_code)]
 pub struct SimpleActionClient<T: Action> {
     action_client: ActionClient<T>,
     goal_handle: Option<AsyncClientGoalHandle<T>>,
@@ -217,7 +216,6 @@ type CallbackStatusOnDone<T> = Box<dyn Fn(GoalState, Option<ResultBody<T>>) + Se
 type CallbackStatusOnActive = Box<dyn Fn() + Send>;
 type CallbackStatusOnFeedback<T> = Box<dyn Fn(FeedbackBody<T>) + Send>;
 
-#[allow(dead_code)]
 struct CallbackStatus<T: Action> {
     expired: bool,
     namespace: String,
