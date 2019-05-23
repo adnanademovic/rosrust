@@ -37,12 +37,7 @@ impl<T: Action> SimpleActionClient<T> {
     }
 
     pub fn wait_for_server(&self, timeout: Option<Duration>) -> bool {
-        if let Some(timeout) = timeout {
-            self.action_client.wait_for_server(timeout)
-        } else {
-            self.action_client.wait_for_server_forever();
-            true
-        }
+        self.action_client.wait_for_server(timeout)
     }
 
     pub fn build_goal_sender<'a>(&'a mut self, goal: GoalBody<T>) -> SendGoalBuilder<'a, T> {

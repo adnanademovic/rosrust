@@ -148,11 +148,16 @@ impl<T: Action> ActionClient<T> {
         })
     }
 
-    pub fn wait_for_server(&self, timeout: rosrust::Duration) -> bool {
-        let timeout_time = rosrust::now() + timeout;
+    pub fn wait_for_server(&self, timeout: Option<rosrust::Duration>) -> bool {
+        let timeout_time = timeout.map(|t| rosrust::now() + t);
 
         let rate = rosrust::rate(100.0);
-        while rosrust::is_ok() && timeout_time > rosrust::now() {
+        while rosrust::is_ok() {
+            if let Some(timeout_time) = timeout_time {
+                if timeout_time < rosrust::now() {
+                    break;
+                }
+            }
             if self.wait_for_server_iteration() {
                 return true;
             }
@@ -160,16 +165,6 @@ impl<T: Action> ActionClient<T> {
         }
 
         false
-    }
-
-    pub fn wait_for_server_forever(&self) {
-        let rate = rosrust::rate(100.0);
-        while rosrust::is_ok() {
-            if self.wait_for_server_iteration() {
-                break;
-            }
-            rate.sleep();
-        }
     }
 
     fn wait_for_server_iteration(&self) -> bool {
