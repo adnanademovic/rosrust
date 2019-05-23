@@ -12,7 +12,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::thread;
 
-mod goal_id_generator;
 mod server_goal_handle;
 mod status_tracker;
 
@@ -295,17 +294,14 @@ impl<T: Action> ActionServerState<T> {
             .iter()
             .filter_map(|(key, tracker)| {
                 let tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
-                let destruction_time = tracker.handle_destruction_time.nanos();
-                if destruction_time == 0 {
-                    return None;
-                }
-                if destruction_time + status_list_timeout > now_nanos {
+                let destruction_time = tracker.destruction_time()?;
+                if destruction_time.nanos() + status_list_timeout > now_nanos {
                     return None;
                 }
                 rosrust::ros_debug!(
                     "Item {} with destruction time of {} being removed from list.  Now = {}",
-                    tracker.status.goal_id.id,
-                    tracker.handle_destruction_time.seconds(),
+                    tracker.goal_id().id,
+                    destruction_time.seconds(),
                     now.seconds()
                 );
                 Some(key)
@@ -319,7 +315,7 @@ impl<T: Action> ActionServerState<T> {
         let status_list = self
             .status_list
             .values()
-            .map(|tracker| tracker.lock().expect(MUTEX_LOCK_FAIL).status.clone().into())
+            .map(|tracker| tracker.lock().expect(MUTEX_LOCK_FAIL).to_status().into())
             .collect();
         GoalStatusArray {
             header: Default::default(),
@@ -377,14 +373,14 @@ impl<T: Action> ActionServerState<T> {
             rosrust::ros_debug!(
                 "Goal {} was already in the status list with status {:?}",
                 goal.id.id,
-                tracker.status.state
+                tracker.state()
             );
 
-            tracker.refresh_destruction_time();
+            tracker.mark_for_destruction(false);
 
-            if tracker.status.state == GoalState::Recalling {
-                tracker.status.state = GoalState::Recalled;
-                let status = tracker.status.clone();
+            if tracker.state() == GoalState::Recalling {
+                tracker.set_state(GoalState::Recalled);
+                let status = tracker.to_status();
 
                 self.publish_result(status, Default::default())?;
             }
@@ -398,9 +394,9 @@ impl<T: Action> ActionServerState<T> {
             .ok_or_else(|| "Action Server was deconstructed before action was handled")?;
 
         let tracker = StatusTracker::from_goal(goal);
-        let goal_timestamp = tracker.status.goal_id.stamp.nanos();
+        let goal_timestamp = tracker.goal_id().stamp.nanos();
 
-        let key = tracker.status.goal_id.id.clone();
+        let key = tracker.goal_id().id.clone();
         let tracker = Arc::new(Mutex::new(tracker));
         self.add_status_tracker(key, Arc::clone(&tracker));
 
@@ -432,14 +428,14 @@ impl<T: Action> ActionServerState<T> {
         for tracker in self.status_list.values() {
             let tracker_ref = Arc::clone(&tracker);
             let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
-            let cancel_this = filter_id == &tracker.status.goal_id.id;
+            let cancel_this = filter_id == &tracker.goal_id().id;
             let cancel_before_stamp =
-                filter_stamp != 0 && tracker.status.goal_id.stamp.nanos() <= filter_stamp;
+                filter_stamp != 0 && tracker.goal_id().stamp.nanos() <= filter_stamp;
             if !cancel_everything && !cancel_this && !cancel_before_stamp {
                 continue;
             }
-            goal_id_found = goal_id_found || filter_id == &tracker.status.goal_id.id;
-            tracker.refresh_destruction_time();
+            goal_id_found = goal_id_found || filter_id == &tracker.goal_id().id;
+            tracker.mark_for_destruction(false);
 
             let goal_handle = ServerGoalHandle::new(Arc::clone(&fields), tracker_ref);
 
@@ -450,8 +446,8 @@ impl<T: Action> ActionServerState<T> {
 
         if filter_id != "" && !goal_id_found {
             let mut tracker = StatusTracker::from_state(goal_id, GoalState::Recalling);
-            tracker.handle_destruction_time = rosrust::now();
-            let key = tracker.status.goal_id.id.clone();
+            tracker.mark_for_destruction(true);
+            let key = tracker.goal_id().id.clone();
             self.add_status_tracker(key, Arc::new(Mutex::new(tracker)));
         }
 

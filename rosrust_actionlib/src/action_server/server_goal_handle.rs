@@ -26,7 +26,7 @@ impl<T: Action> ServerGoalHandle<T> {
         action_server: Arc<Mutex<ActionServerState<T>>>,
         status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
     ) -> Self {
-        let goal = status_tracker.lock().expect(MUTEX_LOCK_FAIL).goal.clone();
+        let goal = status_tracker.lock().expect(MUTEX_LOCK_FAIL).goal();
         Self {
             goal,
             action_server,
@@ -64,12 +64,13 @@ impl<T: Action> ServerGoalHandle<T> {
 
         let mut status_tracker = self.status_tracker.lock().expect(MUTEX_LOCK_FAIL);
 
-        status_tracker.status.state = action
-            .do_transition(status_tracker.status.state)
+        let new_tracker_state = action
+            .do_transition(status_tracker.state())
             .map_err(Into::into)?;
+        status_tracker.set_state(new_tracker_state);
 
         if let Some(text) = text {
-            status_tracker.status.text = text.into();
+            status_tracker.set_text(text);
         }
 
         match action.publish_target() {
@@ -83,9 +84,9 @@ impl<T: Action> ServerGoalHandle<T> {
                     .map_err(|err| Error::new(format!("Failed to publish status: {}", err)))
             }
             ActionPublishTarget::Result => {
-                status_tracker.handle_destruction_time = rosrust::now();
+                status_tracker.mark_for_destruction(true);
 
-                let status = status_tracker.status.clone();
+                let status = status_tracker.to_status();
                 drop(status_tracker);
 
                 self.action_server
@@ -150,8 +151,7 @@ impl<T: Action> ServerGoalHandle<T> {
             .status_tracker
             .lock()
             .expect(MUTEX_LOCK_FAIL)
-            .status
-            .clone();
+            .to_status();
 
         self.action_server
             .lock()
@@ -187,8 +187,7 @@ impl<T: Action> ServerGoalHandle<T> {
             self.status_tracker
                 .lock()
                 .expect(MUTEX_LOCK_FAIL)
-                .status
-                .goal_id
+                .goal_id()
                 .clone(),
         )
     }
@@ -206,8 +205,7 @@ impl<T: Action> ServerGoalHandle<T> {
             self.status_tracker
                 .lock()
                 .expect(MUTEX_LOCK_FAIL)
-                .status
-                .clone(),
+                .to_status(),
         )
     }
 }
