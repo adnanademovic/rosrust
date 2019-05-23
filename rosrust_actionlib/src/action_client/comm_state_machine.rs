@@ -1,9 +1,9 @@
 use crate::action_client::{OnFeedback, OnTransition};
 use crate::msg::actionlib_msgs::GoalStatusArray;
-use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, FeedbackType, GoalType, ResultType, SyncClientGoalHandle};
 use crate::{GoalID, GoalState, GoalStatus};
-use std::sync::{Arc, Mutex};
+use std::cell::Cell;
+use std::sync::Arc;
 
 pub type OnSendGoal<T> = Arc<dyn Fn(<T as Action>::Goal) + Send + Sync + 'static>;
 pub type OnSendCancel = Arc<dyn Fn(GoalID) + Send + Sync + 'static>;
@@ -13,7 +13,7 @@ pub struct CommStateMachine<T: Action> {
     on_feedback: Option<OnFeedback<T>>,
     on_transition: Option<OnTransition<T>>,
     send_cancel_handler: OnSendCancel,
-    state: Arc<Mutex<State>>,
+    state: Cell<State>,
     latest_goal_status: GoalStatus,
     latest_result: Option<ResultType<T>>,
 }
@@ -23,7 +23,7 @@ impl<T: Action> CommStateMachine<T> {
         Self {
             action_goal,
             send_cancel_handler,
-            state: Arc::new(Mutex::new(State::WaitingForGoalAck)),
+            state: Cell::new(State::WaitingForGoalAck),
             latest_goal_status: GoalStatus::default(),
             on_feedback: None,
             on_transition: None,
@@ -51,7 +51,7 @@ impl<T: Action> CommStateMachine<T> {
 
     #[inline]
     pub fn state(&self) -> State {
-        *self.state.lock().expect(MUTEX_LOCK_FAIL)
+        self.state.get()
     }
 
     #[inline]
@@ -65,16 +65,13 @@ impl<T: Action> CommStateMachine<T> {
     }
 
     pub fn transition_to(&self, state: State) {
-        {
-            let mut state_lock = self.state.lock().expect(MUTEX_LOCK_FAIL);
-            rosrust::ros_debug!(
-                "Transitioning to {:?} (from {:?}, goal: {})",
-                state,
-                *state_lock,
-                self.action_goal.id.id,
-            );
-            *state_lock = state;
-        }
+        let old_state = self.state.replace(state);
+        rosrust::ros_debug!(
+            "Transitioning to {:?} (from {:?}, goal: {})",
+            state,
+            old_state,
+            self.action_goal.id.id,
+        );
 
         if let Some(on_transition) = &self.on_transition {
             on_transition(SyncClientGoalHandle::new(self))
@@ -166,8 +163,7 @@ impl<T: Action> CommStateMachine<T> {
 
         let steps = self
             .state
-            .lock()
-            .expect(MUTEX_LOCK_FAIL)
+            .get()
             .transition_to(goal_state)
             .into_update_status_steps()?;
 
