@@ -12,13 +12,8 @@ mod goal_manager;
 
 pub struct ActionClient<T: Action> {
     namespace: String,
-    pub_goal: rosrust::Publisher<T::Goal>,
-    pub_cancel: rosrust::Publisher<GoalID>,
     manager: Arc<Mutex<goal_manager::GoalManager<T>>>,
-    last_caller_id: Arc<Mutex<Option<String>>>,
-    status_sub: rosrust::Subscriber,
-    result_sub: rosrust::Subscriber,
-    feedback_sub: rosrust::Subscriber,
+    communicator: Communicator<T>,
 }
 
 impl<T: Action> ActionClient<T> {
@@ -97,15 +92,19 @@ impl<T: Action> ActionClient<T> {
             on_feedback,
         )?;
 
-        Ok(Self {
-            namespace: namespace.into(),
+        let communicator = Communicator {
+            last_caller_id,
             pub_goal,
             pub_cancel,
-            manager,
-            last_caller_id,
             status_sub,
             result_sub,
             feedback_sub,
+        };
+
+        Ok(Self {
+            namespace: namespace.into(),
+            manager,
+            communicator,
         })
     }
 
@@ -115,8 +114,8 @@ impl<T: Action> ActionClient<T> {
     }
 
     #[inline]
-    pub fn send_goal<'a>(
-        &'a self,
+    pub fn send_goal(
+        &self,
         goal: GoalBody<T>,
         on_transition: Option<OnTransition<T>>,
         on_feedback: Option<OnFeedback<T>>,
@@ -142,13 +141,29 @@ impl<T: Action> ActionClient<T> {
         &self,
         stamp: rosrust::Time,
     ) -> rosrust::error::Result<()> {
-        self.pub_cancel.send(GoalID {
+        self.communicator.pub_cancel.send(GoalID {
             id: String::new(),
             stamp,
         })
     }
 
+    #[inline]
     pub fn wait_for_server(&self, timeout: Option<rosrust::Duration>) -> bool {
+        self.communicator.wait_for_server(timeout)
+    }
+}
+
+struct Communicator<T: Action> {
+    last_caller_id: Arc<Mutex<Option<String>>>,
+    pub_goal: rosrust::Publisher<T::Goal>,
+    pub_cancel: rosrust::Publisher<GoalID>,
+    status_sub: rosrust::Subscriber,
+    result_sub: rosrust::Subscriber,
+    feedback_sub: rosrust::Subscriber,
+}
+
+impl<T: Action> Communicator<T> {
+    fn wait_for_server(&self, timeout: Option<rosrust::Duration>) -> bool {
         let timeout_time = timeout.map(|t| rosrust::now() + t);
 
         let rate = rosrust::rate(100.0);
