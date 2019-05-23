@@ -1,5 +1,6 @@
 pub use self::client_goal_handle::{AsyncClientGoalHandle, SyncClientGoalHandle};
 pub use self::comm_state_machine::State;
+pub use self::simple_action_client::SimpleActionClient;
 use crate::msg::actionlib_msgs;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
 use crate::{Action, ActionResponse, FeedbackBody, GoalBody, GoalID};
@@ -9,6 +10,7 @@ use std::sync::{Arc, Mutex};
 mod client_goal_handle;
 mod comm_state_machine;
 mod goal_manager;
+mod simple_action_client;
 
 pub struct ActionClient<T: Action> {
     namespace: String,

@@ -1,9 +1,7 @@
 use crate::action_server::status_tracker::StatusTracker;
+use crate::action_server::ActionServerState;
 use crate::static_messages::MUTEX_LOCK_FAIL;
-use crate::{
-    Action, ActionServerState, FeedbackBody, GoalBody, GoalID, GoalState, GoalStatus, GoalType,
-    ResultBody,
-};
+use crate::{Action, FeedbackBody, GoalBody, GoalID, GoalState, GoalStatus, GoalType, ResultBody};
 use std::sync::{Arc, Mutex};
 
 pub struct ServerGoalHandle<T: Action> {
@@ -83,7 +81,7 @@ impl<T: Action> ServerGoalHandle<T> {
         }
     }
 
-    pub fn build_message(&self) -> ServerGoalHandleMessageBuilder<T> {
+    pub fn response(&self) -> ServerGoalHandleMessageBuilder<T> {
         ServerGoalHandleMessageBuilder {
             gh: self,
             text: "",
@@ -91,37 +89,13 @@ impl<T: Action> ServerGoalHandle<T> {
         }
     }
 
-    pub fn set_accepted(&self, text: &str) -> bool {
-        self.set_general(None, Some(text), ActionCommand::Accepted)
+    fn set_public(&self, result: Option<ResultBody<T>>, text: &str, action: ActionCommand) -> bool {
+        self.set_general(result, Some(text), action)
             .map_err(Error::log)
             .is_ok()
     }
 
-    pub fn set_canceled(&self, result: Option<ResultBody<T>>, text: &str) -> bool {
-        self.set_general(result, Some(text), ActionCommand::Canceled)
-            .map_err(Error::log)
-            .is_ok()
-    }
-
-    pub fn set_rejected(&self, result: Option<ResultBody<T>>, text: &str) -> bool {
-        self.set_general(result, Some(text), ActionCommand::Rejected)
-            .map_err(Error::log)
-            .is_ok()
-    }
-
-    pub fn set_aborted(&self, result: Option<ResultBody<T>>, text: &str) -> bool {
-        self.set_general(result, Some(text), ActionCommand::Aborted)
-            .map_err(Error::log)
-            .is_ok()
-    }
-
-    pub fn set_succeeded(&self, result: Option<ResultBody<T>>, text: &str) -> bool {
-        self.set_general(result, Some(text), ActionCommand::Succeeded)
-            .map_err(Error::log)
-            .is_ok()
-    }
-
-    pub fn set_cancel_requested(&self) -> bool {
+    pub(crate) fn set_cancel_requested(&self) -> bool {
         // We intentionally do not log the error for this case
         self.set_general(None, None, ActionCommand::CancelRequested)
             .is_ok()
@@ -180,34 +154,45 @@ pub struct ServerGoalHandleMessageBuilder<'a, T: Action> {
 }
 
 impl<'a, T: Action> ServerGoalHandleMessageBuilder<'a, T> {
+    #[inline]
     pub fn text(&mut self, text: &'a str) -> &mut Self {
         self.text = text;
         self
     }
 
+    #[inline]
     pub fn result(&mut self, result: ResultBody<T>) -> &mut Self {
         self.result = Some(result);
         self
     }
 
+    #[inline]
     pub fn send_accepted(&mut self) -> bool {
-        self.gh.set_accepted(self.text)
+        self.gh.set_public(None, self.text, ActionCommand::Accepted)
     }
 
+    #[inline]
     pub fn send_canceled(&mut self) -> bool {
-        self.gh.set_canceled(self.result.take(), self.text)
+        self.gh
+            .set_public(self.result.take(), self.text, ActionCommand::Canceled)
     }
 
+    #[inline]
     pub fn send_rejected(&mut self) -> bool {
-        self.gh.set_rejected(self.result.take(), self.text)
+        self.gh
+            .set_public(self.result.take(), self.text, ActionCommand::Rejected)
     }
 
+    #[inline]
     pub fn send_aborted(&mut self) -> bool {
-        self.gh.set_aborted(self.result.take(), self.text)
+        self.gh
+            .set_public(self.result.take(), self.text, ActionCommand::Aborted)
     }
 
+    #[inline]
     pub fn send_succeeded(&mut self) -> bool {
-        self.gh.set_succeeded(self.result.take(), self.text)
+        self.gh
+            .set_public(self.result.take(), self.text, ActionCommand::Succeeded)
     }
 }
 

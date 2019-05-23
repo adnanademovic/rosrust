@@ -1,9 +1,6 @@
-use crate::action_client::State;
+use crate::action_client::{AsyncClientGoalHandle, State, SyncClientGoalHandle};
 use crate::static_messages::MUTEX_LOCK_FAIL;
-use crate::{
-    Action, ActionClient, AsyncClientGoalHandle, FeedbackBody, GoalBody, GoalState, ResultBody,
-    SyncClientGoalHandle,
-};
+use crate::{Action, ActionClient, FeedbackBody, GoalBody, GoalState, ResultBody};
 use rosrust::error::Result;
 use rosrust::{Duration, Time};
 use std::sync::{Arc, Condvar, Mutex};

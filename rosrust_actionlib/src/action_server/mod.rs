@@ -180,7 +180,7 @@ impl<T: Action> ActionServer<T> {
                             canceled,
                         };
                         goal_handle
-                            .build_message()
+                            .response()
                             .text("This goal has been accepted by the simple action server")
                             .send_accepted();
                         handler(goal_handle);
@@ -233,8 +233,8 @@ pub struct ServerSimpleGoalHandle<T: Action> {
 }
 
 impl<T: Action> ServerSimpleGoalHandle<T> {
-    pub fn build_message(&self) -> ServerGoalHandleMessageBuilder<T> {
-        self.goal_handle.build_message()
+    pub fn response(&self) -> ServerGoalHandleMessageBuilder<T> {
+        self.goal_handle.response()
     }
 
     pub fn handle(&self) -> &ServerGoalHandle<T> {
@@ -394,7 +394,10 @@ impl<T: Action> ActionServerState<T> {
         let goal_handle = ServerGoalHandle::new(goal, fields, tracker);
 
         if goal_timestamp != 0 && goal_timestamp <= self.last_cancel_ns {
-            goal_handle.set_canceled(None, "This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request");
+            goal_handle
+                .response()
+                .text("This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request")
+                .send_canceled();
             return Ok(());
         };
 

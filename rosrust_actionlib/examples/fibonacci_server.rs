@@ -1,4 +1,5 @@
-use rosrust_actionlib::{ActionServer, ServerSimpleGoalHandle};
+use rosrust_actionlib::action_server::ServerSimpleGoalHandle;
+use rosrust_actionlib::ActionServer;
 
 mod msg {
     rosrust::rosmsg_include!(actionlib_tutorials / FibonacciAction);
@@ -31,7 +32,7 @@ fn handler(gh: ServerSimpleGoalHandle<alt::FibonacciAction>) {
     }
 
     rosrust::ros_info!("Action Succeeded");
-    gh.build_message()
+    gh.response()
         .result(alt::FibonacciResult { sequence })
         .send_succeeded();
 }

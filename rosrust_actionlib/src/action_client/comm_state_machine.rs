@@ -1,6 +1,6 @@
-use crate::action_client::{OnFeedback, OnTransition};
+use crate::action_client::{OnFeedback, OnTransition, SyncClientGoalHandle};
 use crate::msg::actionlib_msgs::GoalStatusArray;
-use crate::{Action, FeedbackType, GoalType, ResultType, SyncClientGoalHandle};
+use crate::{Action, FeedbackType, GoalType, ResultType};
 use crate::{GoalID, GoalState, GoalStatus};
 use std::cell::Cell;
 use std::sync::Arc;
