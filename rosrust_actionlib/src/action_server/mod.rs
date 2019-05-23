@@ -161,13 +161,7 @@ impl<T: Action> ActionServer<T> {
             let handler = Arc::new(handler);
 
             move |server_goal_handle: ServerGoalHandle<T>| {
-                let (id, goal_message) = match (
-                    server_goal_handle.goal_id(),
-                    server_goal_handle.goal_message(),
-                ) {
-                    (Some(goal_id), Some(goal_message)) => (goal_id.id, goal_message),
-                    _ => return Ok(()),
-                };
+                let id = server_goal_handle.goal_id().id;
 
                 let canceled = Arc::new(AtomicBool::new(false));
 
@@ -183,7 +177,6 @@ impl<T: Action> ActionServer<T> {
                     thread::spawn(move || {
                         let goal_handle = ServerSimpleGoalHandle {
                             goal_handle: server_goal_handle,
-                            goal_message,
                             canceled,
                         };
                         goal_handle
@@ -202,10 +195,7 @@ impl<T: Action> ActionServer<T> {
         let on_cancel = {
             let active_goals = Arc::clone(&active_goals);
             move |server_goal_handle: ServerGoalHandle<T>| {
-                let id = match server_goal_handle.goal_id() {
-                    None => return Ok(()),
-                    Some(goal_id) => goal_id.id,
-                };
+                let id = server_goal_handle.goal_id().id;
                 if let Some(flag) = active_goals.lock().expect(MUTEX_LOCK_FAIL).remove(&id) {
                     flag.store(true, Ordering::SeqCst);
                 }
@@ -239,7 +229,6 @@ impl<T: Action> ActionServer<T> {
 
 pub struct ServerSimpleGoalHandle<T: Action> {
     goal_handle: ServerGoalHandle<T>,
-    goal_message: Arc<GoalType<T>>,
     canceled: Arc<AtomicBool>,
 }
 
@@ -257,7 +246,7 @@ impl<T: Action> ServerSimpleGoalHandle<T> {
     }
 
     pub fn goal(&self) -> &GoalBody<T> {
-        &self.goal_message.body
+        &self.goal_handle.goal()
     }
 
     pub fn canceled(&self) -> bool {
@@ -393,14 +382,16 @@ impl<T: Action> ActionServerState<T> {
             .upgrade()
             .ok_or_else(|| "Action Server was deconstructed before action was handled")?;
 
-        let tracker = StatusTracker::from_goal(goal);
+        let tracker = StatusTracker::new_goal(goal);
         let goal_timestamp = tracker.goal_id().stamp.nanos();
 
         let key = tracker.goal_id().id.clone();
+        // This is guaranteed to return Some because it's not a cancelation status tracker
+        let goal = tracker.goal().unwrap();
         let tracker = Arc::new(Mutex::new(tracker));
         self.add_status_tracker(key, Arc::clone(&tracker));
 
-        let goal_handle = ServerGoalHandle::new(fields, tracker);
+        let goal_handle = ServerGoalHandle::new(goal, fields, tracker);
 
         if goal_timestamp != 0 && goal_timestamp <= self.last_cancel_ns {
             goal_handle.set_canceled(None, "This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request");
@@ -436,17 +427,20 @@ impl<T: Action> ActionServerState<T> {
             }
             goal_id_found = goal_id_found || filter_id == &tracker.goal_id().id;
             tracker.mark_for_destruction(false);
+            let goal = tracker.goal();
+            drop(tracker);
 
-            let goal_handle = ServerGoalHandle::new(Arc::clone(&fields), tracker_ref);
+            if let Some(goal) = goal {
+                let goal_handle = ServerGoalHandle::new(goal, Arc::clone(&fields), tracker_ref);
 
-            if goal_handle.set_cancel_requested() {
-                (*self.on_cancel)(goal_handle)?;
+                if goal_handle.set_cancel_requested() {
+                    (*self.on_cancel)(goal_handle)?;
+                }
             }
         }
 
         if filter_id != "" && !goal_id_found {
-            let mut tracker = StatusTracker::from_state(goal_id, GoalState::Recalling);
-            tracker.mark_for_destruction(true);
+            let tracker = StatusTracker::new_cancelation(goal_id, GoalState::Recalling);
             let key = tracker.goal_id().id.clone();
             self.add_status_tracker(key, Arc::new(Mutex::new(tracker)));
         }

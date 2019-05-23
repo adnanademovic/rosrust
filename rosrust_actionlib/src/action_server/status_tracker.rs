@@ -13,17 +13,17 @@ pub struct StatusTracker<T> {
 
 impl<T: rosrust::Message> StatusTracker<T> {
     #[inline]
-    pub fn from_state(goal_id: GoalID, state: GoalState) -> Self {
+    pub fn new_cancelation(goal_id: GoalID, state: GoalState) -> Self {
         Self {
             goal: None,
             goal_id,
             state,
             text: String::new(),
-            destruction_time: None,
+            destruction_time: Some(rosrust::now()),
         }
     }
 
-    pub fn from_goal(goal: Goal<T>) -> Self {
+    pub fn new_goal(goal: Goal<T>) -> Self {
         let mut goal_id = if goal.id.id == "" {
             generate_id()
         } else {

@@ -7,26 +7,23 @@ use crate::{
 use std::sync::{Arc, Mutex};
 
 pub struct ServerGoalHandle<T: Action> {
-    goal: Option<Arc<GoalType<T>>>,
+    goal: Arc<GoalType<T>>,
     action_server: Arc<Mutex<ActionServerState<T>>>,
     status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
 }
 
 impl<T: Action> std::cmp::PartialEq<Self> for ServerGoalHandle<T> {
     fn eq(&self, other: &Self) -> bool {
-        if self.goal.is_none() || other.goal.is_none() {
-            return false;
-        }
-        self.goal_id().map(|v| v.id) == other.goal_id().map(|v| v.id)
+        self.goal_id().id == other.goal_id().id
     }
 }
 
 impl<T: Action> ServerGoalHandle<T> {
     pub(crate) fn new(
+        goal: Arc<GoalType<T>>,
         action_server: Arc<Mutex<ActionServerState<T>>>,
         status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
     ) -> Self {
-        let goal = status_tracker.lock().expect(MUTEX_LOCK_FAIL).goal();
         Self {
             goal,
             action_server,
@@ -35,20 +32,10 @@ impl<T: Action> ServerGoalHandle<T> {
     }
 
     fn log_action(&self, operation: &str) {
-        let goal_id = self.goal_id().unwrap_or_default();
+        let goal_id = self.goal_id();
         let id = goal_id.id;
         let stamp = goal_id.stamp.seconds();
         rosrust::ros_debug!("{}, id: {}, stamp: {}", operation, id, stamp);
-    }
-
-    fn check_goal_presence(&self, operation: &str) -> Result<(), Error> {
-        match self.goal {
-            Some(_) => Ok(()),
-            None => Err(Error::new(format!(
-                "Attempt to {} on an uninitialized ServerGoalHandle",
-                operation,
-            ))),
-        }
     }
 
     #[inline]
@@ -59,8 +46,6 @@ impl<T: Action> ServerGoalHandle<T> {
         action: ActionCommand,
     ) -> Result<(), Error> {
         self.log_action(action.precise_description());
-
-        self.check_goal_presence("set_status")?;
 
         let mut status_tracker = self.status_tracker.lock().expect(MUTEX_LOCK_FAIL);
 
@@ -145,8 +130,6 @@ impl<T: Action> ServerGoalHandle<T> {
     fn publish_feedback_inner(&self, feedback: FeedbackBody<T>) -> Result<(), Error> {
         self.log_action("Publishing feedback on goal");
 
-        self.check_goal_presence("publish feedback")?;
-
         let status = self
             .status_tracker
             .lock()
@@ -166,47 +149,27 @@ impl<T: Action> ServerGoalHandle<T> {
             .is_ok()
     }
 
-    pub fn goal_message(&self) -> Option<Arc<GoalType<T>>> {
+    pub fn goal_message(&self) -> Arc<GoalType<T>> {
         self.goal.clone()
     }
 
-    pub fn goal(&self) -> Option<&GoalBody<T>> {
-        Some(&self.goal.as_ref()?.body)
+    pub fn goal(&self) -> &GoalBody<T> {
+        &self.goal.body
     }
 
-    pub fn goal_id(&self) -> Option<GoalID> {
-        if self
-            .check_goal_presence("get a goal id")
-            .map_err(Error::log)
-            .is_err()
-        {
-            return None;
-        }
-
-        Some(
-            self.status_tracker
-                .lock()
-                .expect(MUTEX_LOCK_FAIL)
-                .goal_id()
-                .clone(),
-        )
+    pub fn goal_id(&self) -> GoalID {
+        self.status_tracker
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
+            .goal_id()
+            .clone()
     }
 
-    pub fn goal_status(&self) -> Option<GoalStatus> {
-        if self
-            .check_goal_presence("get a goal status")
-            .map_err(Error::log)
-            .is_err()
-        {
-            return None;
-        }
-
-        Some(
-            self.status_tracker
-                .lock()
-                .expect(MUTEX_LOCK_FAIL)
-                .to_status(),
-        )
+    pub fn goal_status(&self) -> GoalStatus {
+        self.status_tracker
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
+            .to_status()
     }
 }
 
