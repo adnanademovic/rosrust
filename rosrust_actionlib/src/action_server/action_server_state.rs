@@ -5,7 +5,7 @@ use rosrust::error::Result;
 use std::sync::{Arc, Mutex};
 
 pub(crate) struct ActionServerState<T: Action> {
-    last_cancel_ns: i64,
+    last_cancel_ns: Arc<Mutex<i64>>,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
     status_list: Arc<Mutex<StatusList<T>>>,
@@ -22,7 +22,7 @@ impl<T: Action> ActionServerState<T> {
         status_list: Arc<Mutex<StatusList<T>>>,
     ) -> Self {
         Self {
-            last_cancel_ns: 0,
+            last_cancel_ns: Arc::new(Mutex::new(0)),
             result_pub,
             feedback_pub,
             status_list,
@@ -31,7 +31,7 @@ impl<T: Action> ActionServerState<T> {
         }
     }
 
-    pub fn handle_on_goal(&mut self, goal: GoalType<T>) -> Result<()> {
+    pub fn handle_on_goal(&self, goal: GoalType<T>) -> Result<()> {
         rosrust::ros_debug!("The action server has received a new goal request");
 
         let goal_id = goal.id.id.clone();
@@ -79,7 +79,9 @@ impl<T: Action> ActionServerState<T> {
             tracker,
         )?;
 
-        if goal_timestamp != 0 && goal_timestamp <= self.last_cancel_ns {
+        if goal_timestamp != 0
+            && goal_timestamp <= *self.last_cancel_ns.lock().expect(MUTEX_LOCK_FAIL)
+        {
             goal_handle
                 .response()
                 .text("This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request")
@@ -90,7 +92,7 @@ impl<T: Action> ActionServerState<T> {
         (*self.on_goal)(goal_handle)
     }
 
-    pub fn handle_on_cancel(&mut self, goal_id: GoalID) -> Result<()> {
+    pub fn handle_on_cancel(&self, goal_id: GoalID) -> Result<()> {
         rosrust::ros_debug!("The action server has received a new cancel request");
 
         let filter_id = &goal_id.id;
@@ -135,23 +137,14 @@ impl<T: Action> ActionServerState<T> {
             self.add_status_tracker(key, Arc::new(Mutex::new(tracker)));
         }
 
-        if filter_stamp > self.last_cancel_ns {
-            self.last_cancel_ns = filter_stamp;
+        let mut last_cancel_ns = self.last_cancel_ns.lock().expect(MUTEX_LOCK_FAIL);
+        if filter_stamp > *last_cancel_ns {
+            *last_cancel_ns = filter_stamp;
         }
         Ok(())
     }
 
-    #[inline]
-    pub fn set_on_goal(&mut self, on_goal: ActionServerOnRequest<T>) {
-        self.on_goal = on_goal;
-    }
-
-    #[inline]
-    pub fn set_on_cancel(&mut self, on_cancel: ActionServerOnRequest<T>) {
-        self.on_cancel = on_cancel;
-    }
-
-    fn add_status_tracker(&mut self, key: String, tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>) {
+    fn add_status_tracker(&self, key: String, tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>) {
         self.status_list
             .lock()
             .expect(MUTEX_LOCK_FAIL)

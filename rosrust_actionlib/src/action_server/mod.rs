@@ -19,7 +19,7 @@ mod status_list;
 mod status_tracker;
 
 pub struct ActionServer<T: Action> {
-    fields: Arc<Mutex<ActionServerState<T>>>,
+    _fields: Arc<ActionServerState<T>>,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
     status_list: Arc<Mutex<StatusList<T>>>,
@@ -97,13 +97,13 @@ impl<T: Action> ActionServer<T> {
             status_pub.clone(),
         )));
 
-        let fields = Arc::new(Mutex::new(ActionServerState::new(
+        let fields = Arc::new(ActionServerState::new(
             result_pub.clone(),
             feedback_pub.clone(),
             on_goal,
             on_cancel,
             Arc::clone(&status_list),
-        )));
+        ));
 
         let on_status = {
             let status_list = Arc::clone(&status_list);
@@ -121,11 +121,7 @@ impl<T: Action> ActionServer<T> {
         let internal_on_goal = {
             let fields = Arc::clone(&fields);
             move |goal| {
-                if let Err(err) = fields
-                    .lock()
-                    .expect(MUTEX_LOCK_FAIL)
-                    .handle_on_goal(T::Goal::into_goal(goal))
-                {
+                if let Err(err) = fields.handle_on_goal(T::Goal::into_goal(goal)) {
                     rosrust::ros_err!("Failed to handle goal creation: {}", err);
                 }
             }
@@ -140,11 +136,7 @@ impl<T: Action> ActionServer<T> {
         let internal_on_cancel = {
             let fields = Arc::clone(&fields);
             move |goal_id: GoalID| {
-                if let Err(err) = fields
-                    .lock()
-                    .expect(MUTEX_LOCK_FAIL)
-                    .handle_on_cancel(goal_id)
-                {
+                if let Err(err) = fields.handle_on_cancel(goal_id) {
                     rosrust::ros_err!("Failed to handle goal creation: {}", err);
                 }
             }
@@ -157,7 +149,7 @@ impl<T: Action> ActionServer<T> {
         )?;
 
         let action_server = Self {
-            fields,
+            _fields: fields,
             result_pub,
             feedback_pub,
             status_list,
@@ -246,22 +238,6 @@ impl<T: Action> ActionServer<T> {
     #[inline]
     pub fn publish_status(&self) -> Result<()> {
         self.status_list.lock().expect(MUTEX_LOCK_FAIL).publish()
-    }
-
-    #[inline]
-    pub fn set_on_goal(&mut self, on_goal: ActionServerOnRequest<T>) {
-        self.fields
-            .lock()
-            .expect(MUTEX_LOCK_FAIL)
-            .set_on_goal(on_goal);
-    }
-
-    #[inline]
-    pub fn set_on_cancel(&mut self, on_cancel: ActionServerOnRequest<T>) {
-        self.fields
-            .lock()
-            .expect(MUTEX_LOCK_FAIL)
-            .set_on_cancel(on_cancel);
     }
 }
 
