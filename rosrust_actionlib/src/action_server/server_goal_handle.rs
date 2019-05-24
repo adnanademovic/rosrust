@@ -1,10 +1,11 @@
-use crate::action_server::status_tracker::StatusTracker;
-use crate::action_server::ActionServerState;
+use super::{publish_response, ActionServerState, StatusTracker};
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, FeedbackBody, GoalBody, GoalID, GoalState, GoalStatus, GoalType, ResultBody};
 use std::sync::{Arc, Mutex};
 
 pub struct ServerGoalHandle<T: Action> {
+    result_pub: rosrust::Publisher<T::Result>,
+    feedback_pub: rosrust::Publisher<T::Feedback>,
     goal: Arc<GoalType<T>>,
     action_server: Arc<Mutex<ActionServerState<T>>>,
     status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
@@ -19,14 +20,16 @@ impl<T: Action> std::cmp::PartialEq<Self> for ServerGoalHandle<T> {
 impl<T: Action> ServerGoalHandle<T> {
     pub(crate) fn new(
         goal: Arc<GoalType<T>>,
-        action_server: Arc<Mutex<ActionServerState<T>>>,
+        state: &ActionServerState<T>,
         status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
-    ) -> Self {
-        Self {
+    ) -> rosrust::error::Result<Self> {
+        Ok(Self {
+            result_pub: state.result_pub().clone(),
+            feedback_pub: state.feedback_pub().clone(),
             goal,
-            action_server,
+            action_server: state.self_reference()?,
             status_tracker,
-        }
+        })
     }
 
     fn log_action(&self, operation: &str) {
@@ -72,10 +75,7 @@ impl<T: Action> ServerGoalHandle<T> {
                 let status = status_tracker.to_status();
                 drop(status_tracker);
 
-                self.action_server
-                    .lock()
-                    .expect(MUTEX_LOCK_FAIL)
-                    .publish_result(status, result.unwrap_or_default())
+                publish_response(&self.result_pub, status, result.unwrap_or_default())
                     .map_err(|err| Error::new(format!("Failed to publish result: {}", err)))
             }
         }
@@ -110,10 +110,7 @@ impl<T: Action> ServerGoalHandle<T> {
             .expect(MUTEX_LOCK_FAIL)
             .to_status();
 
-        self.action_server
-            .lock()
-            .expect(MUTEX_LOCK_FAIL)
-            .publish_feedback(status, feedback)
+        publish_response(&self.feedback_pub, status, feedback)
             .map_err(|err| Error::new(format!("Failed to publish feedback: {}", err)))
     }
 
