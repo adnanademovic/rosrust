@@ -1,109 +1,34 @@
-use super::{publish_response, ActionServerOnRequest, ServerGoalHandle, StatusTracker};
-use crate::msg::actionlib_msgs::GoalStatusArray;
+use super::{publish_response, ActionServerOnRequest, ServerGoalHandle, StatusList, StatusTracker};
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, GoalBody, GoalID, GoalState, GoalType};
 use rosrust::error::Result;
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 pub(crate) struct ActionServerState<T: Action> {
     last_cancel_ns: i64,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
-    status_pub: rosrust::Publisher<GoalStatusArray>,
-    status_frequency: f64,
-    status_list: BTreeMap<String, Arc<Mutex<StatusTracker<GoalBody<T>>>>>,
-    status_list_timeout: i64,
+    status_list: Arc<Mutex<StatusList<T>>>,
     on_goal: ActionServerOnRequest<T>,
     on_cancel: ActionServerOnRequest<T>,
-    self_reference: Weak<Mutex<Self>>,
 }
 
 impl<T: Action> ActionServerState<T> {
     pub(crate) fn new(
         result_pub: rosrust::Publisher<T::Result>,
         feedback_pub: rosrust::Publisher<T::Feedback>,
-        status_pub: rosrust::Publisher<GoalStatusArray>,
-        status_frequency: f64,
-        status_list_timeout: i64,
         on_goal: ActionServerOnRequest<T>,
         on_cancel: ActionServerOnRequest<T>,
-    ) -> Arc<Mutex<Self>> {
-        let output = Arc::new(Mutex::new(Self {
+        status_list: Arc<Mutex<StatusList<T>>>,
+    ) -> Self {
+        Self {
             last_cancel_ns: 0,
             result_pub,
             feedback_pub,
-            status_pub,
-            status_frequency,
-            status_list: BTreeMap::new(),
-            status_list_timeout,
+            status_list,
             on_goal,
             on_cancel,
-            self_reference: Weak::new(),
-        }));
-
-        output.lock().expect(MUTEX_LOCK_FAIL).self_reference = Arc::downgrade(&output);
-
-        output
-    }
-
-    pub fn result_pub(&self) -> &rosrust::Publisher<T::Result> {
-        &self.result_pub
-    }
-
-    pub fn feedback_pub(&self) -> &rosrust::Publisher<T::Feedback> {
-        &self.feedback_pub
-    }
-
-    pub fn status_frequency(&self) -> f64 {
-        self.status_frequency
-    }
-
-    fn get_status_array(&mut self) -> GoalStatusArray {
-        let now = rosrust::now();
-        let now_nanos = now.nanos();
-        let status_list_timeout = self.status_list_timeout;
-        let dead_keys = self
-            .status_list
-            .iter()
-            .filter_map(|(key, tracker)| {
-                let tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
-                let destruction_time = tracker.destruction_time()?;
-                if destruction_time.nanos() + status_list_timeout > now_nanos {
-                    return None;
-                }
-                rosrust::ros_debug!(
-                    "Item {} with destruction time of {} being removed from list.  Now = {}",
-                    tracker.goal_id().id,
-                    destruction_time.seconds(),
-                    now.seconds()
-                );
-                Some(key)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        for key in dead_keys {
-            self.status_list.remove(&key);
         }
-
-        let status_list = self
-            .status_list
-            .values()
-            .map(|tracker| tracker.lock().expect(MUTEX_LOCK_FAIL).to_status().into())
-            .collect();
-        GoalStatusArray {
-            header: Default::default(),
-            status_list,
-        }
-    }
-
-    pub fn publish_status(&mut self) -> Result<()> {
-        let mut status_array = self.get_status_array();
-        if !rosrust::is_ok() {
-            return Ok(());
-        }
-        status_array.header.stamp = rosrust::now();
-        self.status_pub.send(status_array)
     }
 
     pub fn handle_on_goal(&mut self, goal: GoalType<T>) -> Result<()> {
@@ -111,9 +36,12 @@ impl<T: Action> ActionServerState<T> {
 
         let goal_id = goal.id.id.clone();
 
-        let existing_tracker = self.status_list.get(&goal_id);
-
-        if let Some(tracker) = existing_tracker {
+        if let Some(tracker) = self
+            .status_list
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
+            .get(&goal_id)
+        {
             let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
 
             rosrust::ros_debug!(
@@ -143,7 +71,13 @@ impl<T: Action> ActionServerState<T> {
         let tracker = Arc::new(Mutex::new(tracker));
         self.add_status_tracker(key, Arc::clone(&tracker));
 
-        let goal_handle = ServerGoalHandle::new(goal, &self, tracker)?;
+        let goal_handle = ServerGoalHandle::new(
+            self.result_pub.clone(),
+            self.feedback_pub.clone(),
+            goal,
+            self.status_list.clone(),
+            tracker,
+        )?;
 
         if goal_timestamp != 0 && goal_timestamp <= self.last_cancel_ns {
             goal_handle
@@ -156,12 +90,6 @@ impl<T: Action> ActionServerState<T> {
         (*self.on_goal)(goal_handle)
     }
 
-    pub fn self_reference(&self) -> Result<Arc<Mutex<Self>>> {
-        self.self_reference
-            .upgrade()
-            .ok_or_else(|| "Action Server was deconstructed before action was handled".into())
-    }
-
     pub fn handle_on_cancel(&mut self, goal_id: GoalID) -> Result<()> {
         rosrust::ros_debug!("The action server has received a new cancel request");
 
@@ -172,7 +100,7 @@ impl<T: Action> ActionServerState<T> {
 
         let mut goal_id_found = false;
 
-        for tracker in self.status_list.values() {
+        for tracker in self.status_list.lock().expect(MUTEX_LOCK_FAIL).values() {
             let tracker_ref = Arc::clone(&tracker);
             let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
             let cancel_this = filter_id == &tracker.goal_id().id;
@@ -187,7 +115,13 @@ impl<T: Action> ActionServerState<T> {
             drop(tracker);
 
             if let Some(goal) = goal {
-                let goal_handle = ServerGoalHandle::new(goal, &self, tracker_ref)?;
+                let goal_handle = ServerGoalHandle::new(
+                    self.result_pub.clone(),
+                    self.feedback_pub.clone(),
+                    goal,
+                    self.status_list.clone(),
+                    tracker_ref,
+                )?;
 
                 if goal_handle.set_cancel_requested() {
                     (*self.on_cancel)(goal_handle)?;
@@ -218,6 +152,9 @@ impl<T: Action> ActionServerState<T> {
     }
 
     fn add_status_tracker(&mut self, key: String, tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>) {
-        self.status_list.insert(key, tracker);
+        self.status_list
+            .lock()
+            .expect(MUTEX_LOCK_FAIL)
+            .insert(key, tracker);
     }
 }

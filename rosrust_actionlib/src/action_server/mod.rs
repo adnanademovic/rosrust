@@ -1,5 +1,6 @@
 use self::action_server_state::ActionServerState;
 pub use self::server_goal_handle::{ServerGoalHandle, ServerGoalHandleMessageBuilder};
+use self::status_list::StatusList;
 use self::status_tracker::StatusTracker;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
 use crate::{
@@ -9,19 +10,29 @@ use crate::{
 use rosrust::error::Result;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 mod action_server_state;
 mod server_goal_handle;
+mod status_list;
 mod status_tracker;
 
 pub struct ActionServer<T: Action> {
     fields: Arc<Mutex<ActionServerState<T>>>,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
+    status_list: Arc<Mutex<StatusList<T>>>,
+    is_alive: Arc<AtomicBool>,
+    status_frequency: f64,
     _goal_sub: rosrust::Subscriber,
     _cancel_sub: rosrust::Subscriber,
+}
+
+impl<T: Action> Drop for ActionServer<T> {
+    fn drop(&mut self) {
+        self.is_alive.store(false, Ordering::Relaxed)
+    }
 }
 
 fn decode_queue_size(param: &str, default: usize) -> usize {
@@ -44,19 +55,14 @@ fn get_status_frequency() -> Option<f64> {
     rosrust::param(&key)?.get().ok()
 }
 
-fn create_status_publisher<T, F>(
-    frequency: f64,
-    callback: F,
-    fields: Weak<Mutex<ActionServerState<T>>>,
-) -> impl Fn()
+fn create_status_publisher<F>(frequency: f64, callback: F, is_alive: Arc<AtomicBool>) -> impl Fn()
 where
-    T: Action,
     F: Fn() -> Result<()>,
 {
     move || {
         let rate = rosrust::rate(frequency);
         rosrust::ros_debug!("Starting timer");
-        while rosrust::is_ok() && fields.upgrade().is_some() {
+        while rosrust::is_ok() && is_alive.load(Ordering::Relaxed) {
             rate.sleep();
             if let Err(err) = callback() {
                 rosrust::ros_err!("Failed to publish status: {}", err);
@@ -86,25 +92,30 @@ impl<T: Action> ActionServer<T> {
             .unwrap_or(5.0);
         let status_list_timeout = (status_list_timeout * 1_000_000_000.0) as i64;
 
-        let fields = ActionServerState::new(
+        let status_list = Arc::new(Mutex::new(StatusList::new(
+            status_list_timeout,
+            status_pub.clone(),
+        )));
+
+        let fields = Arc::new(Mutex::new(ActionServerState::new(
             result_pub.clone(),
             feedback_pub.clone(),
-            status_pub,
-            status_frequency,
-            status_list_timeout,
             on_goal,
             on_cancel,
-        );
+            Arc::clone(&status_list),
+        )));
 
         let on_status = {
-            let fields = Arc::clone(&fields);
-            move || fields.lock().expect(MUTEX_LOCK_FAIL).publish_status()
+            let status_list = Arc::clone(&status_list);
+            move || status_list.lock().expect(MUTEX_LOCK_FAIL).publish()
         };
+
+        let is_alive = Arc::new(AtomicBool::new(true));
 
         std::thread::spawn(create_status_publisher(
             status_frequency,
             on_status,
-            Arc::downgrade(&fields),
+            Arc::clone(&is_alive),
         ));
 
         let internal_on_goal = {
@@ -149,6 +160,9 @@ impl<T: Action> ActionServer<T> {
             fields,
             result_pub,
             feedback_pub,
+            status_list,
+            is_alive,
+            status_frequency,
             _goal_sub: goal_sub,
             _cancel_sub: cancel_sub,
         };
@@ -216,10 +230,7 @@ impl<T: Action> ActionServer<T> {
 
     #[inline]
     pub fn status_frequency(&self) -> f64 {
-        self.fields
-            .lock()
-            .expect(MUTEX_LOCK_FAIL)
-            .status_frequency()
+        self.status_frequency
     }
 
     #[inline]
@@ -234,7 +245,7 @@ impl<T: Action> ActionServer<T> {
 
     #[inline]
     pub fn publish_status(&self) -> Result<()> {
-        self.fields.lock().expect(MUTEX_LOCK_FAIL).publish_status()
+        self.status_list.lock().expect(MUTEX_LOCK_FAIL).publish()
     }
 
     #[inline]

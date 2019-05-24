@@ -1,4 +1,4 @@
-use super::{publish_response, ActionServerState, StatusTracker};
+use super::{publish_response, StatusList, StatusTracker};
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, FeedbackBody, GoalBody, GoalID, GoalState, GoalStatus, GoalType, ResultBody};
 use std::sync::{Arc, Mutex};
@@ -7,7 +7,7 @@ pub struct ServerGoalHandle<T: Action> {
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
     goal: Arc<GoalType<T>>,
-    action_server: Arc<Mutex<ActionServerState<T>>>,
+    status_list: Arc<Mutex<StatusList<T>>>,
     status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
 }
 
@@ -19,15 +19,17 @@ impl<T: Action> std::cmp::PartialEq<Self> for ServerGoalHandle<T> {
 
 impl<T: Action> ServerGoalHandle<T> {
     pub(crate) fn new(
+        result_pub: rosrust::Publisher<T::Result>,
+        feedback_pub: rosrust::Publisher<T::Feedback>,
         goal: Arc<GoalType<T>>,
-        state: &ActionServerState<T>,
+        status_list: Arc<Mutex<StatusList<T>>>,
         status_tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
     ) -> rosrust::error::Result<Self> {
         Ok(Self {
-            result_pub: state.result_pub().clone(),
-            feedback_pub: state.feedback_pub().clone(),
+            result_pub,
+            feedback_pub,
             goal,
-            action_server: state.self_reference()?,
+            status_list,
             status_tracker,
         })
     }
@@ -63,10 +65,10 @@ impl<T: Action> ServerGoalHandle<T> {
             ActionPublishTarget::Status => {
                 drop(status_tracker);
 
-                self.action_server
+                self.status_list
                     .lock()
                     .expect(MUTEX_LOCK_FAIL)
-                    .publish_status()
+                    .publish()
                     .map_err(|err| Error::new(format!("Failed to publish status: {}", err)))
             }
             ActionPublishTarget::Result => {
