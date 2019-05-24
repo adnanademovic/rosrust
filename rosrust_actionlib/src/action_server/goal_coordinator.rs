@@ -4,7 +4,7 @@ use crate::{Action, GoalBody, GoalID, GoalState, GoalType};
 use rosrust::error::Result;
 use std::sync::{Arc, Mutex};
 
-pub(crate) struct ActionServerState<T: Action> {
+pub struct GoalCoordinator<T: Action> {
     last_cancel_ns: Arc<Mutex<i64>>,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
@@ -13,8 +13,8 @@ pub(crate) struct ActionServerState<T: Action> {
     on_cancel: ActionServerOnRequest<T>,
 }
 
-impl<T: Action> ActionServerState<T> {
-    pub(crate) fn new(
+impl<T: Action> GoalCoordinator<T> {
+    pub fn new(
         result_pub: rosrust::Publisher<T::Result>,
         feedback_pub: rosrust::Publisher<T::Feedback>,
         on_goal: ActionServerOnRequest<T>,

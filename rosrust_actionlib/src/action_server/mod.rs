@@ -1,4 +1,3 @@
-use self::action_server_state::ActionServerState;
 pub use self::server_goal_handle::{ServerGoalHandle, ServerGoalHandleMessageBuilder};
 use self::status_list::StatusList;
 use self::status_tracker::StatusTracker;
@@ -13,13 +12,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-mod action_server_state;
+mod goal_coordinator;
 mod server_goal_handle;
 mod status_list;
 mod status_tracker;
 
 pub struct ActionServer<T: Action> {
-    _fields: Arc<ActionServerState<T>>,
     result_pub: rosrust::Publisher<T::Result>,
     feedback_pub: rosrust::Publisher<T::Feedback>,
     status_list: Arc<Mutex<StatusList<T>>>,
@@ -31,7 +29,7 @@ pub struct ActionServer<T: Action> {
 
 impl<T: Action> Drop for ActionServer<T> {
     fn drop(&mut self) {
-        self.is_alive.store(false, Ordering::Relaxed)
+        self.is_alive.store(false, Ordering::Relaxed);
     }
 }
 
@@ -97,7 +95,7 @@ impl<T: Action> ActionServer<T> {
             status_pub.clone(),
         )));
 
-        let fields = Arc::new(ActionServerState::new(
+        let goal_coordinator = Arc::new(goal_coordinator::GoalCoordinator::new(
             result_pub.clone(),
             feedback_pub.clone(),
             on_goal,
@@ -112,16 +110,16 @@ impl<T: Action> ActionServer<T> {
 
         let is_alive = Arc::new(AtomicBool::new(true));
 
-        std::thread::spawn(create_status_publisher(
+        thread::spawn(create_status_publisher(
             status_frequency,
             on_status,
             Arc::clone(&is_alive),
         ));
 
         let internal_on_goal = {
-            let fields = Arc::clone(&fields);
+            let goal_coordinator = Arc::clone(&goal_coordinator);
             move |goal| {
-                if let Err(err) = fields.handle_on_goal(T::Goal::into_goal(goal)) {
+                if let Err(err) = goal_coordinator.handle_on_goal(T::Goal::into_goal(goal)) {
                     rosrust::ros_err!("Failed to handle goal creation: {}", err);
                 }
             }
@@ -133,12 +131,9 @@ impl<T: Action> ActionServer<T> {
             internal_on_goal,
         )?;
 
-        let internal_on_cancel = {
-            let fields = Arc::clone(&fields);
-            move |goal_id: GoalID| {
-                if let Err(err) = fields.handle_on_cancel(goal_id) {
-                    rosrust::ros_err!("Failed to handle goal creation: {}", err);
-                }
+        let internal_on_cancel = move |goal_id: GoalID| {
+            if let Err(err) = goal_coordinator.handle_on_cancel(goal_id) {
+                rosrust::ros_err!("Failed to handle goal cancelation: {}", err);
             }
         };
 
@@ -149,7 +144,6 @@ impl<T: Action> ActionServer<T> {
         )?;
 
         let action_server = Self {
-            _fields: fields,
             result_pub,
             feedback_pub,
             status_list,
