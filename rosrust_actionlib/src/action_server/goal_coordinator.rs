@@ -95,23 +95,33 @@ impl<T: Action> GoalCoordinator<T> {
     pub fn handle_on_cancel(&self, goal_id: GoalID) -> Result<()> {
         rosrust::ros_debug!("The action server has received a new cancel request");
 
-        let filter_id = &goal_id.id;
-        let filter_stamp = goal_id.stamp.nanos();
+        let goal_filter: GoalFilter = goal_id.clone().into();
 
-        let cancel_everything = filter_id == "" && filter_stamp == 0;
+        let cancel_everything = goal_filter.matches_everything();
 
-        let mut goal_id_found = false;
+        let mut goal_id_found = goal_filter.id().is_none();
 
-        for tracker in self.status_list.lock().expect(MUTEX_LOCK_FAIL).values() {
-            let tracker_ref = Arc::clone(&tracker);
-            let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
-            let cancel_this = filter_id == &tracker.goal_id().id;
-            let cancel_before_stamp =
-                filter_stamp != 0 && tracker.goal_id().stamp.nanos() <= filter_stamp;
-            if !cancel_everything && !cancel_this && !cancel_before_stamp {
-                continue;
+        let canceled_trackers: Vec<Arc<_>> = {
+            let status_list = self.status_list.lock().expect(MUTEX_LOCK_FAIL);
+            status_list
+                .values()
+                .filter(|tracker| {
+                    if cancel_everything {
+                        return true;
+                    }
+
+                    let tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
+                    goal_filter.matches(&tracker.goal_id())
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+
+        for tracker_ref in canceled_trackers {
+            let mut tracker = tracker_ref.lock().expect(MUTEX_LOCK_FAIL);
+            if goal_filter.matches_id(&tracker.goal_id().id) {
+                goal_id_found = true;
             }
-            goal_id_found = goal_id_found || filter_id == &tracker.goal_id().id;
             tracker.mark_for_destruction(false);
             let goal = tracker.goal();
             drop(tracker);
@@ -131,16 +141,19 @@ impl<T: Action> GoalCoordinator<T> {
             }
         }
 
-        if filter_id != "" && !goal_id_found {
+        if !goal_id_found {
             let tracker = StatusTracker::new_cancelation(goal_id, GoalState::Recalling);
             let key = tracker.goal_id().id.clone();
             self.add_status_tracker(key, Arc::new(Mutex::new(tracker)));
         }
 
-        let mut last_cancel_ns = self.last_cancel_ns.lock().expect(MUTEX_LOCK_FAIL);
-        if filter_stamp > *last_cancel_ns {
-            *last_cancel_ns = filter_stamp;
+        if let Some(ref stamp) = goal_filter.stamp() {
+            let mut last_cancel_ns = self.last_cancel_ns.lock().expect(MUTEX_LOCK_FAIL);
+            if *stamp > *last_cancel_ns {
+                *last_cancel_ns = *stamp;
+            }
         }
+
         Ok(())
     }
 
@@ -149,5 +162,51 @@ impl<T: Action> GoalCoordinator<T> {
             .lock()
             .expect(MUTEX_LOCK_FAIL)
             .insert(key, tracker);
+    }
+}
+
+struct GoalFilter {
+    id: Option<String>,
+    stamp_nanos: Option<i64>,
+}
+
+impl From<GoalID> for GoalFilter {
+    fn from(goal_id: GoalID) -> Self {
+        let id = if goal_id.id == "" {
+            None
+        } else {
+            Some(goal_id.id)
+        };
+        let nanos = goal_id.stamp.nanos();
+        let stamp_nanos = if nanos == 0 { None } else { Some(nanos) };
+        Self { id, stamp_nanos }
+    }
+}
+
+impl GoalFilter {
+    fn matches_everything(&self) -> bool {
+        self.id.is_none() && self.stamp_nanos.is_none()
+    }
+
+    fn matches(&self, goal_id: &GoalID) -> bool {
+        self.matches_id(&goal_id.id) || self.matches_stamp(&goal_id.stamp)
+    }
+
+    fn matches_id(&self, other_id: &str) -> bool {
+        self.id.as_ref().map(|id| id == other_id).unwrap_or(false)
+    }
+
+    fn id(&self) -> &Option<String> {
+        &self.id
+    }
+
+    fn matches_stamp(&self, other_stamp: &rosrust::Time) -> bool {
+        self.stamp_nanos
+            .map(|stamp| other_stamp.nanos() <= stamp)
+            .unwrap_or(false)
+    }
+
+    fn stamp(&self) -> &Option<i64> {
+        &self.stamp_nanos
     }
 }
