@@ -22,7 +22,7 @@ impl<T: Action> StatusList<T> {
         }
     }
 
-    pub fn to_status_array(&mut self) -> GoalStatusArray {
+    fn remove_dead_keys(&mut self) {
         let now = rosrust::now();
         let now_nanos = now.nanos();
         let dead_keys = self
@@ -35,7 +35,7 @@ impl<T: Action> StatusList<T> {
                     return None;
                 }
                 rosrust::ros_debug!(
-                    "Item {} with destruction time of {} being removed from list.  Now = {}",
+                    "Item {} with destruction time of {} being removed from list. Now = {}",
                     tracker.goal_id().id,
                     destruction_time.seconds(),
                     now.seconds()
@@ -47,7 +47,9 @@ impl<T: Action> StatusList<T> {
         for key in dead_keys {
             self.items.remove(&key);
         }
+    }
 
+    fn to_status_array(&self) -> GoalStatusArray {
         let status_list = self
             .items
             .values()
@@ -60,6 +62,7 @@ impl<T: Action> StatusList<T> {
     }
 
     pub fn publish(&mut self) -> rosrust::error::Result<()> {
+        self.remove_dead_keys();
         let mut data = self.to_status_array();
         if !rosrust::is_ok() {
             return Ok(());
