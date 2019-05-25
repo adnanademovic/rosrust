@@ -13,7 +13,7 @@ pub struct StatusTracker<T> {
 
 impl<T: rosrust::Message> StatusTracker<T> {
     #[inline]
-    pub fn new_cancelation(goal_id: GoalID, state: GoalState) -> Self {
+    pub fn new_cancellation(goal_id: GoalID, state: GoalState) -> Self {
         Self {
             goal: None,
             goal_id,

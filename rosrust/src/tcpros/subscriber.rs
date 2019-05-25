@@ -55,6 +55,7 @@ impl Subscriber {
         self.connected_publishers.iter().cloned().collect()
     }
 
+    #[allow(clippy::identity_conversion)]
     pub fn connect_to<U: ToSocketAddrs>(
         &mut self,
         publisher: &str,

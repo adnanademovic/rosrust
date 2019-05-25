@@ -34,41 +34,51 @@ impl<T: Action> GoalCoordinator<T> {
     pub fn handle_on_goal(&self, goal: GoalType<T>) -> Result<()> {
         rosrust::ros_debug!("The action server has received a new goal request");
 
-        let goal_id = goal.id.id.clone();
-
         let tracker_option = self
             .status_list
             .lock()
             .expect(MUTEX_LOCK_FAIL)
-            .get(&goal_id);
+            .get(&goal.id.id);
 
         if let Some(tracker) = tracker_option {
-            let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
+            self.handle_on_goal_existing(goal, tracker)
+        } else {
+            self.handle_on_goal_new(goal)
+        }
+    }
 
-            rosrust::ros_debug!(
-                "Goal {} was already in the status list with status {:?}",
-                goal.id.id,
-                tracker.state()
-            );
+    fn handle_on_goal_existing(
+        &self,
+        goal: GoalType<T>,
+        tracker: Arc<Mutex<StatusTracker<GoalBody<T>>>>,
+    ) -> Result<()> {
+        let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
 
-            tracker.mark_for_destruction(false);
+        rosrust::ros_debug!(
+            "Goal {} was already in the status list with status {:?}",
+            goal.id.id,
+            tracker.state()
+        );
 
-            if tracker.state() == GoalState::Recalling {
-                tracker.set_state(GoalState::Recalled);
-                let status = tracker.to_status();
-                drop(tracker);
+        tracker.mark_for_destruction(false);
 
-                publish_response(&self.result_pub, status, Default::default())?;
-            }
+        if tracker.state() == GoalState::Recalling {
+            tracker.set_state(GoalState::Recalled);
+            let status = tracker.to_status();
+            drop(tracker);
 
-            return Ok(());
+            publish_response(&self.result_pub, status, Default::default())?;
         }
 
+        Ok(())
+    }
+
+    fn handle_on_goal_new(&self, goal: GoalType<T>) -> Result<()> {
         let tracker = StatusTracker::new_goal(goal);
         let goal_timestamp = tracker.goal_id().stamp.nanos();
 
         let key = tracker.goal_id().id.clone();
-        // This is guaranteed to return Some because it's not a cancelation status tracker
+        // This is guaranteed to return Some because it's not a cancellation status tracker
         let goal = tracker.goal().unwrap();
         let tracker = Arc::new(Mutex::new(tracker));
         self.add_status_tracker(key, Arc::clone(&tracker));
@@ -81,17 +91,15 @@ impl<T: Action> GoalCoordinator<T> {
             tracker,
         )?;
 
-        if goal_timestamp != 0
-            && goal_timestamp <= *self.last_cancel_ns.lock().expect(MUTEX_LOCK_FAIL)
-        {
+        if goal_timestamp != 0 && goal_timestamp <= self.last_cancel() {
             goal_handle
                 .response()
                 .text("This goal handle was canceled by the action server because its timestamp is before the timestamp of the last cancel request")
                 .send_canceled();
-            return Ok(());
-        };
-
-        (*self.on_goal)(goal_handle)
+            Ok(())
+        } else {
+            (*self.on_goal)(goal_handle)
+        }
     }
 
     pub fn handle_on_cancel(&self, goal_id: GoalID) -> Result<()> {
@@ -99,24 +107,22 @@ impl<T: Action> GoalCoordinator<T> {
 
         let goal_filter: GoalFilter = goal_id.clone().into();
 
-        let cancel_everything = goal_filter.matches_everything();
-
         let mut goal_id_found = goal_filter.id().is_none();
 
         let canceled_trackers: Vec<Arc<_>> = {
             let status_list = self.status_list.lock().expect(MUTEX_LOCK_FAIL);
-            status_list
-                .values()
-                .filter(|tracker| {
-                    if cancel_everything {
-                        return true;
-                    }
-
-                    let tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
-                    goal_filter.matches(&tracker.goal_id())
-                })
-                .cloned()
-                .collect::<Vec<_>>()
+            if goal_filter.matches_everything() {
+                status_list.values().cloned().collect::<Vec<_>>()
+            } else {
+                status_list
+                    .values()
+                    .filter(|tracker| {
+                        let tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
+                        goal_filter.matches(&tracker.goal_id())
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>()
+            }
         };
 
         for tracker_ref in canceled_trackers {
@@ -144,7 +150,7 @@ impl<T: Action> GoalCoordinator<T> {
         }
 
         if !goal_id_found {
-            let tracker = StatusTracker::new_cancelation(goal_id, GoalState::Recalling);
+            let tracker = StatusTracker::new_cancellation(goal_id, GoalState::Recalling);
             let key = tracker.goal_id().id.clone();
             self.add_status_tracker(key, Arc::new(Mutex::new(tracker)));
         }
@@ -164,6 +170,10 @@ impl<T: Action> GoalCoordinator<T> {
             .lock()
             .expect(MUTEX_LOCK_FAIL)
             .insert(key, tracker);
+    }
+
+    fn last_cancel(&self) -> i64 {
+        *self.last_cancel_ns.lock().expect(MUTEX_LOCK_FAIL)
     }
 }
 
@@ -191,7 +201,7 @@ impl GoalFilter {
     }
 
     fn matches(&self, goal_id: &GoalID) -> bool {
-        self.matches_id(&goal_id.id) || self.matches_stamp(&goal_id.stamp)
+        self.matches_id(&goal_id.id) || self.matches_stamp(goal_id.stamp)
     }
 
     fn matches_id(&self, other_id: &str) -> bool {
@@ -202,7 +212,7 @@ impl GoalFilter {
         &self.id
     }
 
-    fn matches_stamp(&self, other_stamp: &rosrust::Time) -> bool {
+    fn matches_stamp(&self, other_stamp: rosrust::Time) -> bool {
         self.stamp_nanos
             .map(|stamp| other_stamp.nanos() <= stamp)
             .unwrap_or(false)

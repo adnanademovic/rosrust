@@ -2,7 +2,7 @@ use env_logger;
 use rosrust::{self, ros_info};
 use serde_derive::{Deserialize, Serialize};
 
-#[allow(clippy::cyclomatic_complexity)]
+#[allow(clippy::cognitive_complexity)]
 fn main() {
     env_logger::init();
 

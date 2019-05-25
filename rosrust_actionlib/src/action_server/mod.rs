@@ -53,16 +53,17 @@ fn get_status_frequency() -> Option<f64> {
     rosrust::param(&key)?.get().ok()
 }
 
-fn create_status_publisher<F>(frequency: f64, callback: F, is_alive: Arc<AtomicBool>) -> impl Fn()
-where
-    F: Fn() -> Result<()>,
-{
+fn create_status_publisher<T: Action>(
+    frequency: f64,
+    status_list: Arc<Mutex<StatusList<T>>>,
+    is_alive: Arc<AtomicBool>,
+) -> impl Fn() {
     move || {
         let rate = rosrust::rate(frequency);
         rosrust::ros_debug!("Starting timer");
         while rosrust::is_ok() && is_alive.load(Ordering::Relaxed) {
             rate.sleep();
-            if let Err(err) = callback() {
+            if let Err(err) = status_list.lock().expect(MUTEX_LOCK_FAIL).publish() {
                 rosrust::ros_err!("Failed to publish status: {}", err);
             }
         }
@@ -103,16 +104,11 @@ impl<T: Action> ActionServer<T> {
             Arc::clone(&status_list),
         ));
 
-        let on_status = {
-            let status_list = Arc::clone(&status_list);
-            move || status_list.lock().expect(MUTEX_LOCK_FAIL).publish()
-        };
-
         let is_alive = Arc::new(AtomicBool::new(true));
 
         thread::spawn(create_status_publisher(
             status_frequency,
-            on_status,
+            Arc::clone(&status_list),
             Arc::clone(&is_alive),
         ));
 
@@ -133,7 +129,7 @@ impl<T: Action> ActionServer<T> {
 
         let internal_on_cancel = move |goal_id: GoalID| {
             if let Err(err) = goal_coordinator.handle_on_cancel(goal_id) {
-                rosrust::ros_err!("Failed to handle goal cancelation: {}", err);
+                rosrust::ros_err!("Failed to handle goal cancellation: {}", err);
             }
         };
 
