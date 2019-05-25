@@ -36,12 +36,13 @@ impl<T: Action> GoalCoordinator<T> {
 
         let goal_id = goal.id.id.clone();
 
-        if let Some(tracker) = self
+        let tracker_option = self
             .status_list
             .lock()
             .expect(MUTEX_LOCK_FAIL)
-            .get(&goal_id)
-        {
+            .get(&goal_id);
+
+        if let Some(tracker) = tracker_option {
             let mut tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
 
             rosrust::ros_debug!(
@@ -55,6 +56,7 @@ impl<T: Action> GoalCoordinator<T> {
             if tracker.state() == GoalState::Recalling {
                 tracker.set_state(GoalState::Recalled);
                 let status = tracker.to_status();
+                drop(tracker);
 
                 publish_response(&self.result_pub, status, Default::default())?;
             }
