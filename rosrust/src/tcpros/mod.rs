@@ -3,9 +3,10 @@ pub use self::error::Error;
 pub use self::publisher::{Publisher, PublisherStream};
 pub use self::service::Service;
 pub use self::subscriber::Subscriber;
-use crate::rosmsg::RosMsg;
 
+use crate::rosmsg::RosMsg;
 use crate::Clock;
+use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
@@ -19,7 +20,7 @@ mod util;
 
 pub type ServiceResult<T> = Result<T, String>;
 
-pub trait Message: Clone + RosMsg + Send + 'static {
+pub trait Message: Clone + Debug + Default + RosMsg + Send + 'static {
     fn msg_definition() -> String;
     fn md5sum() -> String;
     fn msg_type() -> String;

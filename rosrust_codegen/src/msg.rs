@@ -48,7 +48,7 @@ impl Msg {
             .collect::<Vec<_>>();
         quote! {
             #[allow(dead_code, non_camel_case_types, non_snake_case)]
-            #[derive(Clone)]
+            #[derive(Clone, Debug)]
             pub struct #name {
                 #(#fields)*
             }
