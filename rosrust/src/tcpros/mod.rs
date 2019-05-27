@@ -20,7 +20,7 @@ mod util;
 
 pub type ServiceResult<T> = Result<T, String>;
 
-pub trait Message: Clone + Debug + Default + PartialEq + RosMsg + Send + 'static {
+pub trait Message: Clone + Debug + Default + PartialEq + RosMsg + Send + Sync + 'static {
     fn msg_definition() -> String;
     fn md5sum() -> String;
     fn msg_type() -> String;
