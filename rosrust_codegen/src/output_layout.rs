@@ -123,7 +123,7 @@ impl Service {
 
         quote! {
             #[allow(dead_code,non_camel_case_types,non_snake_case)]
-            #[derive(Clone, Debug, Default)]
+            #[derive(Clone, Debug, Default, PartialEq)]
             pub struct #name_ident;
 
             impl #crate_prefix Message for #name_ident {
