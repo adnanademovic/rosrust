@@ -11,7 +11,7 @@ fn timestamp_status_test() {
     ts.tick_float(rosrust::now().seconds() + 2.0);
     let mut status1 = Status::default();
     ts.run(&mut status1);
-    ts.tick(&rosrust::now());
+    ts.tick(rosrust::now());
     let mut status2 = Status::default();
     ts.run(&mut status2);
     ts.tick_float(rosrust::now().seconds() - 4.0);
