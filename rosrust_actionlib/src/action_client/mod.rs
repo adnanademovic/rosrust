@@ -1,4 +1,4 @@
-pub use self::client_goal_handle::{AsyncClientGoalHandle, SyncClientGoalHandle};
+pub use self::client_goal_handle::{AsyncClientGoalHandle, ClientGoalHandle, SyncClientGoalHandle};
 pub use self::comm_state_machine::State;
 pub use self::simple_action_client::SimpleActionClient;
 use crate::msg::actionlib_msgs;

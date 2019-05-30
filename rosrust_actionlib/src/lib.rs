@@ -1,4 +1,4 @@
-pub use self::action_client::{ActionClient, SimpleActionClient};
+pub use self::action_client::{ActionClient, ClientGoalHandle, SimpleActionClient};
 pub use self::action_server::ActionServer;
 pub use self::goal_status::{GoalState, GoalStatus};
 pub use msg::actionlib_msgs::GoalID;

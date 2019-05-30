@@ -1,4 +1,4 @@
-use crate::action_client::{AsyncClientGoalHandle, State, SyncClientGoalHandle};
+use crate::action_client::{AsyncClientGoalHandle, ClientGoalHandle, State, SyncClientGoalHandle};
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, ActionClient, FeedbackBody, GoalBody, GoalState, ResultBody};
 use rosrust::error::Result;
@@ -147,10 +147,7 @@ impl<T: Action> SimpleActionClient<T> {
     }
 
     pub fn result(&self) -> Option<ResultBody<T>> {
-        let result = self
-            .goal_handle
-            .as_ref()
-            .and_then(AsyncClientGoalHandle::result);
+        let result = self.goal_handle.as_ref().and_then(ClientGoalHandle::result);
         if result.is_none() {
             rosrust::ros_err!("Called result when no goal is running");
         }
