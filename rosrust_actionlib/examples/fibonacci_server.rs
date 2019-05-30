@@ -19,6 +19,7 @@ fn handler(gh: ServerSimpleGoalHandle<alt::FibonacciAction>) {
     for _ in 1..gh.goal().order {
         if !rosrust::is_ok() || gh.canceled() {
             rosrust::ros_info!("Action Canceled");
+            gh.response().send_canceled();
             return;
         }
         let sum = val1 + val2;
