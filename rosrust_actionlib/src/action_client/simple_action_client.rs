@@ -192,12 +192,16 @@ impl<T: Action> SimpleActionClient<T> {
         }
     }
 
-    pub fn stop_tracking_goal(&mut self) {
+    pub fn detach_goal(&mut self) -> Option<AsyncClientGoalHandle<T>> {
+        self.callback_handle = None;
+        self.goal_handle.take()
+    }
+
+    pub fn stop_tracking_goal(&mut self) -> Option<AsyncClientGoalHandle<T>> {
         if let Some(ref cb_handle) = self.callback_handle {
             cb_handle.lock().expect(MUTEX_LOCK_FAIL).expired = true;
         }
-        self.callback_handle = None;
-        self.goal_handle = None;
+        self.detach_goal()
     }
 }
 
