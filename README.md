@@ -258,7 +258,7 @@ fn main() {
 
 ### Logging
 
-Logging is provided through macros `log_debug!()`, `log_info!()`, `log_warn!()`, `log_error!()`, `log_fatal!()`.
+Logging is provided through macros `ros_debug!()`, `ros_info!()`, `ros_warn!()`, `ros_error!()`, `ros_fatal!()`.
 
 Setting verbosity levels and throttled logging have yet to come!
 
