@@ -39,32 +39,37 @@ fn match_wildcard_headers(fields: &HashMap<String, String>, topic: &str) -> Resu
     Ok(())
 }
 
-fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<()> {
+fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<String> {
     let fields = header::decode(&mut stream)?;
     if let Err(err) = match_concrete_headers::<T>(&fields, topic) {
         match_wildcard_headers(&fields, topic).map_err(|_| err)?;
     }
-    if fields.get("callerid").is_none() {
-        bail!(ErrorKind::HeaderMissingField("callerid".into()));
-    }
-    Ok(())
+    let caller_id = fields
+        .get("callerid")
+        .ok_or_else(|| ErrorKind::HeaderMissingField("callerid".into()))?;
+    Ok(caller_id.clone())
 }
 
-fn write_response<T: Message, U: std::io::Write>(mut stream: &mut U) -> Result<()> {
+fn write_response<T: Message, U: std::io::Write>(
+    mut stream: &mut U,
+    caller_id: &str,
+) -> Result<()> {
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
+    fields.insert(String::from("callerid"), caller_id.into());
     header::encode(&mut stream, &fields)?;
     Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, topic: &str) -> Result<()>
+fn exchange_headers<T, U>(mut stream: &mut U, topic: &str, pub_caller_id: &str) -> Result<String>
 where
     T: Message,
     U: std::io::Write + std::io::Read,
 {
-    read_request::<T, U>(&mut stream, topic)?;
-    write_response::<T, U>(&mut stream)
+    let caller_id = read_request::<T, U>(&mut stream, topic)?;
+    write_response::<T, U>(&mut stream, pub_caller_id)?;
+    Ok(caller_id)
 }
 
 fn process_subscriber<T, U>(
@@ -72,40 +77,49 @@ fn process_subscriber<T, U>(
     mut stream: U,
     targets: &TargetList<U>,
     last_message: &Mutex<Arc<Vec<u8>>>,
+    pub_caller_id: &str,
 ) -> tcpconnection::Feedback
 where
     T: Message,
     U: std::io::Read + std::io::Write + Send,
 {
-    let result = exchange_headers::<T, _>(&mut stream, topic)
+    let result = exchange_headers::<T, _>(&mut stream, topic, pub_caller_id)
         .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
-    if let Err(err) = result {
-        let info = err
-            .iter()
-            .map(|v| format!("{}", v))
-            .collect::<Vec<_>>()
-            .join("\nCaused by:");
-        error!("{}", info);
-        return tcpconnection::Feedback::AcceptNextStream;
-    }
+    let caller_id = match result {
+        Ok(caller_id) => caller_id,
+        Err(err) => {
+            let info = err
+                .iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<_>>()
+                .join("\nCaused by:");
+            error!("{}", info);
+            return tcpconnection::Feedback::AcceptNextStream;
+        }
+    };
 
     if let Err(err) = stream.write_all(&last_message.lock().expect(FAILED_TO_LOCK)) {
         error!("{}", err);
         return tcpconnection::Feedback::AcceptNextStream;
     }
 
-    if targets.add(stream).is_err() {
+    if targets.add(caller_id, stream).is_err() {
         // The TCP listener gets shut down when streamfork's thread deallocates.
         // This happens only when all the corresponding publisher streams get deallocated,
         // causing streamfork's data channel to shut down
         return tcpconnection::Feedback::StopAccepting;
     }
 
-    return tcpconnection::Feedback::AcceptNextStream;
+    tcpconnection::Feedback::AcceptNextStream
 }
 
 impl Publisher {
-    pub fn new<T, U>(address: U, topic: &str, queue_size: usize) -> Result<Publisher>
+    pub fn new<T, U>(
+        address: U,
+        topic: &str,
+        queue_size: usize,
+        caller_id: &str,
+    ) -> Result<Publisher>
     where
         T: Message,
         U: ToSocketAddrs,
@@ -123,12 +137,13 @@ impl Publisher {
             let publisher_exists = publisher_exists.clone();
             let topic = String::from(topic);
             let last_message = Arc::clone(&last_message);
+            let caller_id = String::from(caller_id);
 
             move |stream: TcpStream| {
                 if !publisher_exists.load(atomic::Ordering::SeqCst) {
                     return tcpconnection::Feedback::StopAccepting;
                 }
-                process_subscriber::<T, _>(&topic, stream, &targets, &last_message)
+                process_subscriber::<T, _>(&topic, stream, &targets, &last_message, &caller_id)
             }
         };
 
@@ -193,7 +208,12 @@ impl<T: Message> PublisherStream<T> {
 
     #[inline]
     pub fn subscriber_count(&self) -> usize {
-        self.stream.get_target_count()
+        self.stream.target_count()
+    }
+
+    #[inline]
+    pub fn subscriber_names(&self) -> Vec<String> {
+        self.stream.target_names()
     }
 
     #[inline]

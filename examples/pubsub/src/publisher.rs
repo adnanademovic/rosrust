@@ -12,6 +12,8 @@ fn main() {
     // Create publisher
     let chatter_pub = rosrust::publish("chatter", 2).unwrap();
 
+    let log_names = rosrust::param("~log_names").unwrap().get().unwrap_or(false);
+
     let mut count = 0;
 
     // Create object that maintains 10Hz between sleep requests
@@ -28,6 +30,10 @@ fn main() {
 
         // Send string message to topic via publisher
         chatter_pub.send(msg).unwrap();
+
+        if log_names {
+            rosrust::ros_info!("Subscriber names: {:?}", chatter_pub.subscriber_names());
+        }
 
         // Sleep to maintain 10Hz rate
         rate.sleep();

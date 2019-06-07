@@ -135,7 +135,8 @@ impl Slave {
     where
         T: Message,
     {
-        self.publications.add(hostname, topic, queue_size)
+        self.publications
+            .add(hostname, topic, queue_size, &self.name)
     }
 
     #[inline]
@@ -147,7 +148,7 @@ impl Slave {
     pub fn add_subscription<T, F>(&self, topic: &str, queue_size: usize, callback: F) -> Result<()>
     where
         T: Message,
-        F: Fn(T) -> () + Send + 'static,
+        F: Fn(T, &str) + Send + 'static,
     {
         self.subscriptions
             .add(&self.name, topic, queue_size, callback)
@@ -161,5 +162,10 @@ impl Slave {
     #[inline]
     pub fn get_publisher_count_of_subscription(&self, topic: &str) -> usize {
         self.subscriptions.publisher_count(topic)
+    }
+
+    #[inline]
+    pub fn get_publisher_uris_of_subscription(&self, topic: &str) -> Vec<String> {
+        self.subscriptions.publisher_uris(topic)
     }
 }

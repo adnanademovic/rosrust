@@ -47,6 +47,7 @@ impl PublicationsTracker {
         hostname: &str,
         topic: &str,
         queue_size: usize,
+        caller_id: &str,
     ) -> error::tcpros::Result<PublisherStream<T>> {
         use std::collections::hash_map::Entry;
         match self
@@ -57,8 +58,12 @@ impl PublicationsTracker {
         {
             Entry::Occupied(publisher_entry) => publisher_entry.get().stream(queue_size),
             Entry::Vacant(entry) => {
-                let publisher =
-                    Publisher::new::<T, _>(format!("{}:0", hostname).as_str(), topic, queue_size)?;
+                let publisher = Publisher::new::<T, _>(
+                    format!("{}:0", hostname).as_str(),
+                    topic,
+                    queue_size,
+                    caller_id,
+                )?;
                 entry.insert(publisher).stream(queue_size)
             }
         }

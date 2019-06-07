@@ -255,7 +255,16 @@ impl Ros {
         )
     }
 
-    pub fn subscribe<T, F>(
+    #[inline]
+    pub fn subscribe<T, F>(&self, topic: &str, queue_size: usize, callback: F) -> Result<Subscriber>
+    where
+        T: Message,
+        F: Fn(T) + Send + 'static,
+    {
+        self.subscribe_with_ids(topic, queue_size, move |data, _| callback(data))
+    }
+
+    pub fn subscribe_with_ids<T, F>(
         &self,
         topic: &str,
         mut queue_size: usize,
@@ -263,7 +272,7 @@ impl Ros {
     ) -> Result<Subscriber>
     where
         T: Message,
-        F: Fn(T) -> () + Send + 'static,
+        F: Fn(T, &str) + Send + 'static,
     {
         if queue_size == 0 {
             queue_size = usize::max_value();

@@ -49,7 +49,7 @@ impl SubscriptionsTracker {
     pub fn add<T, F>(&self, name: &str, topic: &str, queue_size: usize, callback: F) -> Result<()>
     where
         T: Message,
-        F: Fn(T) -> () + Send + 'static,
+        F: Fn(T, &str) + Send + 'static,
     {
         use std::collections::hash_map::Entry;
         match self
@@ -82,6 +82,15 @@ impl SubscriptionsTracker {
             .expect(FAILED_TO_LOCK)
             .get(topic)
             .map_or(0, Subscriber::publisher_count)
+    }
+
+    #[inline]
+    pub fn publisher_uris(&self, topic: &str) -> Vec<String> {
+        self.mapping
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .get(topic)
+            .map_or_else(Vec::new, Subscriber::publisher_uris)
     }
 }
 

@@ -1,0 +1,11 @@
+[package]
+edition = "2018"
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+description = "Actionlib functionality for rosrust"
+license = "MIT"
+name = "rosrust_actionlib"
+version = "0.0.1"
+
+[dependencies]
+rosrust = {path="../rosrust"}
+paste = "0.1.5"

@@ -9,10 +9,11 @@ use log::error;
 use std;
 use std::collections::{BTreeSet, HashMap};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::sync::Arc;
 use std::thread;
 
 pub struct Subscriber {
-    data_stream: LossySender<Vec<u8>>,
+    data_stream: LossySender<MessageInfo>,
     publishers_stream: Sender<SocketAddr>,
     pub topic: Topic,
     pub connected_publishers: BTreeSet<String>,
@@ -22,7 +23,7 @@ impl Subscriber {
     pub fn new<T, F>(caller_id: &str, topic: &str, queue_size: usize, callback: F) -> Subscriber
     where
         T: Message,
-        F: Fn(T) -> () + Send + 'static,
+        F: Fn(T, &str) + Send + 'static,
     {
         let (data_tx, data_rx) = lossy_channel(queue_size);
         let publisher_connection_queue_size = 8;
@@ -49,6 +50,12 @@ impl Subscriber {
         self.connected_publishers.len()
     }
 
+    #[inline]
+    pub fn publisher_uris(&self) -> Vec<String> {
+        self.connected_publishers.iter().cloned().collect()
+    }
+
+    #[allow(clippy::identity_conversion)]
     pub fn connect_to<U: ToSocketAddrs>(
         &mut self,
         publisher: &str,
@@ -98,21 +105,21 @@ impl Drop for Subscriber {
     }
 }
 
-fn handle_data<T, F>(data: LossyReceiver<Vec<u8>>, callback: F)
+fn handle_data<T, F>(data: LossyReceiver<MessageInfo>, callback: F)
 where
     T: Message,
-    F: Fn(T) -> (),
+    F: Fn(T, &str),
 {
     for buffer in data {
-        match RosMsg::decode_slice(&buffer) {
-            Ok(value) => callback(value),
+        match RosMsg::decode_slice(&buffer.data) {
+            Ok(value) => callback(value, &buffer.caller_id),
             Err(err) => error!("Failed to decode message: {}", err),
         }
     }
 }
 
 fn join_connections<T>(
-    data_stream: &LossySender<Vec<u8>>,
+    data_stream: &LossySender<MessageInfo>,
     publishers: Receiver<SocketAddr>,
     caller_id: &str,
     topic: &str,
@@ -135,7 +142,7 @@ fn join_connections<T>(
 }
 
 fn join_connection<T>(
-    data_stream: &LossySender<Vec<u8>>,
+    data_stream: &LossySender<MessageInfo>,
     publisher: &SocketAddr,
     caller_id: &str,
     topic: &str,
@@ -144,11 +151,14 @@ where
     T: Message,
 {
     let mut stream = TcpStream::connect(publisher)?;
-    exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
+    let pub_caller_id = exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
     let target = data_stream.clone();
     thread::spawn(move || {
+        let pub_caller_id = Arc::new(pub_caller_id.unwrap_or_default());
         while let Ok(buffer) = package_to_vector(&mut stream) {
-            if let Err(TrySendError::Disconnected(_)) = target.try_send(buffer) {
+            if let Err(TrySendError::Disconnected(_)) =
+                target.try_send(MessageInfo::new(Arc::clone(&pub_caller_id), buffer))
+            {
                 // Data receiver has been destroyed after
                 // Subscriber destructor's kill signal
                 break;
@@ -173,13 +183,14 @@ fn write_request<T: Message, U: std::io::Write>(
     Ok(())
 }
 
-fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<()> {
+fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<Option<String>> {
     let fields = decode(&mut stream)?;
     match_field(&fields, "md5sum", &T::md5sum())?;
-    match_field(&fields, "type", &T::msg_type())
+    match_field(&fields, "type", &T::msg_type())?;
+    Ok(fields.get("callerid").cloned())
 }
 
-fn exchange_headers<T, U>(stream: &mut U, caller_id: &str, topic: &str) -> Result<()>
+fn exchange_headers<T, U>(stream: &mut U, caller_id: &str, topic: &str) -> Result<Option<String>>
 where
     T: Message,
     U: std::io::Write + std::io::Read,
@@ -217,6 +228,18 @@ fn package_to_vector<R: std::io::Read>(stream: &mut R) -> std::io::Result<Vec<u8
 
     // Return the new, now full and "safely" initialized.
     Ok(unsafe { Vec::from_raw_parts(out_ptr, num_bytes, num_bytes) })
+}
+
+#[derive(Clone)]
+struct MessageInfo {
+    caller_id: Arc<String>,
+    data: Vec<u8>,
+}
+
+impl MessageInfo {
+    fn new(caller_id: Arc<String>, data: Vec<u8>) -> Self {
+        Self { caller_id, data }
+    }
 }
 
 #[cfg(test)]

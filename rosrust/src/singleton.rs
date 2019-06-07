@@ -153,9 +153,18 @@ where
 pub fn subscribe<T, F>(topic: &str, queue_size: usize, callback: F) -> Result<Subscriber>
 where
     T: Message,
-    F: Fn(T) -> () + Send + 'static,
+    F: Fn(T) + Send + 'static,
 {
     ros!().subscribe::<T, F>(topic, queue_size, callback)
+}
+
+#[inline]
+pub fn subscribe_with_ids<T, F>(topic: &str, queue_size: usize, callback: F) -> Result<Subscriber>
+where
+    T: Message,
+    F: Fn(T, &str) + Send + 'static,
+{
+    ros!().subscribe_with_ids::<T, F>(topic, queue_size, callback)
 }
 
 #[inline]
