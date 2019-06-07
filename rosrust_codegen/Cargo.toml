@@ -4,7 +4,7 @@ authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
 description = "Message generation for rosrust"
 license = "MIT"
 name = "rosrust_codegen"
-readme = "../README.md"
+readme = "README.md"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.7.0"
 
