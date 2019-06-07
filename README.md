@@ -12,7 +12,7 @@ The following dependency is needed to use the crate:
 
 ```toml
 [dependencies]
-rosrust = "0.7.1"
+rosrust = "0.8.0"
 ```
 
 Then just depend on the library with macro usage, using:
