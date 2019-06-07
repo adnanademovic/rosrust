@@ -43,6 +43,8 @@ There are multiple examples in the [examples folder](https://github.com/adnanade
 ### Message Generation
 
 Message generation is done at build time. If you have ROS installed and sourced in your shell session, you will not need to do any extra setup for this to work.
+If you do not have ROS installed, then the message generation utilizes the `ROSRUST_MSG_PATH` environment variable, which is a colon seperated list of directories to search.
+These directories should have the structure `<ROSRUST_MGS_PATH>/<package>/msg/<message>` or `<ROSRUST_MSG_PATH>/<package>/srv/<service>`.
 
 To generate messages, create a module for messages. Using something like a `msg.rs` file in your project root, like in the `pubsub` and `serviceclient` examples, results in importing similar to `roscpp` and `rospy`. The file only needs one line:
 
