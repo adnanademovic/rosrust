@@ -1,7 +1,9 @@
 use env_logger;
 use rosrust;
 
-mod msg;
+mod msg {
+    rosrust::rosmsg_include!(std_msgs / String);
+}
 
 fn main() {
     env_logger::init();

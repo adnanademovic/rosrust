@@ -23,10 +23,9 @@ fn publisher_to_multiple_subscribers() {
             .arg("listener"),
     );
     let _subscriber_rust = util::ChildProcessTerminator::spawn_example(
-        "../examples/pubsub",
         Command::new("cargo")
             .arg("run")
-            .arg("--bin")
+            .arg("--example")
             .arg("subscriber"),
     );
 

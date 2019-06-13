@@ -1,5 +1,4 @@
 use rosrust;
-use std::fs::canonicalize;
 use std::process::Command;
 
 mod util;
@@ -11,11 +10,10 @@ mod msg {
 fn test_request(a: i64, b: i64) {
     let client = Command::new("cargo")
         .arg("run")
-        .arg("--bin")
+        .arg("--example")
         .arg("client")
         .arg(format!("{}", a))
         .arg(format!("{}", b))
-        .current_dir(canonicalize("../examples/serviceclient").unwrap())
         .output()
         .unwrap();
     util::assert_success_and_output_containing(client, &format!("{} + {} = {}", a, b, a + b));

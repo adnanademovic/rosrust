@@ -21,8 +21,10 @@ fn test_request(client: &rosrust::Client<msg::roscpp_tutorials::TwoInts>, a: i64
 fn client_to_inline_service() {
     let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Client);
     let _service = util::ChildProcessTerminator::spawn_example(
-        "../examples/serviceclient",
-        Command::new("cargo").arg("run").arg("--bin").arg("service"),
+        Command::new("cargo")
+            .arg("run")
+            .arg("--example")
+            .arg("service"),
     );
 
     rosrust::init("add_two_ints_client_service");

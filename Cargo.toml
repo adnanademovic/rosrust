@@ -1,11 +1,5 @@
 [workspace]
 members = [
-    "examples/camera",
-    "examples/parameters",
-    "examples/pubsub",
-    "examples/serviceclient",
-    "examples/oldedition",
-    "examples/reservedkeywords",
     "rosrust",
     "rosrust_codegen",
     "rosrust_actionlib",

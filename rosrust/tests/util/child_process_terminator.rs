@@ -1,6 +1,5 @@
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
-use std::fs::canonicalize;
 use std::process::{Child, Command, Stdio};
 
 #[must_use]
@@ -16,32 +15,30 @@ impl ChildProcessTerminator {
     }
 
     #[allow(dead_code)]
-    pub fn spawn_example(path: &str, command: &mut Command) -> ChildProcessTerminator {
-        let canonical_path = canonicalize(path).unwrap();
+    pub fn spawn_example(command: &mut Command) -> ChildProcessTerminator {
         assert!(Command::new("cargo")
             .arg("build")
-            .current_dir(&canonical_path)
+            .arg("--all-targets")
             .output()
             .unwrap()
             .status
             .success());
 
-        Self::spawn(command.current_dir(&canonical_path))
+        Self::spawn(command)
     }
 
     #[allow(dead_code)]
-    pub fn spawn_example_bench(path: &str, command: &mut Command) -> ChildProcessTerminator {
-        let canonical_path = canonicalize(path).unwrap();
+    pub fn spawn_example_bench(command: &mut Command) -> ChildProcessTerminator {
         assert!(Command::new("cargo")
             .arg("build")
+            .arg("--all-targets")
             .arg("--release")
-            .current_dir(&canonical_path)
             .output()
             .unwrap()
             .status
             .success());
 
-        Self::spawn(command.current_dir(&canonical_path))
+        Self::spawn(command)
     }
 }
 

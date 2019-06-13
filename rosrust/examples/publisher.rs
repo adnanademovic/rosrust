@@ -1,24 +1,20 @@
 use env_logger;
 use rosrust;
 
-mod msg;
+mod msg {
+    rosrust::rosmsg_include!(std_msgs / String);
+}
 
 fn main() {
     env_logger::init();
 
     // Initialize node
-    rosrust::init("talker_listener");
-
-    // Create subscriber
-    // The subscriber is stopped when the returned object is destroyed
-    let _subscriber_raii = rosrust::subscribe("chatter", 200, |v: msg::std_msgs::String| {
-        // Callback for handling received messages
-        rosrust::ros_info!("Received: {}", v.data);
-    })
-    .unwrap();
+    rosrust::init("talker");
 
     // Create publisher
-    let chatter_pub = rosrust::publish("chatter", 200).unwrap();
+    let chatter_pub = rosrust::publish("chatter", 2).unwrap();
+
+    let log_names = rosrust::param("~log_names").unwrap().get().unwrap_or(false);
 
     let mut count = 0;
 
@@ -36,6 +32,10 @@ fn main() {
 
         // Send string message to topic via publisher
         chatter_pub.send(msg).unwrap();
+
+        if log_names {
+            rosrust::ros_info!("Subscriber names: {:?}", chatter_pub.subscriber_names());
+        }
 
         // Sleep to maintain 10Hz rate
         rate.sleep();

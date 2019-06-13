@@ -2,7 +2,9 @@ extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
 
-mod msg;
+mod msg {
+    rosrust::rosmsg_include!(roscpp_tutorials / TwoInts);
+}
 
 fn main() {
     env_logger::init();

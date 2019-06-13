@@ -36,7 +36,7 @@ Integration with [catkin](http://www.ros.org/wiki/catkin) will be handled once a
 
 The API is close to reaching its final form.
 
-There are multiple examples in the [examples folder](https://github.com/adnanademovic/rosrust/tree/master/examples). The publisher/subscriber and service/client examples are designed to closely immitate the `roscpp` tutorial.
+There are multiple examples in the [examples folder](https://github.com/adnanademovic/rosrust/tree/master/rosrust/examples). The publisher/subscriber and service/client examples are designed to closely imitate the `roscpp` tutorial.
 
 ## Features
 
@@ -46,7 +46,7 @@ Message generation is done at build time. If you have ROS installed and sourced 
 If you do not have ROS installed, then the message generation utilizes the `ROSRUST_MSG_PATH` environment variable, which is a colon seperated list of directories to search.
 These directories should have the structure `<ROSRUST_MGS_PATH>/<package>/msg/<message>` or `<ROSRUST_MSG_PATH>/<package>/srv/<service>`.
 
-To generate messages, create a module for messages. Using something like a `msg.rs` file in your project root, like in the `pubsub` and `serviceclient` examples, results in importing similar to `roscpp` and `rospy`. The file only needs one line:
+To generate messages, create a module for messages. Using something like a `msg.rs` file in your project root results in importing similar to `roscpp` and `rospy`. The file only needs one line:
 
 ```rust
 // If you wanted

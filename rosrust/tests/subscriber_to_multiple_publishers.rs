@@ -33,10 +33,9 @@ fn subscriber_to_multiple_publishers() {
             .arg("__name:=talker_py"),
     );
     let _publisher = util::ChildProcessTerminator::spawn_example(
-        "../examples/pubsub",
         Command::new("cargo")
             .arg("run")
-            .arg("--bin")
+            .arg("--example")
             .arg("publisher")
             .arg("__name:=talker_rust"),
     );

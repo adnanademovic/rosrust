@@ -12,10 +12,9 @@ mod msg {
 fn subscriber_to_rosrust_publisher() {
     let _roscore = util::run_roscore_for(util::Language::Rust, util::Feature::Subscriber);
     let _publisher = util::ChildProcessTerminator::spawn_example(
-        "../examples/pubsub",
         Command::new("cargo")
             .arg("run")
-            .arg("--bin")
+            .arg("--example")
             .arg("publisher"),
     );
 

@@ -216,11 +216,10 @@ fn call_service(criterion: &mut Criterion) {
     );
 
     let _roscpp_service = util::ChildProcessTerminator::spawn_example_bench(
-        "../examples/serviceclient",
         Command::new("cargo")
             .arg("run")
             .arg("--release")
-            .arg("--bin")
+            .arg("--example")
             .arg("service")
             .arg(format!("__ns:={}", namespace))
             .arg("__name:=rosrust_service")

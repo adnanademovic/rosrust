@@ -25,10 +25,9 @@ fn can_read_log_from_rosout_for_multiple() {
             .arg("__name:=talker_py"),
     );
     let _publisher_rust = util::ChildProcessTerminator::spawn_example(
-        "../examples/pubsub",
         Command::new("cargo")
             .arg("run")
-            .arg("--bin")
+            .arg("--example")
             .arg("publisher")
             .arg("__name:=talker_rust"),
     );

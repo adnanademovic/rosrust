@@ -2,7 +2,9 @@ use env_logger;
 use rosrust;
 use std::time;
 
-mod msg;
+mod msg {
+    rosrust::rosmsg_include!(roscpp_tutorials / TwoInts);
+}
 
 fn main() {
     env_logger::init();

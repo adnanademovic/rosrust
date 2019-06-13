@@ -12,10 +12,9 @@ mod msg {
 fn can_read_log_from_rosout_for_rosrust() {
     let _roscore = util::run_roscore_for(util::Language::Rust, util::Feature::Log);
     let _publisher = util::ChildProcessTerminator::spawn_example(
-        "../examples/pubsub",
         Command::new("cargo")
             .arg("run")
-            .arg("--bin")
+            .arg("--example")
             .arg("publisher"),
     );
 
