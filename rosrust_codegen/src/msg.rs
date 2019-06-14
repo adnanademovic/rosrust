@@ -41,6 +41,19 @@ impl Msg {
             .iter()
             .map(|v| v.field_default_token_stream(crate_prefix))
             .collect::<Vec<_>>();
+        let fields_for_eq_and_debug = self
+            .fields
+            .iter()
+            .filter_map(|v| v.field_name_eq_and_debug_token_stream())
+            .collect::<Vec<_>>();
+        let fields_partialeq = fields_for_eq_and_debug
+            .iter()
+            .map(|(_, peq, _)| quote! { self.#peq == other.#peq })
+            .collect::<Vec<_>>();
+        let fields_debug = fields_for_eq_and_debug
+            .iter()
+            .map(|(name, _, dbg)| quote! { .field(stringify!(#name), #dbg) })
+            .collect::<Vec<_>>();
         let const_fields = self
             .fields
             .iter()
@@ -48,13 +61,27 @@ impl Msg {
             .collect::<Vec<_>>();
         quote! {
             #[allow(dead_code, non_camel_case_types, non_snake_case)]
-            #[derive(Clone, Debug, PartialEq)]
+            #[derive(Clone)]
             pub struct #name {
                 #(#fields)*
             }
 
             impl #name {
                 #(#const_fields)*
+            }
+
+            impl std::cmp::PartialEq<Self> for #name {
+                fn eq(&self, other: &Self) -> bool {
+                    true #(&& #fields_partialeq)*
+                }
+            }
+
+            impl std::fmt::Debug for #name {
+                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    f.debug_struct(stringify!(#name))
+                        #(#fields_debug)*
+                        .finish()
+                }
             }
 
             impl Default for #name {
@@ -400,6 +427,23 @@ impl FieldInfo {
             FieldCase::Vector => quote! { pub #name: Vec<#datatype>, },
             FieldCase::Array(l) => quote! { pub #name: [#datatype; #l], },
             FieldCase::Const(_) => quote! {},
+        }
+    }
+
+    pub fn field_name_eq_and_debug_token_stream(
+        &self,
+    ) -> Option<(impl ToTokens, impl ToTokens, impl ToTokens)> {
+        let name = self.create_identifier(Span::call_site());
+        match self.case {
+            FieldCase::Unit | FieldCase::Vector => {
+                Some((quote! { #name }, quote! { #name }, quote! { &self.#name }))
+            }
+            FieldCase::Array(_) => Some((
+                quote! { #name },
+                quote! { #name[..] },
+                quote! { &self.#name.iter().collect::<Vec<_>>() },
+            )),
+            FieldCase::Const(_) => None,
         }
     }
 
