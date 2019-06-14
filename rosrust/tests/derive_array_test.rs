@@ -7,7 +7,7 @@ mod msg {
 }
 
 #[test]
-fn field_names_are_correct() {
+fn implementations_work() {
     let mut message1 = msg::geometry_msgs::PoseWithCovariance::default();
     message1.covariance[5] = 5.0;
     let mut message2 = msg::geometry_msgs::PoseWithCovariance::default();
@@ -19,7 +19,7 @@ fn field_names_are_correct() {
         "Messages should not equal: {:?}, {:#?}",
         message1, message2,
     );
-    assert_ne!(
+    assert_eq!(
         message1, message3,
         "Messages should equal: {:?}, {:#?}",
         message1, message3,
