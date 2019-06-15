@@ -13,12 +13,12 @@ use crate::{Level, Status, Task};
 /// takes ownership of tasks. To maintain ownership, and manage things optimally
 /// implement your own `Task`, by utilizing the `run_diagnostics!` macro for
 /// similar functionality.
-pub struct CompositeTask {
+pub struct CompositeTask<'a> {
     name: String,
-    tasks: Vec<Box<dyn Task>>,
+    tasks: Vec<&'a Task>,
 }
 
-impl CompositeTask {
+impl<'a> CompositeTask<'a> {
     /// Creates a new composite task with the given name.
     pub fn new(name: impl std::string::ToString) -> Self {
         Self {
@@ -30,12 +30,12 @@ impl CompositeTask {
     /// Adds a child to the composite task.
     ///
     /// This child will be called every time the composit task is called.
-    pub fn add_task(&mut self, task: impl Task + 'static) {
-        self.tasks.push(Box::new(task))
+    pub fn add_task(&mut self, task: &'a dyn Task) {
+        self.tasks.push(task)
     }
 }
 
-impl Task for CompositeTask {
+impl<'a> Task for CompositeTask<'a> {
     #[inline]
     fn name(&self) -> &str {
         &self.name

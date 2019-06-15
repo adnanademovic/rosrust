@@ -84,8 +84,11 @@ fn main() {
     updater.add_task(&dummy_task).unwrap();
 
     let mut bounds = CompositeTask::new("Bound check");
-    bounds.add_task(check_lower_bound.into_task("Lower-bound check"));
-    bounds.add_task(check_upper_bound.into_task("Upper-bound check"));
+
+    let lower_task = check_lower_bound.into_task("Lower-bound check");
+    let upper_task = check_upper_bound.into_task("Upper-bound check");
+    bounds.add_task(&lower_task);
+    bounds.add_task(&upper_task);
 
     updater.add_task(&bounds).unwrap();
 
