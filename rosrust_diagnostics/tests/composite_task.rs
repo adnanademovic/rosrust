@@ -26,11 +26,11 @@ fn oks_get_ignored_when_issues_arise() {
     target.set_summary(Level::Ok, "start");
 
     let mut task = CompositeTask::new("composite_task");
-    task.add_task(task_noop.clone());
-    task.add_task(task1);
-    task.add_task(task2);
-    task.add_task(task3);
-    task.add_task(task_noop);
+    task.add_task(&task_noop);
+    task.add_task(&task1);
+    task.add_task(&task2);
+    task.add_task(&task3);
+    task.add_task(&task_noop);
 
     task.run(&mut target);
 
@@ -71,11 +71,11 @@ fn oks_get_perserved_when_there_are_no_issues() {
     target.set_summary(Level::Ok, "start");
 
     let mut task = CompositeTask::new("composite_task");
-    task.add_task(task_noop.clone());
-    task.add_task(task1);
-    task.add_task(task2);
-    task.add_task(task3);
-    task.add_task(task_noop);
+    task.add_task(&task_noop);
+    task.add_task(&task1);
+    task.add_task(&task2);
+    task.add_task(&task3);
+    task.add_task(&task_noop);
 
     task.run(&mut target);
 
