@@ -17,6 +17,7 @@ impl SubscriptionsTracker {
     where
         T: Iterator<Item = String>,
     {
+        let mut last_error_message = None;
         if let Some(mut subscription) = self.mapping.lock().expect(FAILED_TO_LOCK).get_mut(topic) {
             let publisher_set: BTreeSet<String> = publishers.collect();
             subscription.limit_publishers_to(&publisher_set);
@@ -28,11 +29,14 @@ impl SubscriptionsTracker {
                         .collect::<Vec<_>>()
                         .join("\nCaused by:");
                     error!("Failed to connect to publisher '{}': {}", publisher, info);
-                    return Err(err);
+                    last_error_message = Some(err);
                 }
             }
         }
-        Ok(())
+        match last_error_message {
+            None => Ok(()),
+            Some(err) => Err(err),
+        }
     }
 
     #[inline]
