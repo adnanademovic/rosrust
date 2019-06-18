@@ -17,8 +17,21 @@ fn main() {
     ));
     freq_statuses.push(Arc::new(
         FrequencyStatus::builder()
+            .name("No limits allowing empty")
+            .allow_no_events(true)
+            .build(),
+    ));
+    freq_statuses.push(Arc::new(
+        FrequencyStatus::builder()
             .name("Only max")
             .max_frequency(10.0)
+            .build(),
+    ));
+    freq_statuses.push(Arc::new(
+        FrequencyStatus::builder()
+            .name("Only max allowing empty")
+            .max_frequency(10.0)
+            .allow_no_events(true)
             .build(),
     ));
     freq_statuses.push(Arc::new(

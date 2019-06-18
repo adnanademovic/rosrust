@@ -12,6 +12,7 @@ pub struct FrequencyStatusBuilder<'a> {
     tolerance: f64,
     window_size: usize,
     name: &'a str,
+    allow_no_events: bool,
 }
 
 impl<'a> FrequencyStatusBuilder<'a> {
@@ -23,6 +24,7 @@ impl<'a> FrequencyStatusBuilder<'a> {
             tolerance: 0.1,
             window_size: 5,
             name: "Frequency Status",
+            allow_no_events: false,
         }
     }
 
@@ -79,6 +81,24 @@ impl<'a> FrequencyStatusBuilder<'a> {
         self
     }
 
+    /// Sets whether or not a lack of events within the window is an error.
+    ///
+    /// While frequencies outside of the desired range cause warnings,
+    /// getting no events triggered at all causes an error condition.
+    ///
+    /// Setting this flag allows you to ignore that error condition, and just emmit warnings
+    /// when the rates aren't within the frequency window.
+    ///
+    /// A special case where this is very significant is when the minimum frequency is zero.
+    /// Without this flag set, actually having zero events would cause an error condition.
+    ///
+    /// Defaults to `false`.
+    #[inline]
+    pub fn allow_no_events(&mut self, allow_no_events: bool) -> &mut Self {
+        self.allow_no_events = allow_no_events;
+        self
+    }
+
     /// Builds the frequency status with the provided parameters.
     #[inline]
     pub fn build(&self) -> FrequencyStatus {
@@ -88,6 +108,7 @@ impl<'a> FrequencyStatusBuilder<'a> {
             self.tolerance,
             self.window_size,
             self.name.into(),
+            self.allow_no_events,
         )
     }
 }
@@ -104,6 +125,7 @@ pub struct FrequencyStatus {
     min_tolerated_frequency: f64,
     max_tolerated_frequency: f64,
     name: String,
+    allow_no_events: bool,
     tracker: Mutex<Tracker>,
 }
 
@@ -156,6 +178,7 @@ impl FrequencyStatus {
         tolerance: f64,
         window_size: usize,
         name: String,
+        allow_no_events: bool,
     ) -> Self {
         Self {
             min_frequency,
@@ -163,6 +186,7 @@ impl FrequencyStatus {
             min_tolerated_frequency: min_frequency * (1.0 - tolerance),
             max_tolerated_frequency: max_frequency * (1.0 + tolerance),
             name,
+            allow_no_events,
             tracker: Mutex::new(Tracker::new(window_size)),
         }
     }
@@ -184,7 +208,7 @@ impl FrequencyStatus {
 
     fn frequency_to_summary(&self, frequency: f64) -> (Level, &str) {
         match frequency {
-            v if v == 0.0 => (Level::Error, "No events recorded."),
+            v if v == 0.0 && !self.allow_no_events => (Level::Error, "No events recorded."),
             v if v < self.min_tolerated_frequency => (Level::Warn, "Frequency too low."),
             v if v > self.max_tolerated_frequency => (Level::Warn, "Frequency too high."),
             _ => (Level::Ok, "Desired frequency met"),
