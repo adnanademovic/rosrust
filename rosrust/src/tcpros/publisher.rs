@@ -25,25 +25,18 @@ impl Drop for Publisher {
     }
 }
 
-fn match_concrete_headers<T: Message>(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
-    header::match_field(fields, "md5sum", &T::md5sum())?;
-    header::match_field(fields, "type", &T::msg_type())?;
-    header::match_field(fields, "topic", topic)?;
-    Ok(())
-}
-
-fn match_wildcard_headers(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
-    header::match_field(fields, "md5sum", "*")?;
-    header::match_field(fields, "type", "*")?;
+fn match_headers<T: Message>(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
+    header::match_field(fields, "md5sum", &T::md5sum())
+        .or_else(|e| header::match_field(fields, "md5sum", "*").or(Err(e)))?;
+    header::match_field(fields, "type", &T::msg_type())
+        .or_else(|e| header::match_field(fields, "type", "*").or(Err(e)))?;
     header::match_field(fields, "topic", topic)?;
     Ok(())
 }
 
 fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<String> {
     let fields = header::decode(&mut stream)?;
-    if let Err(err) = match_concrete_headers::<T>(&fields, topic) {
-        match_wildcard_headers(&fields, topic).map_err(|_| err)?;
-    }
+    match_headers::<T>(&fields, topic)?;
     let caller_id = fields
         .get("callerid")
         .ok_or_else(|| ErrorKind::HeaderMissingField("callerid".into()))?;
