@@ -12,6 +12,7 @@ use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
+use error_chain::bail;
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

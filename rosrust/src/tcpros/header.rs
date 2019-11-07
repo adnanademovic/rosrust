@@ -1,4 +1,5 @@
 use crate::rosmsg::RosMsg;
+use error_chain::bail;
 use std;
 use std::collections::HashMap;
 use std::io::Error;

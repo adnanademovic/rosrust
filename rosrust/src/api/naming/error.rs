@@ -1,5 +1,4 @@
-#![allow(deprecated)]
-error_chain! {
+error_chain::error_chain! {
     errors {
         IllegalCharacter(name: String) {
             description("Illegal character")

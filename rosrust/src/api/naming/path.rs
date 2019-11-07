@@ -1,4 +1,5 @@
 use super::error::{Error, ErrorKind};
+use error_chain::bail;
 use std;
 use std::fmt;
 use std::ops::{Add, AddAssign};

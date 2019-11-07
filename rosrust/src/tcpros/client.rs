@@ -3,6 +3,7 @@ use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
 use crate::rosmsg::RosMsg;
 use byteorder::{LittleEndian, ReadBytesExt};
+use error_chain::bail;
 use log::error;
 use net2::TcpStreamExt;
 use std;

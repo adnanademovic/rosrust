@@ -8,6 +8,7 @@ use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
 use crossbeam::sync::ShardedLock;
 use ctrlc;
+use error_chain::bail;
 use lazy_static::lazy_static;
 use std::time;
 

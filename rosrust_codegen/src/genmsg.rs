@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::helpers;
 use crate::output_layout;
+use error_chain::bail;
 use std::collections::HashSet;
 
 pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_layout::Layout> {
