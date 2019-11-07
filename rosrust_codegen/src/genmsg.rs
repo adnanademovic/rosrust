@@ -1,28 +1,28 @@
 use crate::error::Result;
 use crate::helpers;
+use crate::message_path::MessagePath;
 use crate::output_layout;
-use error_chain::bail;
 use std::collections::HashSet;
 
 pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_layout::Layout> {
     let mut output = output_layout::Layout {
         packages: Vec::new(),
     };
-    let mut message_pairs = Vec::<(&str, &str)>::new();
-    for message in messages {
-        message_pairs.push(string_into_pair(message)?);
-    }
+    let message_pairs = messages
+        .iter()
+        .map(|v| MessagePath::from_combined(v))
+        .collect::<Result<Vec<MessagePath>>>()?;
     let message_map = helpers::get_message_map(folders, &message_pairs)?;
     let hashes = helpers::calculate_md5(&message_map)?;
     let packages = message_map
         .messages
         .iter()
-        .map(|(&(ref pack, ref _name), _value)| pack.clone())
+        .map(|(message, _value)| message.package.clone())
         .chain(
             message_map
                 .services
                 .iter()
-                .map(|&(ref pack, ref _name)| pack.clone()),
+                .map(|message| message.package.clone()),
         )
         .collect::<HashSet<String>>();
     for package in packages {
@@ -34,11 +34,11 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_
         let names = message_map
             .messages
             .iter()
-            .filter(|&(&(ref pack, ref _name), _value)| pack == &package)
-            .map(|(&(ref _pack, ref name), _value)| name.clone())
+            .filter(|&(message, _value)| &message.package == &package)
+            .map(|(message, _value)| message.name.clone())
             .collect::<HashSet<String>>();
-        for name in &names {
-            let key = (package.clone(), name.clone());
+        for name in names {
+            let key = MessagePath::new(&package, name);
             let message = message_map
                 .messages
                 .get(&key)
@@ -61,17 +61,17 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_
         let names = message_map
             .services
             .iter()
-            .filter(|&&(ref pack, ref _name)| pack == &package)
-            .map(|&(ref _pack, ref name)| name.clone())
+            .filter(|&message| &message.package == &package)
+            .map(|message| message.name.clone())
             .collect::<HashSet<String>>();
-        for name in &names {
+        for name in names {
             let md5sum = hashes
-                .get(&(package.clone(), name.clone()))
+                .get(&MessagePath::new(&package, &name))
                 .expect("Internal implementation contains mismatch in map keys")
                 .clone();
             let msg_type = format!("{}/{}", package, name);
             package_data.services.push(output_layout::Service {
-                name: name.clone(),
+                name,
                 md5sum,
                 msg_type,
             })
@@ -79,20 +79,4 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_
         output.packages.push(package_data);
     }
     Ok(output)
-}
-
-fn string_into_pair(input: &str) -> Result<(&str, &str)> {
-    let mut parts = input.splitn(2, '/');
-    let package = match parts.next() {
-        Some(v) => v,
-        None => bail!("Package string constains no parts: {}", input),
-    };
-    let name = match parts.next() {
-        Some(v) => v,
-        None => bail!(
-            "Package string needs to be in package/name format: {}",
-            input
-        ),
-    };
-    Ok((package, name))
 }
