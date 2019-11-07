@@ -4,6 +4,7 @@ use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
 use super::{Message, Topic};
 use crate::util::FAILED_TO_LOCK;
+use error_chain::bail;
 use log::error;
 use std;
 use std::collections::HashMap;

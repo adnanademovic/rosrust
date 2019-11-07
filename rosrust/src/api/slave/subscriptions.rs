@@ -2,6 +2,7 @@ use crate::api::error::{self, ErrorKind, Result};
 use crate::tcpros::{Subscriber, Topic};
 use crate::util::FAILED_TO_LOCK;
 use crate::Message;
+use error_chain::bail;
 use log::error;
 use std::collections::{BTreeSet, HashMap};
 use std::iter::FromIterator;

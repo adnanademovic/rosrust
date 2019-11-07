@@ -15,12 +15,14 @@ The following dependency is needed to use the crate:
 rosrust = "0.8.2"
 ```
 
-Then just depend on the library with macro usage, using:
+If using Rust 2015 edition, just depend on the library with macro usage, using:
 
 ```rust
 #[macro_use]
 extern crate rosrust;
 ```
+
+Examples are written using Rust 2018, as it's the expected edition to use now.
 
 ## Implementation
 
@@ -53,7 +55,7 @@ To generate messages, create a module for messages. Using something like a `msg.
 // * messages: std_msgs/String, sensor_msgs/Imu
 // * services: roscpp_tutorials/TwoInts
 // * and all the message types used by them, like geometry_msgs/Vector3
-rosmsg_include!(std_msgs/String,sensor_msgs/Imu,roscpp_tutorials/TwoInts);
+rosrust::rosmsg_include!(std_msgs/String,sensor_msgs/Imu,roscpp_tutorials/TwoInts);
 ```
 
 Just add this file to your project and you're done.
@@ -65,11 +67,8 @@ If you have put this in a `src/msg.rs` file, this will include all the generated
 If we wanted to publish a defined message (let's use `std_msgs/String`) to topic `chatter` ten times a second, we can do it in the following way.
 
 ```rust
-#[macro_use]
-extern crate rosrust;
-
 mod msg {
-    rosmsg_include!(std_msgs/String);
+    rosrust::rosmsg_include!(std_msgs/String);
 }
 
 fn main() {
@@ -109,11 +108,8 @@ The constructor creates an object, which represents the subscriber lifetime.
 Upon the destruction of this object, the topic is unsubscribed as well.
 
 ```rust
-#[macro_use]
-extern crate rosrust;
-
 mod msg {
-    rosmsg_include!(std_msgs/UInt64);
+    rosrust::rosmsg_include!(std_msgs/UInt64);
 }
 
 fn main() {
@@ -124,7 +120,7 @@ fn main() {
     // The subscriber is stopped when the returned object is destroyed
     let _subscriber_raii = rosrust::subscribe("chatter", 100, |v: msg::std_msgs::UInt64| {
         // Callback for handling received messages
-        ros_info!("Received: {}", v.data);
+        rosrust::ros_info!("Received: {}", v.data);
     }).unwrap();
 
     // Block the thread until a shutdown signal is received
@@ -137,11 +133,8 @@ fn main() {
 Creating a service is the easiest out of all the options. Just define a callback for each request. Let's use the `roscpp_tutorials/AddTwoInts` service on the topic `/add_two_ints`.
 
 ```rust
-#[macro_use]
-extern crate rosrust;
-
 mod msg {
-    rosmsg_include!(roscpp_tutorials/AddTwoInts);
+    rosrust::rosmsg_include!(roscpp_tutorials/AddTwoInts);
 }
 
 fn main() {
@@ -156,7 +149,7 @@ fn main() {
             let sum = req.a + req.b;
 
             // Log each request
-            ros_info!("{} + {} = {}", req.a, req.b, sum);
+            rosrust::ros_info!("{} + {} = {}", req.a, req.b, sum);
 
             Ok(msg::roscpp_tutorials::TwoIntsRes { sum })
         }).unwrap();
@@ -174,12 +167,11 @@ Clients can handle requests synchronously and asynchronously. The sync method be
 Let's call requests from the `AddTwoInts` service on the topic `/add_two_ints`.
 The numbers shall be provided as command line arguments.
 
-```rust
-#[macro_use]
-extern crate rosrust;
+We're also depending on `env_logger` here to log `ros_info` messages to the standard output.
 
+```rust
 mod msg {
-    rosmsg_include!(roscpp_tutorials/AddTwoInts);
+    rosrust::rosmsg_include!(roscpp_tutorials/AddTwoInts);
 }
 
 use std::{env, time};
@@ -221,7 +213,7 @@ fn main() {
 
     // Asynchronous call that can be resolved later on
     let retval = client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b });
-    ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
+    rosrust::ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
 }
 
 ```
@@ -230,10 +222,9 @@ fn main() {
 
 There are a lot of methods provided, so we'll just give a taste of all of them here. Get requests return results, so you can use `unwrap_or` to handle defaults.
 
-```rust
-#[macro_use]
-extern crate rosrust;
+We're also depending on `env_logger` here to log `ros_info` messages to the standard output.
 
+```rust
 fn main() {
     env_logger::init();
 
@@ -242,17 +233,17 @@ fn main() {
 
     // Create parameter, go through all methods, and delete it
     let param = rosrust::param("~foo").unwrap();
-    ros_info!("Handling ~foo:");
-    ros_info!("Exists? {:?}", param.exists()); // false
+    rosrust::ros_info!("Handling ~foo:");
+    rosrust::ros_info!("Exists? {:?}", param.exists()); // false
     param.set(&42u64).unwrap();
-    ros_info!("Get: {:?}", param.get::<u64>().unwrap());
-    ros_info!("Get raw: {:?}", param.get_raw().unwrap());
-    ros_info!("Search: {:?}", param.search().unwrap());
-    ros_info!("Exists? {}", param.exists().unwrap());
+    rosrust::ros_info!("Get: {:?}", param.get::<u64>().unwrap());
+    rosrust::ros_info!("Get raw: {:?}", param.get_raw().unwrap());
+    rosrust::ros_info!("Search: {:?}", param.search().unwrap());
+    rosrust::ros_info!("Exists? {}", param.exists().unwrap());
     param.delete().unwrap();
-    ros_info!("Get {:?}", param.get::<u64>().unwrap_err());
-    ros_info!("Get with default: {:?}", param.get::<u64>().unwrap_or(44u64));
-    ros_info!("Exists? {}", param.exists().unwrap());
+    rosrust::ros_info!("Get {:?}", param.get::<u64>().unwrap_err());
+    rosrust::ros_info!("Get with default: {:?}", param.get::<u64>().unwrap_or(44u64));
+    rosrust::ros_info!("Exists? {}", param.exists().unwrap());
 }
 ```
 

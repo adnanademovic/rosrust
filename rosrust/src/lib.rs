@@ -1,8 +1,5 @@
 #![recursion_limit = "1024"]
 
-#[macro_use]
-extern crate error_chain;
-
 pub use crate::api::raii::{Publisher, Service, Subscriber};
 pub use crate::api::{error, Clock, Parameter};
 #[doc(hidden)]

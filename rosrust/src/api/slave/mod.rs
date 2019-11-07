@@ -8,6 +8,7 @@ use crate::api::ShutdownManager;
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 use crate::util::{kill, FAILED_TO_LOCK};
 use crossbeam::channel::TryRecvError;
+use error_chain::bail;
 use log::error;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

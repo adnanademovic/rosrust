@@ -1,5 +1,6 @@
 use crate::error::{ErrorKind, Result, ResultExt};
 use crate::msg::Msg;
+use error_chain::bail;
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
 use std;
