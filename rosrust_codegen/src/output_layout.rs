@@ -21,6 +21,7 @@ impl Layout {
     }
 }
 
+#[derive(Debug)]
 pub struct Package {
     pub name: String,
     pub messages: Vec<Message>,
@@ -49,6 +50,7 @@ impl Package {
     }
 }
 
+#[derive(Debug)]
 pub struct Message {
     pub message: Msg,
     pub msg_definition: String,
@@ -104,6 +106,7 @@ impl Message {
     }
 }
 
+#[derive(Debug)]
 pub struct Service {
     pub name: String,
     pub md5sum: String,

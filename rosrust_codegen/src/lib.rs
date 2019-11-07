@@ -5,6 +5,7 @@ extern crate proc_macro;
 mod error;
 mod genmsg;
 mod helpers;
+mod message_path;
 mod msg;
 mod output_layout;
 mod rosmsg_include;

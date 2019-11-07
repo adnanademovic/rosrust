@@ -1,4 +1,5 @@
 use crate::error::{Result, ResultExt};
+use crate::message_path::MessagePath;
 use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
 use quote::{quote, ToTokens};
@@ -6,27 +7,25 @@ use regex::Regex;
 use std::collections::{BTreeSet, HashMap};
 use syn::Ident;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Msg {
-    pub package: String,
-    pub name: String,
+    pub path: MessagePath,
     pub fields: Vec<FieldInfo>,
     pub source: String,
 }
 
 impl Msg {
-    pub fn new(package: &str, name: &str, source: &str) -> Result<Msg> {
+    pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
         let fields = match_lines(source)?;
         Ok(Msg {
-            package: package.to_owned(),
-            name: name.to_owned(),
+            path,
             fields,
             source: source.trim().into(),
         })
     }
 
     pub fn name_ident(&self) -> Ident {
-        Ident::new(&self.name, Span::call_site())
+        Ident::new(&self.path.name, Span::call_site())
     }
 
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
@@ -120,15 +119,15 @@ impl Msg {
     }
 
     pub fn get_type(&self) -> String {
-        format!("{}/{}", self.package, self.name)
+        format!("{}/{}", self.path.package, self.path.name)
     }
 
-    pub fn dependencies(&self) -> Vec<(String, String)> {
+    pub fn dependencies(&self) -> Vec<MessagePath> {
         self.fields
             .iter()
             .filter_map(|field| match field.datatype {
-                DataType::LocalStruct(ref name) => Some((self.package.clone(), name.clone())),
-                DataType::RemoteStruct(ref pkg, ref name) => Some((pkg.clone(), name.clone())),
+                DataType::LocalStruct(ref name) => Some(MessagePath::new(&self.path.package, name)),
+                DataType::RemoteStruct(ref message) => Some(message.clone()),
                 _ => None,
             })
             .collect()
@@ -137,7 +136,7 @@ impl Msg {
     #[cfg(test)]
     pub fn calculate_md5(
         &self,
-        hashes: &HashMap<(String, String), String>,
+        hashes: &HashMap<MessagePath, String>,
     ) -> ::std::result::Result<String, ()> {
         use md5::{Digest, Md5};
 
@@ -148,19 +147,19 @@ impl Msg {
 
     pub fn get_md5_representation(
         &self,
-        hashes: &HashMap<(String, String), String>,
+        hashes: &HashMap<MessagePath, String>,
     ) -> ::std::result::Result<String, ()> {
         let constants = self
             .fields
             .iter()
             .filter(|v| v.is_constant())
-            .map(|v| v.md5_string(&self.package, hashes))
+            .map(|v| v.md5_string(&self.path.package, hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
         let fields = self
             .fields
             .iter()
             .filter(|v| !v.is_constant())
-            .map(|v| v.md5_string(&self.package, hashes))
+            .map(|v| v.md5_string(&self.path.package, hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
         let representation = constants
             .into_iter()
@@ -465,7 +464,7 @@ impl FieldInfo {
                 | DataType::Time
                 | DataType::Duration
                 | DataType::LocalStruct(_)
-                | DataType::RemoteStruct(_, _) => {
+                | DataType::RemoteStruct(_) => {
                     quote! { #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
                 }
                 _ => {
@@ -488,7 +487,7 @@ impl FieldInfo {
                 | DataType::Time
                 | DataType::Duration
                 | DataType::LocalStruct(_)
-                | DataType::RemoteStruct(_, _) => {
+                | DataType::RemoteStruct(_) => {
                     quote! { #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
                 }
                 _ => {
@@ -575,7 +574,7 @@ impl FieldInfo {
     fn md5_string(
         &self,
         package: &str,
-        hashes: &HashMap<(String, String), String>,
+        hashes: &HashMap<MessagePath, String>,
     ) -> ::std::result::Result<String, ()> {
         let datatype = self.datatype.md5_string(package, hashes)?;
         Ok(match (self.datatype.is_builtin(), &self.case) {
@@ -589,7 +588,7 @@ impl FieldInfo {
     fn is_header(&self) -> bool {
         self.case == FieldCase::Unit
             && self.name == "header"
-            && self.datatype == DataType::RemoteStruct("std_msgs".into(), "Header".into())
+            && self.datatype == DataType::RemoteStruct(MessagePath::new("std_msgs", "Header"))
     }
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
@@ -619,7 +618,7 @@ pub enum DataType {
     Time,
     Duration,
     LocalStruct(String),
-    RemoteStruct(String, String),
+    RemoteStruct(MessagePath),
 }
 
 impl DataType {
@@ -643,9 +642,9 @@ impl DataType {
                 let name = Ident::new(&name, Span::call_site());
                 quote! { #name }
             }
-            DataType::RemoteStruct(ref pkg, ref name) => {
-                let name = Ident::new(&name, Span::call_site());
-                let pkg = Ident::new(&pkg, Span::call_site());
+            DataType::RemoteStruct(ref message) => {
+                let name = Ident::new(&message.name, Span::call_site());
+                let pkg = Ident::new(&message.package, Span::call_site());
                 quote! { super::#pkg::#name }
             }
         }
@@ -667,14 +666,14 @@ impl DataType {
             | DataType::String
             | DataType::Time
             | DataType::Duration => true,
-            DataType::LocalStruct(_) | DataType::RemoteStruct(_, _) => false,
+            DataType::LocalStruct(_) | DataType::RemoteStruct(_) => false,
         }
     }
 
     fn md5_string(
         &self,
         package: &str,
-        hashes: &HashMap<(String, String), String>,
+        hashes: &HashMap<MessagePath, String>,
     ) -> ::std::result::Result<String, ()> {
         Ok(match *self {
             DataType::Bool => "bool",
@@ -694,12 +693,10 @@ impl DataType {
             DataType::Time => "time",
             DataType::Duration => "duration",
             DataType::LocalStruct(ref name) => hashes
-                .get(&(package.to_owned(), name.clone()))
+                .get(&MessagePath::new(package, name))
                 .ok_or(())?
                 .as_str(),
-            DataType::RemoteStruct(ref pkg, ref name) => {
-                hashes.get(&(pkg.clone(), name.clone())).ok_or(())?.as_str()
-            }
+            DataType::RemoteStruct(ref message) => hashes.get(&message).ok_or(())?.as_str(),
         }
         .into())
     }
@@ -723,18 +720,17 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
         "string" => Some(DataType::String),
         "time" => Some(DataType::Time),
         "duration" => Some(DataType::Duration),
-        "Header" => Some(DataType::RemoteStruct("std_msgs".into(), "Header".into())),
+        "Header" => Some(DataType::RemoteStruct(MessagePath::new(
+            "std_msgs", "Header",
+        ))),
         _ => {
             let parts = datatype.split('/').collect::<Vec<_>>();
             if parts.iter().any(|v| v.is_empty()) {
                 return None;
             }
-            match parts.len() {
-                2 => Some(DataType::RemoteStruct(
-                    parts[0].to_owned(),
-                    parts[1].to_owned(),
-                )),
-                1 => Some(DataType::LocalStruct(parts[0].to_owned())),
+            match parts.as_slice() {
+                &[package, name] => Some(DataType::RemoteStruct(MessagePath::new(package, name))),
+                &[name] => Some(DataType::LocalStruct(name.into())),
                 _ => None,
             }
         }
@@ -745,12 +741,13 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use std::convert::TryInto;
 
     #[test]
     fn datatype_md5_string_correct() {
         let mut hashes = HashMap::new();
-        hashes.insert(("p1".into(), "xx".into()), "ABCD".into());
-        hashes.insert(("p2".into(), "xx".into()), "EFGH".into());
+        hashes.insert(MessagePath::new("p1", "xx"), "ABCD".into());
+        hashes.insert(MessagePath::new("p2", "xx"), "EFGH".into());
         assert_eq!(
             DataType::I64.md5_string("", &hashes).unwrap(),
             "int64".to_owned()
@@ -776,7 +773,7 @@ mod tests {
             "EFGH".to_owned()
         );
         assert_eq!(
-            DataType::RemoteStruct("p1".into(), "xx".into())
+            DataType::RemoteStruct(MessagePath::new("p1", "xx"))
                 .md5_string("p2", &hashes)
                 .unwrap(),
             "ABCD".to_owned()
@@ -786,8 +783,8 @@ mod tests {
     #[test]
     fn fieldinfo_md5_string_correct() {
         let mut hashes = HashMap::new();
-        hashes.insert(("p1".into(), "xx".into()), "ABCD".into());
-        hashes.insert(("p2".into(), "xx".into()), "EFGH".into());
+        hashes.insert(MessagePath::new("p1", "xx"), "ABCD".into());
+        hashes.insert(MessagePath::new("p2", "xx"), "EFGH".into());
         assert_eq!(
             FieldInfo::new("int64", "abc", FieldCase::Unit)
                 .unwrap()
@@ -842,7 +839,7 @@ mod tests {
     #[test]
     fn message_md5_string_correct() {
         assert_eq!(
-            Msg::new("std_msgs", "String", "string data")
+            Msg::new("std_msgs/String".try_into().unwrap(), "string data")
                 .unwrap()
                 .calculate_md5(&HashMap::new())
                 .unwrap(),
@@ -850,8 +847,7 @@ mod tests {
         );
         assert_eq!(
             Msg::new(
-                "geometry_msgs",
-                "Point",
+                "geometry_msgs/Point".try_into().unwrap(),
                 include_str!("msg_examples/geometry_msgs/msg/Point.msg"),
             )
             .unwrap()
@@ -861,8 +857,7 @@ mod tests {
         );
         assert_eq!(
             Msg::new(
-                "geometry_msgs",
-                "Quaternion",
+                "geometry_msgs/Quaternion".try_into().unwrap(),
                 include_str!("msg_examples/geometry_msgs/msg/Quaternion.msg"),
             )
             .unwrap()
@@ -872,17 +867,16 @@ mod tests {
         );
         let mut hashes = HashMap::new();
         hashes.insert(
-            ("geometry_msgs".into(), "Point".into()),
+            MessagePath::new("geometry_msgs", "Point"),
             "4a842b65f413084dc2b10fb484ea7f17".into(),
         );
         hashes.insert(
-            ("geometry_msgs".into(), "Quaternion".into()),
+            MessagePath::new("geometry_msgs", "Quaternion"),
             "a779879fadf0160734f906b8c19c7004".into(),
         );
         assert_eq!(
             Msg::new(
-                "geometry_msgs",
-                "Pose",
+                "geometry_msgs/Pose".try_into().unwrap(),
                 include_str!("msg_examples/geometry_msgs/msg/Pose.msg"),
             )
             .unwrap()
@@ -892,21 +886,20 @@ mod tests {
         );
         let mut hashes = HashMap::new();
         hashes.insert(
-            ("geometry_msgs".into(), "Point".into()),
+            MessagePath::new("geometry_msgs", "Point"),
             "4a842b65f413084dc2b10fb484ea7f17".into(),
         );
         hashes.insert(
-            ("std_msgs".into(), "ColorRGBA".into()),
+            MessagePath::new("std_msgs", "ColorRGBA"),
             "a29a96539573343b1310c73607334b00".into(),
         );
         hashes.insert(
-            ("std_msgs".into(), "Header".into()),
+            MessagePath::new("std_msgs", "Header"),
             "2176decaecbce78abc3b96ef049fabed".into(),
         );
         assert_eq!(
             Msg::new(
-                "visualization_msgs",
-                "ImageMarker",
+                "visualization_msgs/ImageMarker".try_into().unwrap(),
                 include_str!("msg_examples/visualization_msgs/msg/ImageMarker.msg"),
             )
             .unwrap()
@@ -988,18 +981,18 @@ mod tests {
 
         assert_eq!(
             FieldInfo {
-                datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
+                datatype: DataType::RemoteStruct(MessagePath::new("geom_msgs", "Twist")),
                 name: "myname".into(),
                 case: FieldCase::Unit,
             },
-            match_line("  geom_msgs/Twist   myname    # this clearly should succeed",)
+            match_line("  geom_msgs/Twist   myname    # this clearly should succeed")
                 .unwrap()
                 .unwrap()
         );
 
         assert_eq!(
             FieldInfo {
-                datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
+                datatype: DataType::RemoteStruct(MessagePath::new("geom_msgs", "Twist")),
                 name: "myname".into(),
                 case: FieldCase::Vector,
             },
@@ -1030,7 +1023,7 @@ mod tests {
         );
         assert_eq!(
             FieldInfo {
-                datatype: DataType::RemoteStruct("geom_msgs".into(), "Twist".into()),
+                datatype: DataType::RemoteStruct(MessagePath::new("geom_msgs", "Twist")),
                 name: "myname".into(),
                 case: FieldCase::Const("-444".into()),
             },
@@ -1070,7 +1063,7 @@ mod tests {
         assert_eq!(
             vec![
                 FieldInfo {
-                    datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
+                    datatype: DataType::RemoteStruct(MessagePath::new("std_msgs", "Header")),
                     name: "header".into(),
                     case: FieldCase::Unit,
                 },
@@ -1084,20 +1077,19 @@ mod tests {
         );
     }
 
-    fn get_dependency_set(message: &Msg) -> HashSet<(String, String)> {
+    fn get_dependency_set(message: &Msg) -> HashSet<MessagePath> {
         message.dependencies().into_iter().collect()
     }
 
     #[test]
     fn msg_constructor_parses_real_message() {
         let data = Msg::new(
-            "geometry_msgs",
-            "TwistWithCovariance",
+            "geometry_msgs/TwistWithCovariance".try_into().unwrap(),
             include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"),
         )
         .unwrap();
-        assert_eq!(data.package, "geometry_msgs");
-        assert_eq!(data.name, "TwistWithCovariance");
+        assert_eq!(data.path.package, "geometry_msgs");
+        assert_eq!(data.path.name, "TwistWithCovariance");
         assert_eq!(
             data.fields,
             vec![
@@ -1115,21 +1107,20 @@ mod tests {
         );
         let dependencies = get_dependency_set(&data);
         assert_eq!(dependencies.len(), 1);
-        assert!(dependencies.contains(&("geometry_msgs".into(), "Twist".into()),));
+        assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Twist")));
 
         let data = Msg::new(
-            "geometry_msgs",
-            "PoseStamped",
+            "geometry_msgs/PoseStamped".try_into().unwrap(),
             include_str!("msg_examples/geometry_msgs/msg/PoseStamped.msg"),
         )
         .unwrap();
-        assert_eq!(data.package, "geometry_msgs");
-        assert_eq!(data.name, "PoseStamped");
+        assert_eq!(data.path.package, "geometry_msgs");
+        assert_eq!(data.path.name, "PoseStamped");
         assert_eq!(
             data.fields,
             vec![
                 FieldInfo {
-                    datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
+                    datatype: DataType::RemoteStruct(MessagePath::new("std_msgs", "Header")),
                     name: "header".into(),
                     case: FieldCase::Unit,
                 },
@@ -1142,27 +1133,29 @@ mod tests {
         );
         let dependencies = get_dependency_set(&data);
         assert_eq!(dependencies.len(), 2);
-        assert!(dependencies.contains(&("geometry_msgs".into(), "Pose".into()),));
-        assert!(dependencies.contains(&("std_msgs".into(), "Header".into())));
+        assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Pose")));
+        assert!(dependencies.contains(&MessagePath::new("std_msgs", "Header")));
 
         let data = Msg::new(
-            "sensor_msgs",
-            "Imu",
+            "sensor_msgs/Imu".try_into().unwrap(),
             include_str!("msg_examples/sensor_msgs/msg/Imu.msg"),
         )
         .unwrap();
-        assert_eq!(data.package, "sensor_msgs");
-        assert_eq!(data.name, "Imu");
+        assert_eq!(data.path.package, "sensor_msgs");
+        assert_eq!(data.path.name, "Imu");
         assert_eq!(
             data.fields,
             vec![
                 FieldInfo {
-                    datatype: DataType::RemoteStruct("std_msgs".into(), "Header".into()),
+                    datatype: DataType::RemoteStruct(MessagePath::new("std_msgs", "Header")),
                     name: "header".into(),
                     case: FieldCase::Unit,
                 },
                 FieldInfo {
-                    datatype: DataType::RemoteStruct("geometry_msgs".into(), "Quaternion".into()),
+                    datatype: DataType::RemoteStruct(MessagePath::new(
+                        "geometry_msgs",
+                        "Quaternion"
+                    )),
                     name: "orientation".into(),
                     case: FieldCase::Unit,
                 },
@@ -1172,7 +1165,7 @@ mod tests {
                     case: FieldCase::Array(9),
                 },
                 FieldInfo {
-                    datatype: DataType::RemoteStruct("geometry_msgs".into(), "Vector3".into()),
+                    datatype: DataType::RemoteStruct(MessagePath::new("geometry_msgs", "Vector3")),
                     name: "angular_velocity".into(),
                     case: FieldCase::Unit,
                 },
@@ -1182,7 +1175,7 @@ mod tests {
                     case: FieldCase::Array(9),
                 },
                 FieldInfo {
-                    datatype: DataType::RemoteStruct("geometry_msgs".into(), "Vector3".into()),
+                    datatype: DataType::RemoteStruct(MessagePath::new("geometry_msgs", "Vector3")),
                     name: "linear_acceleration".into(),
                     case: FieldCase::Unit,
                 },
@@ -1195,8 +1188,8 @@ mod tests {
         );
         let dependencies = get_dependency_set(&data);
         assert_eq!(dependencies.len(), 3);
-        assert!(dependencies.contains(&("geometry_msgs".into(), "Vector3".into()),));
-        assert!(dependencies.contains(&("geometry_msgs".into(), "Quaternion".into()),));
-        assert!(dependencies.contains(&("std_msgs".into(), "Header".into())));
+        assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Vector3")));
+        assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Quaternion")));
+        assert!(dependencies.contains(&MessagePath::new("std_msgs", "Header")));
     }
 }
