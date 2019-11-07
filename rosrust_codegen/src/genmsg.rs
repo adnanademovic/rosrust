@@ -1,18 +1,38 @@
 use crate::error::Result;
 use crate::helpers;
+use crate::helpers::MessageMap;
 use crate::message_path::MessagePath;
 use crate::output_layout;
 use std::collections::HashSet;
 
 pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_layout::Layout> {
-    let mut output = output_layout::Layout {
-        packages: Vec::new(),
-    };
+    let message_map = message_names_to_message_map(folders, messages)?;
+    validate_message_paths(&message_map)?;
+    message_map_to_layout(&message_map)
+}
+
+fn message_names_to_message_map(folders: &[&str], messages: &[&str]) -> Result<MessageMap> {
     let message_pairs = messages
         .iter()
         .map(|v| MessagePath::from_combined(v))
         .collect::<Result<Vec<MessagePath>>>()?;
-    let message_map = helpers::get_message_map(folders, &message_pairs)?;
+    helpers::get_message_map(folders, &message_pairs)
+}
+
+fn validate_message_paths(message_map: &MessageMap) -> Result<()> {
+    for message in message_map.messages.keys() {
+        message.validate()?;
+    }
+    for message in &message_map.services {
+        message.validate()?;
+    }
+    Ok(())
+}
+
+fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layout> {
+    let mut output = output_layout::Layout {
+        packages: Vec::new(),
+    };
     let hashes = helpers::calculate_md5(&message_map)?;
     let packages = message_map
         .messages
