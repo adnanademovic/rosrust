@@ -8,4 +8,4 @@ version = "0.0.1"
 
 [dependencies]
 rosrust = {path="../rosrust"}
-paste = "0.1.5"
+paste = "0.1.6"
