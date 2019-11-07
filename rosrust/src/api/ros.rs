@@ -26,7 +26,7 @@ pub struct Ros {
     bind_address: String,
     resolver: Resolver,
     name: String,
-    clock: Arc<Clock>,
+    clock: Arc<dyn Clock>,
     static_subs: Vec<Subscriber>,
     logger: Option<Publisher<Log>>,
     shutdown_manager: Arc<ShutdownManager>,

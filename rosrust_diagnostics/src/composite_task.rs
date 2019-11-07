@@ -15,7 +15,7 @@ use crate::{Level, Status, Task};
 /// similar functionality.
 pub struct CompositeTask<'a> {
     name: String,
-    tasks: Vec<&'a Task>,
+    tasks: Vec<&'a dyn Task>,
 }
 
 impl<'a> CompositeTask<'a> {

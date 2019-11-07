@@ -11,12 +11,12 @@ use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 static BEFORE_EPOCH: &'static str = "Requested time is before UNIX epoch.";
 
 pub struct Delay {
-    clock: Arc<Clock>,
+    clock: Arc<dyn Clock>,
     delay: Duration,
 }
 
 impl Delay {
-    pub fn new(clock: Arc<Clock>, delay: Duration) -> Self {
+    pub fn new(clock: Arc<dyn Clock>, delay: Duration) -> Self {
         Self { clock, delay }
     }
 
@@ -26,13 +26,13 @@ impl Delay {
 }
 
 pub struct Rate {
-    clock: Arc<Clock>,
+    clock: Arc<dyn Clock>,
     next: Cell<Time>,
     delay: Duration,
 }
 
 impl Rate {
-    pub fn new(clock: Arc<Clock>, delay: Duration) -> Rate {
+    pub fn new(clock: Arc<dyn Clock>, delay: Duration) -> Rate {
         let start = clock.now();
         Rate {
             clock,

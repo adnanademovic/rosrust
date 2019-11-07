@@ -24,7 +24,7 @@ pub trait Message: Clone + Debug + Default + PartialEq + RosMsg + Send + Sync + 
     fn msg_definition() -> String;
     fn md5sum() -> String;
     fn msg_type() -> String;
-    fn set_header(&mut self, _clock: &Arc<Clock>, _seq: &Arc<AtomicUsize>) {}
+    fn set_header(&mut self, _clock: &Arc<dyn Clock>, _seq: &Arc<AtomicUsize>) {}
 }
 
 pub trait ServicePair: Clone + Debug + Default + PartialEq + Message {

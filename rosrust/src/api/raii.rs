@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Publisher<T: Message> {
-    clock: Arc<Clock>,
+    clock: Arc<dyn Clock>,
     seq: Arc<AtomicUsize>,
     stream: PublisherStream<T>,
     _raii: Arc<InteractorRaii<PublisherInfo>>,
@@ -20,7 +20,7 @@ impl<T: Message> Publisher<T> {
     pub(crate) fn new(
         master: Arc<Master>,
         slave: Arc<Slave>,
-        clock: Arc<Clock>,
+        clock: Arc<dyn Clock>,
         hostname: &str,
         name: &str,
         queue_size: usize,

@@ -321,7 +321,7 @@ mod tests {
             <(f64, f64, f64)>::arbitrary(g).into()
         }
 
-        fn shrink(&self) -> Box<Iterator<Item = Self>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
             Box::new(Arbitrary::shrink(&(self.low, self.mid, self.high)).map(Into::into))
         }
     }

@@ -258,7 +258,7 @@ impl<T: Action> ServerSimpleGoalHandle<T> {
     }
 }
 
-pub type ActionServerOnRequest<T> = Box<Fn(ServerGoalHandle<T>) -> Result<()> + Send + Sync>;
+pub type ActionServerOnRequest<T> = Box<dyn Fn(ServerGoalHandle<T>) -> Result<()> + Send + Sync>;
 
 fn publish_response<T: ActionResponse>(
     publisher: &rosrust::Publisher<T>,

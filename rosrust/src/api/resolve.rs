@@ -450,5 +450,4 @@ mod tests {
         set_args(&vec!["__hostname:=host2", "__ip:=127.0.0.1"]);
         assert_eq!(String::from("host2"), hostname());
     }
-
 }
