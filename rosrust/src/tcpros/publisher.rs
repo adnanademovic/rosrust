@@ -51,6 +51,7 @@ fn write_response<T: Message, U: std::io::Write>(
     fields.insert(String::from("md5sum"), T::md5sum());
     fields.insert(String::from("type"), T::msg_type());
     fields.insert(String::from("callerid"), caller_id.into());
+    fields.insert(String::from("message_definition"), T::msg_definition());
     header::encode(&mut stream, &fields)?;
     Ok(())
 }
