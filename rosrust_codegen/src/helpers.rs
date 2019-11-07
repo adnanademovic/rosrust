@@ -74,7 +74,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
         handled_messages.insert(value.clone());
         result += "\n\n========================================";
         result += "========================================";
-        result += &format!("\nMSG: {}/{}\n", value.package, value.name);
+        result += &format!("\nMSG: {}\n", value);
         let message = match message_map.get(&value) {
             Some(msg) => msg,
             None => bail!("Message map does not contain all needed elements"),
@@ -93,71 +93,71 @@ pub struct MessageMap {
     pub services: HashSet<MessagePath>,
 }
 
-pub fn get_message_map(folders: &[&str], messages: &[MessagePath]) -> Result<MessageMap> {
-    let mut msgs = HashMap::new();
-    let mut srvs = HashSet::new();
-    let mut pending = messages.to_vec();
-    while let Some(value) = pending.pop() {
-        let package = value.package.clone();
-        let name = value.name.clone();
-        if !msgs.contains_key(&value) {
-            match get_message(folders, &package, &name)? {
-                MessageCase::Message(message) => {
-                    for dependency in &message.dependencies() {
-                        pending.push(dependency.clone());
-                    }
-                    msgs.insert(value, message);
+pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Result<MessageMap> {
+    let mut messages = HashMap::new();
+    let mut services = HashSet::new();
+    let mut pending = message_paths.to_vec();
+    while let Some(message_path) = pending.pop() {
+        if messages.contains_key(&message_path) {
+            continue;
+        }
+        match get_message_or_service(folders, message_path)? {
+            MessageCase::Message(message) => {
+                for dependency in &message.dependencies() {
+                    pending.push(dependency.clone());
                 }
-                MessageCase::Service(service_name, req, res) => {
-                    for dependency in &req.dependencies() {
-                        pending.push(dependency.clone());
-                    }
-                    for dependency in &res.dependencies() {
-                        pending.push(dependency.clone());
-                    }
-                    msgs.insert(MessagePath::new(&package, &req.path.name), req);
-                    msgs.insert(MessagePath::new(&package, &res.path.name), res);
-                    srvs.insert(MessagePath::new(package, service_name));
+                messages.insert(message.path.clone(), message);
+            }
+            MessageCase::Service(service, req, res) => {
+                for dependency in &req.dependencies() {
+                    pending.push(dependency.clone());
                 }
-            };
+                for dependency in &res.dependencies() {
+                    pending.push(dependency.clone());
+                }
+                messages.insert(req.path.clone(), req);
+                messages.insert(res.path.clone(), res);
+                services.insert(service);
+            }
         }
     }
-    Ok(MessageMap {
-        messages: msgs,
-        services: srvs,
-    })
+    Ok(MessageMap { messages, services })
 }
 
 enum MessageCase {
     Message(Msg),
-    Service(String, Msg, Msg),
+    Service(MessagePath, Msg, Msg),
 }
 
 lazy_static! {
-    static ref IN_MEMORY_MESSAGES: HashMap<&'static str, &'static str> =
+    static ref IN_MEMORY_MESSAGES: HashMap<MessagePath, &'static str> =
         generate_in_memory_messages();
 }
 
-fn generate_in_memory_messages() -> HashMap<&'static str, &'static str> {
+fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
     let mut output = HashMap::new();
     output.insert(
-        "rosgraph_msgs/Clock",
+        MessagePath::new("rosgraph_msgs", "Clock"),
         include_str!("msg_examples/rosgraph_msgs/msg/Clock.msg"),
     );
     output.insert(
-        "rosgraph_msgs/Log",
+        MessagePath::new("rosgraph_msgs", "Log"),
         include_str!("msg_examples/rosgraph_msgs/msg/Log.msg"),
     );
     output.insert(
-        "std_msgs/Header",
+        MessagePath::new("std_msgs", "Header"),
         include_str!("msg_examples/std_msgs/msg/Header.msg"),
     );
     output
 }
 
 #[allow(clippy::trivial_regex)]
-fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCase> {
+fn get_message_or_service(folders: &[&str], message: MessagePath) -> Result<MessageCase> {
     use std::io::Read;
+
+    let package = &message.package;
+    let name = &message.name;
+
     for folder in folders {
         let full_path = Path::new(&folder)
             .join(&package)
@@ -168,7 +168,7 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            return Msg::new(package, name, &contents).map(MessageCase::Message);
+            return Msg::new(message, &contents).map(MessageCase::Message);
         }
         let full_path = Path::new(&folder)
             .join(&package)
@@ -180,30 +180,24 @@ fn get_message(folders: &[&str], package: &str, name: &str) -> Result<MessageCas
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
             let re = RegexBuilder::new("^---$").multi_line(true).build()?;
-            let mut parts = re.split(&contents);
-            let req = match parts.next() {
-                Some(v) => v,
-                None => bail!("Service needs to have content"),
+            let (req, res) = match re.split(&contents).collect::<Vec<_>>().as_slice() {
+                &[req] => (req, ""),
+                &[req, res] => (req, res),
+                &[] => bail!("Service {} does not have any content", message),
+                v => bail!("Service {} is split into {} parts", message, v.len()),
             };
-            let res = match parts.next() {
-                Some(v) => v,
-                None => "",
-            };
-            if parts.next().is_some() {
-                bail!("Too many splits in service");
-            }
-            let req = Msg::new(package, &format!("{}Req", name), req)?;
-            let res = Msg::new(package, &format!("{}Res", name), res)?;
-            return Ok(MessageCase::Service(name.into(), req, res));
+            let req = Msg::new(MessagePath::new(package, format!("{}Req", name)), req)?;
+            let res = Msg::new(MessagePath::new(package, format!("{}Res", name)), res)?;
+            return Ok(MessageCase::Service(message, req, res));
         }
     }
-    if let Some(contents) = IN_MEMORY_MESSAGES.get(format!("{}/{}", package, name).as_str()) {
-        return Msg::new(package, name, contents).map(MessageCase::Message);
+    if let Some(contents) = IN_MEMORY_MESSAGES.get(&message) {
+        return Msg::new(message, contents).map(MessageCase::Message);
     }
     bail!(ErrorKind::MessageNotFound(
-        format!("{}/{}", package, name),
-        folders.join("\n")
-    ));
+        message.to_string(),
+        folders.join("\n"),
+    ))
 }
 
 #[cfg(test)]

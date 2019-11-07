@@ -15,10 +15,10 @@ pub struct Msg {
 }
 
 impl Msg {
-    pub fn new(package: &str, name: &str, source: &str) -> Result<Msg> {
+    pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
         let fields = match_lines(source)?;
         Ok(Msg {
-            path: MessagePath::new(package, name),
+            path,
             fields,
             source: source.trim().into(),
         })
@@ -741,6 +741,7 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use std::convert::TryInto;
 
     #[test]
     fn datatype_md5_string_correct() {
@@ -838,7 +839,7 @@ mod tests {
     #[test]
     fn message_md5_string_correct() {
         assert_eq!(
-            Msg::new("std_msgs", "String", "string data")
+            Msg::new("std_msgs/String".try_into().unwrap(), "string data")
                 .unwrap()
                 .calculate_md5(&HashMap::new())
                 .unwrap(),
@@ -846,8 +847,7 @@ mod tests {
         );
         assert_eq!(
             Msg::new(
-                "geometry_msgs",
-                "Point",
+                "geometry_msgs/Point".try_into().unwrap(),
                 include_str!("msg_examples/geometry_msgs/msg/Point.msg"),
             )
             .unwrap()
@@ -857,8 +857,7 @@ mod tests {
         );
         assert_eq!(
             Msg::new(
-                "geometry_msgs",
-                "Quaternion",
+                "geometry_msgs/Quaternion".try_into().unwrap(),
                 include_str!("msg_examples/geometry_msgs/msg/Quaternion.msg"),
             )
             .unwrap()
@@ -877,8 +876,7 @@ mod tests {
         );
         assert_eq!(
             Msg::new(
-                "geometry_msgs",
-                "Pose",
+                "geometry_msgs/Pose".try_into().unwrap(),
                 include_str!("msg_examples/geometry_msgs/msg/Pose.msg"),
             )
             .unwrap()
@@ -901,8 +899,7 @@ mod tests {
         );
         assert_eq!(
             Msg::new(
-                "visualization_msgs",
-                "ImageMarker",
+                "visualization_msgs/ImageMarker".try_into().unwrap(),
                 include_str!("msg_examples/visualization_msgs/msg/ImageMarker.msg"),
             )
             .unwrap()
@@ -1087,8 +1084,7 @@ mod tests {
     #[test]
     fn msg_constructor_parses_real_message() {
         let data = Msg::new(
-            "geometry_msgs",
-            "TwistWithCovariance",
+            "geometry_msgs/TwistWithCovariance".try_into().unwrap(),
             include_str!("msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"),
         )
         .unwrap();
@@ -1114,8 +1110,7 @@ mod tests {
         assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Twist")));
 
         let data = Msg::new(
-            "geometry_msgs",
-            "PoseStamped",
+            "geometry_msgs/PoseStamped".try_into().unwrap(),
             include_str!("msg_examples/geometry_msgs/msg/PoseStamped.msg"),
         )
         .unwrap();
@@ -1142,8 +1137,7 @@ mod tests {
         assert!(dependencies.contains(&MessagePath::new("std_msgs", "Header")));
 
         let data = Msg::new(
-            "sensor_msgs",
-            "Imu",
+            "sensor_msgs/Imu".try_into().unwrap(),
             include_str!("msg_examples/sensor_msgs/msg/Imu.msg"),
         )
         .unwrap();

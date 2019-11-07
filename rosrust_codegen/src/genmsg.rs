@@ -4,6 +4,7 @@ use crate::helpers::MessageMap;
 use crate::message_path::MessagePath;
 use crate::output_layout;
 use std::collections::HashSet;
+use std::convert::TryInto;
 
 pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_layout::Layout> {
     let message_map = message_names_to_message_map(folders, messages)?;
@@ -14,7 +15,8 @@ pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_
 fn message_names_to_message_map(folders: &[&str], messages: &[&str]) -> Result<MessageMap> {
     let message_pairs = messages
         .iter()
-        .map(|v| MessagePath::from_combined(v))
+        .copied()
+        .map(TryInto::try_into)
         .collect::<Result<Vec<MessagePath>>>()?;
     helpers::get_message_map(folders, &message_pairs)
 }

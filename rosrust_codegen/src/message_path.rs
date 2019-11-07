@@ -1,7 +1,9 @@
-use crate::error::{ErrorKind, Result};
+use crate::error::{Error, ErrorKind, Result};
 use error_chain::bail;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::convert::TryFrom;
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,7 +20,7 @@ impl MessagePath {
         }
     }
 
-    pub fn from_combined(input: &str) -> Result<Self> {
+    fn from_combined(input: &str) -> Result<Self> {
         let mut parts = input.splitn(2, '/');
         let package = match parts.next() {
             Some(v) => v,
@@ -49,6 +51,20 @@ impl MessagePath {
             bail!(ErrorKind::PackageNameInvalid(self.package.clone()));
         }
         Ok(())
+    }
+}
+
+impl Display for MessagePath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.package, self.name)
+    }
+}
+
+impl<'a> TryFrom<&'a str> for MessagePath {
+    type Error = Error;
+
+    fn try_from(value: &'a str) -> Result<Self> {
+        Self::from_combined(value)
     }
 }
 
