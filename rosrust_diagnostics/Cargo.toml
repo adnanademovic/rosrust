@@ -10,6 +10,6 @@ version = "0.0.1"
 rosrust = {path="../rosrust"}
 
 [dev-dependencies]
-quickcheck = "0.8.2"
+quickcheck = "0.9.0"
 quickcheck_macros = "0.8.0"
-nix = "0.13.0"
+nix = "0.15.0"
