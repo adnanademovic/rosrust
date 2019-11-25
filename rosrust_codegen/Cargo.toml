@@ -6,7 +6,7 @@ license = "MIT"
 name = "rosrust_codegen"
 readme = "README.md"
 repository = "https://github.com/adnanademovic/rosrust"
-version = "0.9.0"
+version = "0.9.1"
 
 [dependencies]
 error-chain = "0.12.1"

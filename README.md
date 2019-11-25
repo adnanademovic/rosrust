@@ -12,7 +12,7 @@ The following dependency is needed to use the crate:
 
 ```toml
 [dependencies]
-rosrust = "0.9.0"
+rosrust = "0.9"
 ```
 
 If using Rust 2015 edition, just depend on the library with macro usage, using:
