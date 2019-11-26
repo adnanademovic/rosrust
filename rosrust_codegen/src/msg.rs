@@ -294,7 +294,7 @@ fn match_const_string(data: &str) -> Option<(FieldLine, String)> {
 fn match_const_numeric(data: &str) -> Option<(FieldLine, String)> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            r"^{}{}{}{}={}(-?[0-9]+)$",
+            r"^{}{}{}{}={}(-?[0-9\.eE\+\-]+)$",
             FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, IGNORE_WHITESPACE
         );
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
