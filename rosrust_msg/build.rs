@@ -9,6 +9,7 @@ fn main() {
     rerun_if_env_changed("OUT_DIR");
     rerun_if_env_changed("CMAKE_PREFIX_PATH");
     rerun_if_env_changed("ROSRUST_MSG_PATH");
+    rerun_if_env_changed("ROSRUST_MSG_TYPES");
 
     let cmake_paths = env::var("CMAKE_PREFIX_PATH")
         .unwrap_or_default()
@@ -32,14 +33,21 @@ fn main() {
     for path in paths {
         rerun_if_folder_content_changed(Path::new(path));
     }
-    let rosmsg_list_output = Command::new("rosmsg").arg("list").output().unwrap().stdout;
-    let messages = std::str::from_utf8(&rosmsg_list_output).unwrap();
+
+    let messages;
+    if let Ok(message_types_override) = env::var("ROSRUST_MSG_TYPES") {
+        messages = message_types_override;
+    } else {
+        let rosmsg_list_output = Command::new("rosmsg").arg("list").output().unwrap().stdout;
+        messages = std::str::from_utf8(&rosmsg_list_output)
+            .unwrap()
+            .lines()
+            .collect::<Vec<&str>>()
+            .join(",");
+    }
 
     let file_name = format!("{}/{}", out_dir, "messages.rs");
-    let file_content = format!(
-        "use rosrust;rosrust::rosmsg_include!({});",
-        messages.lines().collect::<Vec<&str>>().join(","),
-    );
+    let file_content = format!("use rosrust;rosrust::rosmsg_include!({});", messages,);
 
     fs::write(&file_name, &file_content).unwrap();
 }
