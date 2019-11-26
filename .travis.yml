@@ -1,7 +1,7 @@
 language: rust
-dist: xenial
+dist: bionic
 env:
-  - ROS_DISTRO=kinetic
+  - ROS_DISTRO=melodic
 rust:
   - stable
   - beta
