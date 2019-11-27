@@ -8,11 +8,14 @@
 
 ## Usage
 
-The following dependency is needed to use the crate:
+For all the key features, it is enough to depend on the crate itself. It's highly recommended to depend on `rosrust_msg` as well, as it provides bindings for message generation.
+
+The following dependencies are recommended to use the crate:
 
 ```toml
 [dependencies]
 rosrust = "0.9"
+rosrust_msg = "0.1"
 ```
 
 If using Rust 2015 edition, just depend on the library with macro usage, using:
@@ -44,9 +47,22 @@ There are multiple examples in the [examples folder](https://github.com/adnanade
 
 ### Message Generation
 
+Message generation can be done automatically by depending on `rosrust_msg`, or manually using `rosrust::rosmsg_include`.
+
+The preferred way is automatic, as it allows interop between dependencies that use messages and your crate.
+
+If you do not have ROS installed, then the message generation utilizes the `ROSRUST_MSG_PATH` environment variable, which is a colon separated list of directories to search.
+These directories should have the structure `<ROSRUST_MSG_PATH>/<anything>/<package>/msg/<message>` or `<ROSRUST_MSG_PATH>/<anything>/<package>/srv/<service>`. 
+
+#### Automatic
+
+For automatic message generation just depend on `rosrust_msg`, with the version specified at the top of this document.
+
+After that you'll be able to generate a `sensor_msgs/Imu` message object by using `rosrust_msg::sensor_msgs::Imu::default()`. All fields are always public, so you can initialize structures as literals.
+
+#### Manual
+
 Message generation is done at build time. If you have ROS installed and sourced in your shell session, you will not need to do any extra setup for this to work.
-If you do not have ROS installed, then the message generation utilizes the `ROSRUST_MSG_PATH` environment variable, which is a colon seperated list of directories to search.
-These directories should have the structure `<ROSRUST_MSG_PATH>/<package>/msg/<message>` or `<ROSRUST_MSG_PATH>/<package>/srv/<service>`.
 
 To generate messages, create a module for messages. Using something like a `msg.rs` file in your project root results in importing similar to `roscpp` and `rospy`. The file only needs one line:
 

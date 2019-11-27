@@ -35,6 +35,7 @@ fn main() {
     }
 
     let messages;
+    // TODO: rather than consulting "rosmsg list", we should just look for the messages ourself
     if let Ok(message_types_override) = env::var("ROSRUST_MSG_TYPES") {
         messages = message_types_override;
     } else {
