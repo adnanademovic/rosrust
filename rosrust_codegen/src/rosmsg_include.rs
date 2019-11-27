@@ -4,7 +4,11 @@ use quote::quote;
 use std::env;
 use std::path::Path;
 
-pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
+pub fn depend_on_messages(
+    messages: &[&str],
+    internal: bool,
+    ignore_bad_messages: bool,
+) -> TokenStream {
     let cmake_paths = env::var("CMAKE_PREFIX_PATH")
         .unwrap_or_default()
         .split(':')
@@ -26,7 +30,7 @@ pub fn depend_on_messages(messages: &[&str], internal: bool) -> TokenStream {
         .chain(extra_paths.iter())
         .map(String::as_str)
         .collect::<Vec<&str>>();
-    let output = genmsg::depend_on_messages(paths.as_slice(), messages)
+    let output = genmsg::depend_on_messages(ignore_bad_messages, paths.as_slice(), messages)
         .unwrap_or_else(|r| panic!("{}", r))
         .token_stream(&if internal {
             quote! { crate:: }

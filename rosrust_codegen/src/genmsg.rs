@@ -6,19 +6,27 @@ use crate::output_layout;
 use std::collections::HashSet;
 use std::convert::TryInto;
 
-pub fn depend_on_messages(folders: &[&str], messages: &[&str]) -> Result<output_layout::Layout> {
-    let message_map = message_names_to_message_map(folders, messages)?;
+pub fn depend_on_messages(
+    ignore_bad_messages: bool,
+    folders: &[&str],
+    messages: &[&str],
+) -> Result<output_layout::Layout> {
+    let message_map = message_names_to_message_map(ignore_bad_messages, folders, messages)?;
     validate_message_paths(&message_map)?;
     message_map_to_layout(&message_map)
 }
 
-fn message_names_to_message_map(folders: &[&str], messages: &[&str]) -> Result<MessageMap> {
+fn message_names_to_message_map(
+    ignore_bad_messages: bool,
+    folders: &[&str],
+    messages: &[&str],
+) -> Result<MessageMap> {
     let message_pairs = messages
         .iter()
         .copied()
         .map(TryInto::try_into)
         .collect::<Result<Vec<MessagePath>>>()?;
-    helpers::get_message_map(folders, &message_pairs)
+    helpers::get_message_map(ignore_bad_messages, folders, &message_pairs)
 }
 
 fn validate_message_paths(message_map: &MessageMap) -> Result<()> {

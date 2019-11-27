@@ -40,7 +40,10 @@ fn main() {
         .join(",");
 
     let file_name = format!("{}/{}", out_dir, "messages.rs");
-    let file_content = format!("use rosrust;rosrust::rosmsg_include!({});", messages);
+    let file_content = format!(
+        "use rosrust;rosrust::rosmsg_include!({},IGNORE_BAD);",
+        messages,
+    );
 
     fs::write(&file_name, &file_content).unwrap();
 }

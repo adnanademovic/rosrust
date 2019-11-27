@@ -93,7 +93,11 @@ pub struct MessageMap {
     pub services: HashSet<MessagePath>,
 }
 
-pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Result<MessageMap> {
+pub fn get_message_map(
+    ignore_bad_messages: bool,
+    folders: &[&str],
+    message_paths: &[MessagePath],
+) -> Result<MessageMap> {
     let mut message_locations = HashMap::new();
     let mut service_locations = HashMap::new();
 
@@ -117,6 +121,7 @@ pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Resul
             continue;
         }
         match get_message_or_service(
+            ignore_bad_messages,
             folders,
             &message_locations,
             &service_locations,
@@ -212,6 +217,7 @@ fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
 
 #[allow(clippy::trivial_regex)]
 fn get_message_or_service(
+    ignore_bad_messages: bool,
     folders: &[&str],
     message_locations: &HashMap<MessagePath, PathBuf>,
     service_locations: &HashMap<MessagePath, PathBuf>,
@@ -227,7 +233,8 @@ fn get_message_or_service(
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            return Msg::new(message, &contents).map(MessageCase::Message);
+            return create_message(message, &contents, ignore_bad_messages)
+                .map(MessageCase::Message);
         }
     }
     if let Some(full_path) = service_locations.get(&message) {
@@ -242,18 +249,39 @@ fn get_message_or_service(
                 &[] => bail!("Service {} does not have any content", message),
                 v => bail!("Service {} is split into {} parts", message, v.len()),
             };
-            let req = Msg::new(MessagePath::new(package, format!("{}Req", name)), req)?;
-            let res = Msg::new(MessagePath::new(package, format!("{}Res", name)), res)?;
+            let req = create_message(
+                MessagePath::new(package, format!("{}Req", name)),
+                req,
+                ignore_bad_messages,
+            )?;
+            let res = create_message(
+                MessagePath::new(package, format!("{}Res", name)),
+                res,
+                ignore_bad_messages,
+            )?;
             return Ok(MessageCase::Service(message, req, res));
         }
     }
     if let Some(contents) = IN_MEMORY_MESSAGES.get(&message) {
         return Msg::new(message, contents).map(MessageCase::Message);
     }
+    if ignore_bad_messages {
+        return Msg::new(message, "").map(MessageCase::Message);
+    }
     bail!(ErrorKind::MessageNotFound(
         message.to_string(),
         folders.join("\n"),
     ))
+}
+
+fn create_message(message: MessagePath, contents: &str, ignore_bad_messages: bool) -> Result<Msg> {
+    Msg::new(message.clone(), contents).or_else(|err| {
+        if ignore_bad_messages {
+            Msg::new(message, "")
+        } else {
+            Err(err)
+        }
+    })
 }
 
 #[cfg(test)]
@@ -264,20 +292,26 @@ mod tests {
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
-        let message_map =
-            get_message_map(&[FILEPATH], &[MessagePath::new("geometry_msgs", "Point")])
-                .unwrap()
-                .messages;
+        let message_map = get_message_map(
+            false,
+            &[FILEPATH],
+            &[MessagePath::new("geometry_msgs", "Point")],
+        )
+        .unwrap()
+        .messages;
         assert_eq!(message_map.len(), 1);
         assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
     }
 
     #[test]
     fn get_message_map_fetches_message_and_dependencies() {
-        let message_map =
-            get_message_map(&[FILEPATH], &[MessagePath::new("geometry_msgs", "Pose")])
-                .unwrap()
-                .messages;
+        let message_map = get_message_map(
+            false,
+            &[FILEPATH],
+            &[MessagePath::new("geometry_msgs", "Pose")],
+        )
+        .unwrap()
+        .messages;
         assert_eq!(message_map.len(), 3);
         assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
         assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose")));
@@ -287,6 +321,7 @@ mod tests {
     #[test]
     fn get_message_map_traverses_whole_dependency_tree() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[MessagePath::new("geometry_msgs", "PoseStamped")],
         )
@@ -303,6 +338,7 @@ mod tests {
     #[test]
     fn get_message_map_traverses_all_passed_messages_dependency_tree() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("geometry_msgs", "PoseStamped"),
@@ -328,6 +364,7 @@ mod tests {
     #[test]
     fn calculate_md5_works() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("geometry_msgs", "PoseStamped"),
@@ -393,10 +430,13 @@ mod tests {
 
     #[test]
     fn generate_message_definition_works() {
-        let message_map =
-            get_message_map(&[FILEPATH], &[MessagePath::new("geometry_msgs", "Vector3")])
-                .unwrap()
-                .messages;
+        let message_map = get_message_map(
+            false,
+            &[FILEPATH],
+            &[MessagePath::new("geometry_msgs", "Vector3")],
+        )
+        .unwrap()
+        .messages;
         let definition = generate_message_definition(
             &message_map,
             &message_map
@@ -414,6 +454,7 @@ mod tests {
              y\nfloat64 z\n"
         );
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[MessagePath::new("geometry_msgs", "PoseStamped")],
         )
@@ -478,6 +519,7 @@ float64 w\n\
     #[test]
     fn calculate_md5_works_for_services() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("diagnostic_msgs", "AddDiagnostics"),
@@ -504,6 +546,7 @@ float64 w\n\
     #[test]
     fn parse_tricky_srv_files() {
         get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("empty_srv", "Empty"),
