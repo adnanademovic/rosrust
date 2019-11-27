@@ -1,13 +1,6 @@
 use rosrust_actionlib::action_server::ServerSimpleGoalHandle;
 use rosrust_actionlib::ActionServer;
-
-mod msg {
-    rosrust::rosmsg_include!(actionlib_tutorials / FibonacciAction);
-
-    rosrust_actionlib::action!(self; actionlib_tutorials: Fibonacci);
-}
-
-use msg::actionlib_tutorials as alt;
+use rosrust_msg::actionlib_tutorials as alt;
 
 fn handler(gh: ServerSimpleGoalHandle<alt::FibonacciAction>) {
     let rate = rosrust::rate(1.0);

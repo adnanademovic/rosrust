@@ -1,10 +1,10 @@
 pub use self::client_goal_handle::{AsyncClientGoalHandle, ClientGoalHandle, SyncClientGoalHandle};
 pub use self::comm_state_machine::State;
 pub use self::simple_action_client::SimpleActionClient;
-use crate::msg::actionlib_msgs;
 use crate::static_messages::{MUTEX_LOCK_FAIL, UNEXPECTED_FAILED_NAME_RESOLVE};
 use crate::{Action, ActionResponse, FeedbackBody, GoalBody, GoalID};
 use rosrust::error::Result;
+use rosrust_msg::actionlib_msgs::GoalStatusArray;
 use std::sync::{Arc, Mutex};
 
 mod client_goal_handle;
@@ -54,7 +54,7 @@ impl<T: Action> ActionClient<T> {
         let on_status = {
             let manager = Arc::clone(&manager);
             let last_caller_id = Arc::clone(&last_caller_id);
-            move |message: actionlib_msgs::GoalStatusArray, caller_id: &str| {
+            move |message: GoalStatusArray, caller_id: &str| {
                 (*last_caller_id.lock().expect(MUTEX_LOCK_FAIL)) = Some(caller_id.into());
                 manager
                     .lock()

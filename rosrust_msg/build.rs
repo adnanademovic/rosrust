@@ -36,13 +36,28 @@ fn main() {
     let messages = paths
         .iter()
         .flat_map(|path| find_all_messages_and_services(Path::new(path)))
+        .collect::<Vec<(String, String)>>();
+
+    let file_name = format!("{}/{}", out_dir, "messages.rs");
+
+    let package_names = messages
+        .iter()
+        .map(|(pkg, msg)| format!("{}/{}", pkg, msg))
+        .collect::<Vec<String>>()
+        .join(",");
+    let package_tuples = messages
+        .iter()
+        .map(|(pkg, msg)| format!("(\"{}\",\"{}\")", pkg, msg))
         .collect::<Vec<String>>()
         .join(",");
 
-    let file_name = format!("{}/{}", out_dir, "messages.rs");
     let file_content = format!(
-        "use rosrust;rosrust::rosmsg_include!({},IGNORE_BAD);",
-        messages,
+        "
+        use rosrust;
+        rosrust::rosmsg_include!({},IGNORE_BAD);
+        pub static MESSAGES: &'static [(&str, &str)]=&[{}];
+        ",
+        package_names, package_tuples
     );
 
     fs::write(&file_name, &file_content).unwrap();
@@ -89,7 +104,7 @@ fn append_src_folder(path: &str) -> Option<String> {
         .map(String::from)
 }
 
-fn find_all_messages_and_services(root: &Path) -> Vec<String> {
+fn find_all_messages_and_services(root: &Path) -> Vec<(String, String)> {
     if !root.is_dir() {
         return identify_message_or_service(root).into_iter().collect();
     }
@@ -102,7 +117,7 @@ fn find_all_messages_and_services(root: &Path) -> Vec<String> {
     items
 }
 
-fn identify_message_or_service(filename: &Path) -> Option<String> {
+fn identify_message_or_service(filename: &Path) -> Option<(String, String)> {
     let extension = filename.extension()?;
     let message = filename.file_stem()?;
     let parent = filename.parent()?;
@@ -116,5 +131,5 @@ fn identify_message_or_service(filename: &Path) -> Option<String> {
         Some("srv") => {}
         _ => return None,
     }
-    Some(format!("{}/{}", package.to_str()?, message.to_str()?))
+    Some((package.to_str()?.into(), message.to_str()?.into()))
 }
