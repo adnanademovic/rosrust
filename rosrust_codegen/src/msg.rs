@@ -14,6 +14,12 @@ pub struct Msg {
     pub source: String,
 }
 
+#[derive(Clone, Debug)]
+pub struct Srv {
+    pub path: MessagePath,
+    pub source: String,
+}
+
 impl Msg {
     pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
         let fields = match_lines(source)?;

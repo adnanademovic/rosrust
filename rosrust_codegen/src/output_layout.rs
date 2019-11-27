@@ -50,12 +50,15 @@ impl Package {
     }
 }
 
+// TODO: Present source code of messages and services somehow
+
 #[derive(Debug)]
 pub struct Message {
     pub message: Msg,
     pub msg_definition: String,
     pub md5sum: String,
     pub msg_type: String,
+    pub source: String,
 }
 
 impl Message {
@@ -65,6 +68,7 @@ impl Message {
             msg_definition,
             md5sum,
             msg_type,
+            source: _,
         } = self;
         let base_message = message.token_stream(crate_prefix);
         let encode_message = message.token_stream_encode(crate_prefix);
@@ -111,6 +115,7 @@ pub struct Service {
     pub name: String,
     pub md5sum: String,
     pub msg_type: String,
+    pub source: String,
 }
 
 impl Service {
@@ -119,6 +124,7 @@ impl Service {
             name,
             md5sum,
             msg_type,
+            source: _,
         } = self;
         let name_ident = Ident::new(&name, Span::call_site());
         let req_ident = Ident::new(&format!("{}Req", name), Span::call_site());

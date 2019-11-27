@@ -1,6 +1,6 @@
 use crate::error::{ErrorKind, Result, ResultExt};
 use crate::message_path::MessagePath;
-use crate::msg::Msg;
+use crate::msg::{Msg, Srv};
 use error_chain::bail;
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
@@ -28,7 +28,7 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
             break;
         }
     }
-    for message in &message_map.services {
+    for message in message_map.services.keys() {
         let key_req = MessagePath::new(&message.package, format!("{}Req", message.name));
         let key_res = MessagePath::new(&message.package, format!("{}Res", message.name));
         let req = match representations.get(&key_req) {
@@ -90,7 +90,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
 
 pub struct MessageMap {
     pub messages: HashMap<MessagePath, Msg>,
-    pub services: HashSet<MessagePath>,
+    pub services: HashMap<MessagePath, Srv>,
 }
 
 pub fn get_message_map(
@@ -114,7 +114,7 @@ pub fn get_message_map(
     }
 
     let mut messages = HashMap::new();
-    let mut services = HashSet::new();
+    let mut services = HashMap::new();
     let mut pending = message_paths.to_vec();
     while let Some(message_path) = pending.pop() {
         if messages.contains_key(&message_path) {
@@ -142,7 +142,7 @@ pub fn get_message_map(
                 }
                 messages.insert(req.path.clone(), req);
                 messages.insert(res.path.clone(), res);
-                services.insert(service);
+                services.insert(service.path.clone(), service);
             }
         }
     }
@@ -190,7 +190,7 @@ fn identify_message_or_service(filename: &Path) -> Option<(MessagePath, PathBuf,
 
 enum MessageCase {
     Message(Msg),
-    Service(MessagePath, Msg, Msg),
+    Service(Srv, Msg, Msg),
 }
 
 lazy_static! {
@@ -259,7 +259,11 @@ fn get_message_or_service(
                 res,
                 ignore_bad_messages,
             )?;
-            return Ok(MessageCase::Service(message, req, res));
+            let service = Srv {
+                path: message,
+                source: contents,
+            };
+            return Ok(MessageCase::Service(service, req, res));
         }
     }
     if let Some(contents) = IN_MEMORY_MESSAGES.get(&message) {
