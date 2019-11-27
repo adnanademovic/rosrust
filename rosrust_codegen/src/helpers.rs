@@ -6,8 +6,8 @@ use lazy_static::lazy_static;
 use regex::RegexBuilder;
 use std;
 use std::collections::{HashMap, HashSet, LinkedList};
-use std::fs::File;
-use std::path::Path;
+use std::fs::{read_dir, File};
+use std::path::{Path, PathBuf};
 
 pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, String>> {
     let mut representations = HashMap::<MessagePath, String>::new();
@@ -94,6 +94,21 @@ pub struct MessageMap {
 }
 
 pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Result<MessageMap> {
+    let mut message_locations = HashMap::new();
+    let mut service_locations = HashMap::new();
+
+    let mut messages_and_services = vec![];
+    for folder in folders {
+        messages_and_services.append(&mut find_all_messages_and_services(Path::new(folder)));
+    }
+
+    for (message_path, file_path, message_type) in messages_and_services {
+        match message_type {
+            MessageType::Message => message_locations.insert(message_path, file_path),
+            MessageType::Service => service_locations.insert(message_path, file_path),
+        };
+    }
+
     let mut messages = HashMap::new();
     let mut services = HashSet::new();
     let mut pending = message_paths.to_vec();
@@ -101,7 +116,12 @@ pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Resul
         if messages.contains_key(&message_path) {
             continue;
         }
-        match get_message_or_service(folders, message_path)? {
+        match get_message_or_service(
+            folders,
+            &message_locations,
+            &service_locations,
+            message_path,
+        )? {
             MessageCase::Message(message) => {
                 for dependency in &message.dependencies() {
                     pending.push(dependency.clone());
@@ -122,6 +142,45 @@ pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Resul
         }
     }
     Ok(MessageMap { messages, services })
+}
+
+enum MessageType {
+    Message,
+    Service,
+}
+
+fn find_all_messages_and_services(root: &Path) -> Vec<(MessagePath, PathBuf, MessageType)> {
+    if !root.is_dir() {
+        return identify_message_or_service(root).into_iter().collect();
+    }
+    let mut items = vec![];
+    if let Ok(children) = read_dir(root) {
+        for child in children.filter_map(|v| v.ok()) {
+            items.append(&mut find_all_messages_and_services(&child.path()));
+        }
+    }
+    items
+}
+
+fn identify_message_or_service(filename: &Path) -> Option<(MessagePath, PathBuf, MessageType)> {
+    let extension = filename.extension()?;
+    let message = filename.file_stem()?;
+    let parent = filename.parent()?;
+    let grandparent = parent.parent()?;
+    let package = grandparent.file_name()?;
+    if Some(extension) != parent.file_name() {
+        return None;
+    }
+    let message_type = match extension.to_str() {
+        Some("msg") => MessageType::Message,
+        Some("srv") => MessageType::Service,
+        _ => return None,
+    };
+    Some((
+        MessagePath::new(package.to_str()?, message.to_str()?),
+        filename.into(),
+        message_type,
+    ))
 }
 
 enum MessageCase {
@@ -152,30 +211,27 @@ fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
 }
 
 #[allow(clippy::trivial_regex)]
-fn get_message_or_service(folders: &[&str], message: MessagePath) -> Result<MessageCase> {
+fn get_message_or_service(
+    folders: &[&str],
+    message_locations: &HashMap<MessagePath, PathBuf>,
+    service_locations: &HashMap<MessagePath, PathBuf>,
+    message: MessagePath,
+) -> Result<MessageCase> {
     use std::io::Read;
 
     let package = &message.package;
     let name = &message.name;
 
-    for folder in folders {
-        let full_path = Path::new(&folder)
-            .join(&package)
-            .join("msg")
-            .join(&name)
-            .with_extension("msg");
-        if let Ok(mut f) = File::open(&full_path) {
+    if let Some(full_path) = message_locations.get(&message) {
+        if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
             return Msg::new(message, &contents).map(MessageCase::Message);
         }
-        let full_path = Path::new(&folder)
-            .join(&package)
-            .join("srv")
-            .join(&name)
-            .with_extension("srv");
-        if let Ok(mut f) = File::open(&full_path) {
+    }
+    if let Some(full_path) = service_locations.get(&message) {
+        if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
