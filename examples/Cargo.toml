@@ -1,0 +1,14 @@
+[package]
+edition = "2018"
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+description = "Collection of examples of using rosrust and rosrust_msg"
+license = "MIT"
+name = "examples"
+version = "0.0.1"
+
+[dependencies]
+env_logger = "0.7.1"
+rosrust = {path="../rosrust"}
+rosrust_msg = {path="../rosrust_msg"}
+serde = "1.0.102"
+serde_derive = "1.0.102"

@@ -41,7 +41,7 @@ Integration with [catkin](http://www.ros.org/wiki/catkin) will be handled once a
 
 The API is close to reaching its final form.
 
-There are multiple examples in the [examples folder](https://github.com/adnanademovic/rosrust/tree/master/rosrust/examples). The publisher/subscriber and service/client examples are designed to closely imitate the `roscpp` tutorial.
+There are multiple examples in the [examples folder](https://github.com/adnanademovic/rosrust/tree/master/examples/examples). The publisher/subscriber and service/client examples are designed to closely imitate the `roscpp` tutorial.
 
 ## Features
 
@@ -83,10 +83,6 @@ If you have put this in a `src/msg.rs` file, this will include all the generated
 If we wanted to publish a defined message (let's use `std_msgs/String`) to topic `chatter` ten times a second, we can do it in the following way.
 
 ```rust
-mod msg {
-    rosrust::rosmsg_include!(std_msgs/String);
-}
-
 fn main() {
     // Initialize node
     rosrust::init("talker");
@@ -102,7 +98,7 @@ fn main() {
     // Breaks when a shutdown signal is sent
     while rosrust::is_ok() {
         // Create string message
-        let mut msg = msg::std_msgs::String::default();
+        let mut msg = rosrust_msg::std_msgs::String::default();
         msg.data = format!("hello world {}", count);
 
         // Send string message to topic via publisher
@@ -124,17 +120,13 @@ The constructor creates an object, which represents the subscriber lifetime.
 Upon the destruction of this object, the topic is unsubscribed as well.
 
 ```rust
-mod msg {
-    rosrust::rosmsg_include!(std_msgs/UInt64);
-}
-
 fn main() {
     // Initialize node
     rosrust::init("listener");
 
     // Create subscriber
     // The subscriber is stopped when the returned object is destroyed
-    let _subscriber_raii = rosrust::subscribe("chatter", 100, |v: msg::std_msgs::UInt64| {
+    let _subscriber_raii = rosrust::subscribe("chatter", 100, |v: rosrust_msg::std_msgs::UInt64| {
         // Callback for handling received messages
         rosrust::ros_info!("Received: {}", v.data);
     }).unwrap();
@@ -149,10 +141,6 @@ fn main() {
 Creating a service is the easiest out of all the options. Just define a callback for each request. Let's use the `roscpp_tutorials/AddTwoInts` service on the topic `/add_two_ints`.
 
 ```rust
-mod msg {
-    rosrust::rosmsg_include!(roscpp_tutorials/AddTwoInts);
-}
-
 fn main() {
     // Initialize node
     rosrust::init("add_two_ints_server");
@@ -160,14 +148,14 @@ fn main() {
     // Create service
     // The service is stopped when the returned object is destroyed
     let _service_raii =
-        rosrust::service::<msg::roscpp_tutorials::TwoInts, _>("add_two_ints", move |req| {
+        rosrust::service::<rosrust_msg::roscpp_tutorials::TwoInts, _>("add_two_ints", move |req| {
             // Callback for handling requests
             let sum = req.a + req.b;
 
             // Log each request
             rosrust::ros_info!("{} + {} = {}", req.a, req.b, sum);
 
-            Ok(msg::roscpp_tutorials::TwoIntsRes { sum })
+            Ok(rosrust_msg::roscpp_tutorials::TwoIntsRes { sum })
         }).unwrap();
 
     // Block the thread until a shutdown signal is received
@@ -186,10 +174,6 @@ The numbers shall be provided as command line arguments.
 We're also depending on `env_logger` here to log `ros_info` messages to the standard output.
 
 ```rust
-mod msg {
-    rosrust::rosmsg_include!(roscpp_tutorials/AddTwoInts);
-}
-
 use std::{env, time};
 
 fn main() {
@@ -213,7 +197,7 @@ fn main() {
     rosrust::wait_for_service("add_two_ints", Some(time::Duration::from_secs(10))).unwrap();
 
     // Create client for the service
-    let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
+    let client = rosrust::client::<rosrust_msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
 
     // Synchronous call that blocks the thread until a response is received
     ros_info!(
@@ -221,14 +205,14 @@ fn main() {
         a,
         b,
         client
-            .req(&msg::roscpp_tutorials::TwoIntsReq { a, b })
+            .req(&rosrust_msg::roscpp_tutorials::TwoIntsReq { a, b })
             .unwrap()
             .unwrap()
             .sum
     );
 
     // Asynchronous call that can be resolved later on
-    let retval = client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b });
+    let retval = client.req_async(rosrust_msg::roscpp_tutorials::TwoIntsReq { a, b });
     rosrust::ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
 }
 

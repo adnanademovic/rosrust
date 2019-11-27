@@ -1,10 +1,6 @@
 use env_logger;
 use rosrust;
 
-mod msg {
-    rosrust::rosmsg_include!(std_msgs / String);
-}
-
 fn main() {
     env_logger::init();
 
@@ -13,12 +9,11 @@ fn main() {
 
     // Create subscriber
     // The subscriber is stopped when the returned object is destroyed
-    let subscriber_info =
-        rosrust::subscribe_with_ids("chatter", 2, |v: msg::std_msgs::String, caller_id: &str| {
-            // Callback for handling received messages
-            rosrust::ros_info!("Received from '{}': {}", caller_id, v.data);
-        })
-        .unwrap();
+    let subscriber_info = rosrust::subscribe("chatter", 2, |v: rosrust_msg::std_msgs::String| {
+        // Callback for handling received messages
+        rosrust::ros_info!("Received: {}", v.data);
+    })
+    .unwrap();
 
     let log_names = rosrust::param("~log_names").unwrap().get().unwrap_or(false);
 

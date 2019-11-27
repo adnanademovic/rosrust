@@ -2,10 +2,6 @@ use env_logger;
 use rosrust;
 use std::time;
 
-mod msg {
-    rosrust::rosmsg_include!(roscpp_tutorials / TwoInts);
-}
-
 fn main() {
     env_logger::init();
 
@@ -27,7 +23,7 @@ fn main() {
     rosrust::wait_for_service("add_two_ints", Some(time::Duration::from_secs(10))).unwrap();
 
     // Create client for the service
-    let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
+    let client = rosrust::client::<rosrust_msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
 
     // Synchronous call that blocks the thread until a response is received
     rosrust::ros_info!(
@@ -35,13 +31,13 @@ fn main() {
         a,
         b,
         client
-            .req(&msg::roscpp_tutorials::TwoIntsReq { a, b })
+            .req(&rosrust_msg::roscpp_tutorials::TwoIntsReq { a, b })
             .unwrap()
             .unwrap()
             .sum
     );
 
     // Asynchronous call that can be resolved later on
-    let retval = client.req_async(msg::roscpp_tutorials::TwoIntsReq { a, b });
+    let retval = client.req_async(rosrust_msg::roscpp_tutorials::TwoIntsReq { a, b });
     rosrust::ros_info!("{} + {} = {}", a, b, retval.read().unwrap().unwrap().sum);
 }
