@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::path::Path;
-use std::process::Command;
 use std::{env, fs};
 
 fn main() {
@@ -9,7 +8,6 @@ fn main() {
     rerun_if_env_changed("OUT_DIR");
     rerun_if_env_changed("CMAKE_PREFIX_PATH");
     rerun_if_env_changed("ROSRUST_MSG_PATH");
-    rerun_if_env_changed("ROSRUST_MSG_TYPES");
 
     let cmake_paths = env::var("CMAKE_PREFIX_PATH")
         .unwrap_or_default()
@@ -29,26 +27,20 @@ fn main() {
     let paths = cmake_paths
         .iter()
         .chain(cmake_alt_paths.iter())
-        .chain(extra_paths.iter());
-    for path in paths {
+        .chain(extra_paths.iter())
+        .collect::<Vec<_>>();
+    for path in &paths {
         rerun_if_folder_content_changed(Path::new(path));
     }
 
-    let messages;
-    // TODO: rather than consulting "rosmsg list", we should just look for the messages ourself
-    if let Ok(message_types_override) = env::var("ROSRUST_MSG_TYPES") {
-        messages = message_types_override;
-    } else {
-        let rosmsg_list_output = Command::new("rosmsg").arg("list").output().unwrap().stdout;
-        messages = std::str::from_utf8(&rosmsg_list_output)
-            .unwrap()
-            .lines()
-            .collect::<Vec<&str>>()
-            .join(",");
-    }
+    let messages = paths
+        .iter()
+        .flat_map(|path| find_all_messages_and_services(Path::new(path)))
+        .collect::<Vec<String>>()
+        .join(",");
 
     let file_name = format!("{}/{}", out_dir, "messages.rs");
-    let file_content = format!("use rosrust;rosrust::rosmsg_include!({});", messages,);
+    let file_content = format!("use rosrust;rosrust::rosmsg_include!({});", messages);
 
     fs::write(&file_name, &file_content).unwrap();
 }
@@ -92,4 +84,34 @@ fn append_src_folder(path: &str) -> Option<String> {
         .join("src")
         .to_str()
         .map(String::from)
+}
+
+fn find_all_messages_and_services(root: &Path) -> Vec<String> {
+    if !root.is_dir() {
+        return identify_message_or_service(root).into_iter().collect();
+    }
+    let mut items = vec![];
+    if let Ok(children) = fs::read_dir(root) {
+        for child in children.filter_map(|v| v.ok()) {
+            items.append(&mut find_all_messages_and_services(&child.path()));
+        }
+    }
+    items
+}
+
+fn identify_message_or_service(filename: &Path) -> Option<String> {
+    let extension = filename.extension()?;
+    let message = filename.file_stem()?;
+    let parent = filename.parent()?;
+    let grandparent = parent.parent()?;
+    let package = grandparent.file_name()?;
+    if Some(extension) != parent.file_name() {
+        return None;
+    }
+    match extension.to_str() {
+        Some("msg") => {}
+        Some("srv") => {}
+        _ => return None,
+    }
+    Some(format!("{}/{}", package.to_str()?, message.to_str()?))
 }
