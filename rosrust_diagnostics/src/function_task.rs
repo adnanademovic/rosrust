@@ -15,7 +15,7 @@ use crate::{Status, Task};
 #[derive(Clone)]
 pub struct FunctionTask<F>
 where
-    F: Fn(&mut Status),
+    F: Fn(&mut Status) + Sync,
 {
     name: String,
     function: F,
@@ -23,7 +23,7 @@ where
 
 impl<F> FunctionTask<F>
 where
-    F: Fn(&mut Status),
+    F: Fn(&mut Status) + Sync,
 {
     /// Create a function task with the given name and function.
     #[inline]
@@ -37,7 +37,7 @@ where
 
 impl<F> Task for FunctionTask<F>
 where
-    F: Fn(&mut Status),
+    F: Fn(&mut Status) + Sync,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -51,14 +51,14 @@ where
 }
 
 /// Extension trait for functions that allows easy creation of function tasks.
-pub trait FunctionExt: Sized + Fn(&mut Status) {
+pub trait FunctionExt: Sized + Fn(&mut Status) + Sync {
     /// Converts the function into a task, and gives it the provided name.
     fn into_task(self, name: &str) -> FunctionTask<Self>;
 }
 
 impl<F> FunctionExt for F
 where
-    F: Fn(&mut Status),
+    F: Fn(&mut Status) + Sync,
 {
     fn into_task(self, name: &str) -> FunctionTask<Self> {
         FunctionTask::new(name, self)
