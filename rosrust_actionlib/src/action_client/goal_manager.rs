@@ -1,10 +1,10 @@
 use super::comm_state_machine::{CommStateMachine, OnSendCancel, OnSendGoal};
 use super::AsyncClientGoalHandle;
 use crate::action_client::{OnFeedback, OnTransition};
-use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::GoalID;
 use crate::{Action, FeedbackType, GoalBody, GoalType, ResultType};
+use rosrust_msg::actionlib_msgs::GoalStatusArray;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 

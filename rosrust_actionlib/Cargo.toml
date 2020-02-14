@@ -5,7 +5,12 @@ description = "Actionlib functionality for rosrust"
 license = "MIT"
 name = "rosrust_actionlib"
 version = "0.0.1"
+build = "build.rs"
 
 [dependencies]
 rosrust = {path="../rosrust"}
+rosrust_msg = {path="../rosrust_msg"}
 paste = "0.1.6"
+
+[build-dependencies]
+rosrust_msg = {path="../rosrust_msg"}

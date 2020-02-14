@@ -4,9 +4,9 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct MessagePath {
     pub package: String,
     pub name: String,
@@ -65,12 +65,6 @@ impl<'a> TryFrom<&'a str> for MessagePath {
 
     fn try_from(value: &'a str) -> Result<Self> {
         Self::from_combined(value)
-    }
-}
-
-impl Hash for MessagePath {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        (&self.package, &self.name).hash(state)
     }
 }
 

@@ -26,9 +26,10 @@ pub fn rosmsg_include(input: TokenStream) -> TokenStream {
         }
     }
     let is_internal = next_item == "INTERNAL";
-    if !is_internal && next_item != "" {
+    let ignore_bad = next_item == "IGNORE_BAD";
+    if !is_internal && !ignore_bad && next_item != "" {
         messages.push(next_item);
     }
     let message_refs = messages.iter().map(String::as_str).collect::<Vec<&str>>();
-    rosmsg_include::depend_on_messages(&message_refs, is_internal)
+    rosmsg_include::depend_on_messages(&message_refs, is_internal, ignore_bad)
 }

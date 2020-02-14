@@ -1,7 +1,7 @@
-use crate::msg::diagnostic_msgs::{DiagnosticArray, DiagnosticStatus};
-use crate::msg::std_msgs::Header;
 use crate::{Level, Status, Task};
 use rosrust::{error::Result, Publisher};
+use rosrust_msg::diagnostic_msgs::{DiagnosticArray, DiagnosticStatus};
+use rosrust_msg::std_msgs::Header;
 use std::sync::Mutex;
 
 /// Manages a list of diagnostic tasks, and calls them in a rate-limited manner.

@@ -1,17 +1,17 @@
 pub use self::action_client::{ActionClient, ClientGoalHandle, SimpleActionClient};
 pub use self::action_server::ActionServer;
 pub use self::goal_status::{GoalState, GoalStatus};
-pub use msg::actionlib_msgs::GoalID;
-pub use msg::std_msgs::Header;
 #[doc(hidden)]
 pub use paste;
+pub use rosrust_msg::actionlib_msgs::GoalID;
+pub use rosrust_msg::std_msgs::Header;
 
 pub mod action_client;
 pub mod action_server;
 mod goal_status;
-mod msg;
 #[macro_use]
 mod macros;
+mod impls;
 mod static_messages;
 
 pub trait Action: rosrust::Message {
@@ -32,7 +32,7 @@ pub trait ActionGoal: rosrust::Message {
 
 #[derive(Clone, Default)]
 pub struct Goal<T> {
-    pub header: msg::std_msgs::Header,
+    pub header: Header,
     pub id: GoalID,
     pub body: T,
 }
@@ -46,7 +46,7 @@ pub trait ActionResponse: rosrust::Message {
 
 #[derive(Clone, Default)]
 pub struct Response<T> {
-    pub header: msg::std_msgs::Header,
+    pub header: Header,
     pub status: GoalStatus,
     pub body: T,
 }

@@ -1,13 +1,13 @@
 use crate::error::{ErrorKind, Result, ResultExt};
 use crate::message_path::MessagePath;
-use crate::msg::Msg;
+use crate::msg::{Msg, Srv};
 use error_chain::bail;
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
 use std;
 use std::collections::{HashMap, HashSet, LinkedList};
-use std::fs::File;
-use std::path::Path;
+use std::fs::{read_dir, File};
+use std::path::{Path, PathBuf};
 
 pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, String>> {
     let mut representations = HashMap::<MessagePath, String>::new();
@@ -28,7 +28,7 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
             break;
         }
     }
-    for message in &message_map.services {
+    for message in message_map.services.keys() {
         let key_req = MessagePath::new(&message.package, format!("{}Req", message.name));
         let key_res = MessagePath::new(&message.package, format!("{}Res", message.name));
         let req = match representations.get(&key_req) {
@@ -90,18 +90,43 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
 
 pub struct MessageMap {
     pub messages: HashMap<MessagePath, Msg>,
-    pub services: HashSet<MessagePath>,
+    pub services: HashMap<MessagePath, Srv>,
 }
 
-pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Result<MessageMap> {
+pub fn get_message_map(
+    ignore_bad_messages: bool,
+    folders: &[&str],
+    message_paths: &[MessagePath],
+) -> Result<MessageMap> {
+    let mut message_locations = HashMap::new();
+    let mut service_locations = HashMap::new();
+
+    let mut messages_and_services = vec![];
+    for folder in folders {
+        messages_and_services.append(&mut find_all_messages_and_services(Path::new(folder)));
+    }
+
+    for (message_path, file_path, message_type) in messages_and_services {
+        match message_type {
+            MessageType::Message => message_locations.insert(message_path, file_path),
+            MessageType::Service => service_locations.insert(message_path, file_path),
+        };
+    }
+
     let mut messages = HashMap::new();
-    let mut services = HashSet::new();
+    let mut services = HashMap::new();
     let mut pending = message_paths.to_vec();
     while let Some(message_path) = pending.pop() {
         if messages.contains_key(&message_path) {
             continue;
         }
-        match get_message_or_service(folders, message_path)? {
+        match get_message_or_service(
+            ignore_bad_messages,
+            folders,
+            &message_locations,
+            &service_locations,
+            message_path,
+        )? {
             MessageCase::Message(message) => {
                 for dependency in &message.dependencies() {
                     pending.push(dependency.clone());
@@ -117,16 +142,55 @@ pub fn get_message_map(folders: &[&str], message_paths: &[MessagePath]) -> Resul
                 }
                 messages.insert(req.path.clone(), req);
                 messages.insert(res.path.clone(), res);
-                services.insert(service);
+                services.insert(service.path.clone(), service);
             }
         }
     }
     Ok(MessageMap { messages, services })
 }
 
+enum MessageType {
+    Message,
+    Service,
+}
+
+fn find_all_messages_and_services(root: &Path) -> Vec<(MessagePath, PathBuf, MessageType)> {
+    if !root.is_dir() {
+        return identify_message_or_service(root).into_iter().collect();
+    }
+    let mut items = vec![];
+    if let Ok(children) = read_dir(root) {
+        for child in children.filter_map(|v| v.ok()) {
+            items.append(&mut find_all_messages_and_services(&child.path()));
+        }
+    }
+    items
+}
+
+fn identify_message_or_service(filename: &Path) -> Option<(MessagePath, PathBuf, MessageType)> {
+    let extension = filename.extension()?;
+    let message = filename.file_stem()?;
+    let parent = filename.parent()?;
+    let grandparent = parent.parent()?;
+    let package = grandparent.file_name()?;
+    if Some(extension) != parent.file_name() {
+        return None;
+    }
+    let message_type = match extension.to_str() {
+        Some("msg") => MessageType::Message,
+        Some("srv") => MessageType::Service,
+        _ => return None,
+    };
+    Some((
+        MessagePath::new(package.to_str()?, message.to_str()?),
+        filename.into(),
+        message_type,
+    ))
+}
+
 enum MessageCase {
     Message(Msg),
-    Service(MessagePath, Msg, Msg),
+    Service(Srv, Msg, Msg),
 }
 
 lazy_static! {
@@ -152,30 +216,29 @@ fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
 }
 
 #[allow(clippy::trivial_regex)]
-fn get_message_or_service(folders: &[&str], message: MessagePath) -> Result<MessageCase> {
+fn get_message_or_service(
+    ignore_bad_messages: bool,
+    folders: &[&str],
+    message_locations: &HashMap<MessagePath, PathBuf>,
+    service_locations: &HashMap<MessagePath, PathBuf>,
+    message: MessagePath,
+) -> Result<MessageCase> {
     use std::io::Read;
 
     let package = &message.package;
     let name = &message.name;
 
-    for folder in folders {
-        let full_path = Path::new(&folder)
-            .join(&package)
-            .join("msg")
-            .join(&name)
-            .with_extension("msg");
-        if let Ok(mut f) = File::open(&full_path) {
+    if let Some(full_path) = message_locations.get(&message) {
+        if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            return Msg::new(message, &contents).map(MessageCase::Message);
+            return create_message(message, &contents, ignore_bad_messages)
+                .map(MessageCase::Message);
         }
-        let full_path = Path::new(&folder)
-            .join(&package)
-            .join("srv")
-            .join(&name)
-            .with_extension("srv");
-        if let Ok(mut f) = File::open(&full_path) {
+    }
+    if let Some(full_path) = service_locations.get(&message) {
+        if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
@@ -186,18 +249,43 @@ fn get_message_or_service(folders: &[&str], message: MessagePath) -> Result<Mess
                 &[] => bail!("Service {} does not have any content", message),
                 v => bail!("Service {} is split into {} parts", message, v.len()),
             };
-            let req = Msg::new(MessagePath::new(package, format!("{}Req", name)), req)?;
-            let res = Msg::new(MessagePath::new(package, format!("{}Res", name)), res)?;
-            return Ok(MessageCase::Service(message, req, res));
+            let req = create_message(
+                MessagePath::new(package, format!("{}Req", name)),
+                req,
+                ignore_bad_messages,
+            )?;
+            let res = create_message(
+                MessagePath::new(package, format!("{}Res", name)),
+                res,
+                ignore_bad_messages,
+            )?;
+            let service = Srv {
+                path: message,
+                source: contents,
+            };
+            return Ok(MessageCase::Service(service, req, res));
         }
     }
     if let Some(contents) = IN_MEMORY_MESSAGES.get(&message) {
         return Msg::new(message, contents).map(MessageCase::Message);
     }
+    if ignore_bad_messages {
+        return Msg::new(message, "").map(MessageCase::Message);
+    }
     bail!(ErrorKind::MessageNotFound(
         message.to_string(),
         folders.join("\n"),
     ))
+}
+
+fn create_message(message: MessagePath, contents: &str, ignore_bad_messages: bool) -> Result<Msg> {
+    Msg::new(message.clone(), contents).or_else(|err| {
+        if ignore_bad_messages {
+            Msg::new(message, "")
+        } else {
+            Err(err)
+        }
+    })
 }
 
 #[cfg(test)]
@@ -208,20 +296,26 @@ mod tests {
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
-        let message_map =
-            get_message_map(&[FILEPATH], &[MessagePath::new("geometry_msgs", "Point")])
-                .unwrap()
-                .messages;
+        let message_map = get_message_map(
+            false,
+            &[FILEPATH],
+            &[MessagePath::new("geometry_msgs", "Point")],
+        )
+        .unwrap()
+        .messages;
         assert_eq!(message_map.len(), 1);
         assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
     }
 
     #[test]
     fn get_message_map_fetches_message_and_dependencies() {
-        let message_map =
-            get_message_map(&[FILEPATH], &[MessagePath::new("geometry_msgs", "Pose")])
-                .unwrap()
-                .messages;
+        let message_map = get_message_map(
+            false,
+            &[FILEPATH],
+            &[MessagePath::new("geometry_msgs", "Pose")],
+        )
+        .unwrap()
+        .messages;
         assert_eq!(message_map.len(), 3);
         assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
         assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose")));
@@ -231,6 +325,7 @@ mod tests {
     #[test]
     fn get_message_map_traverses_whole_dependency_tree() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[MessagePath::new("geometry_msgs", "PoseStamped")],
         )
@@ -247,6 +342,7 @@ mod tests {
     #[test]
     fn get_message_map_traverses_all_passed_messages_dependency_tree() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("geometry_msgs", "PoseStamped"),
@@ -272,6 +368,7 @@ mod tests {
     #[test]
     fn calculate_md5_works() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("geometry_msgs", "PoseStamped"),
@@ -337,10 +434,13 @@ mod tests {
 
     #[test]
     fn generate_message_definition_works() {
-        let message_map =
-            get_message_map(&[FILEPATH], &[MessagePath::new("geometry_msgs", "Vector3")])
-                .unwrap()
-                .messages;
+        let message_map = get_message_map(
+            false,
+            &[FILEPATH],
+            &[MessagePath::new("geometry_msgs", "Vector3")],
+        )
+        .unwrap()
+        .messages;
         let definition = generate_message_definition(
             &message_map,
             &message_map
@@ -358,6 +458,7 @@ mod tests {
              y\nfloat64 z\n"
         );
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[MessagePath::new("geometry_msgs", "PoseStamped")],
         )
@@ -422,6 +523,7 @@ float64 w\n\
     #[test]
     fn calculate_md5_works_for_services() {
         let message_map = get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("diagnostic_msgs", "AddDiagnostics"),
@@ -448,6 +550,7 @@ float64 w\n\
     #[test]
     fn parse_tricky_srv_files() {
         get_message_map(
+            false,
             &[FILEPATH],
             &[
                 MessagePath::new("empty_srv", "Empty"),

@@ -1,10 +1,6 @@
 use env_logger;
 use rosrust::{self, ros_info};
 
-mod msg {
-    rosrust::rosmsg_include!(std_msgs / String);
-}
-
 fn main() {
     env_logger::init();
 
@@ -16,7 +12,7 @@ fn main() {
     let chatter_pub_unlatched = rosrust::publish("chatter", 2).unwrap();
     chatter_pub_latched.set_latching(true);
 
-    let mut msg = msg::std_msgs::String::default();
+    let mut msg = rosrust_msg::std_msgs::String::default();
     msg.data = String::from("hello world latched");
 
     // Log event
