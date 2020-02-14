@@ -10,4 +10,4 @@ version = "0.1.0"
 build = "build.rs"
 
 [dependencies]
-rosrust = "0.9"
+rosrust = "0.9.4"
