@@ -65,9 +65,9 @@ impl Msg {
             .map(|v| v.const_token_stream(crate_prefix))
             .collect::<Vec<_>>();
         let serde_derives = if cfg!(feature = "derive-serde") {
-            quote! { #[derive(::serde::Serialize, ::serde::Deserialize)] };
+            quote! { #[derive(::serde::Serialize, ::serde::Deserialize)] }
         } else {
-            quote! {};
+            quote! {}
         };
         quote! {
             #[allow(dead_code, non_camel_case_types, non_snake_case)]
