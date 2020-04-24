@@ -5,6 +5,7 @@ use super::slave::Slave;
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
 use log::error;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
@@ -95,14 +96,20 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub(crate) fn new<T: Message, F: Fn(T, &str) + Send + 'static>(
+    pub(crate) fn new<T, F, G>(
         master: Arc<Master>,
         slave: Arc<Slave>,
         name: &str,
         queue_size: usize,
-        callback: F,
-    ) -> Result<Self> {
-        slave.add_subscription::<T, F>(name, queue_size, callback)?;
+        on_message: F,
+        on_connect: G,
+    ) -> Result<Self>
+    where
+        T: Message,
+        F: Fn(T, &str) + Send + 'static,
+        G: Fn(HashMap<String, String>) + Send + 'static,
+    {
+        slave.add_subscription::<T, F, G>(name, queue_size, on_message, on_connect)?;
 
         let info = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,

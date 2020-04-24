@@ -15,6 +15,7 @@ use crate::time::{Duration, Time};
 use error_chain::bail;
 use log::error;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread::sleep;
 use xml_rpc;
@@ -268,23 +269,44 @@ impl Ros {
     pub fn subscribe_with_ids<T, F>(
         &self,
         topic: &str,
-        mut queue_size: usize,
+        queue_size: usize,
         callback: F,
     ) -> Result<Subscriber>
     where
         T: Message,
         F: Fn(T, &str) + Send + 'static,
     {
+        self.subscribe_with_ids_and_headers(
+            topic,
+            queue_size,
+            callback,
+            |_: HashMap<String, String>| (),
+        )
+    }
+
+    pub fn subscribe_with_ids_and_headers<T, F, G>(
+        &self,
+        topic: &str,
+        mut queue_size: usize,
+        on_message: F,
+        on_connect: G,
+    ) -> Result<Subscriber>
+    where
+        T: Message,
+        F: Fn(T, &str) + Send + 'static,
+        G: Fn(HashMap<String, String>) + Send + 'static,
+    {
         if queue_size == 0 {
             queue_size = usize::max_value();
         }
         let name = self.resolver.translate(topic)?;
-        Subscriber::new::<T, F>(
+        Subscriber::new::<T, F, G>(
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
             &name,
             queue_size,
-            callback,
+            on_message,
+            on_connect,
         )
     }
 

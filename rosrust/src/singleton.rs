@@ -10,6 +10,7 @@ use crossbeam::sync::ShardedLock;
 use ctrlc;
 use error_chain::bail;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::time;
 
 lazy_static! {
@@ -166,6 +167,21 @@ where
     F: Fn(T, &str) + Send + 'static,
 {
     ros!().subscribe_with_ids::<T, F>(topic, queue_size, callback)
+}
+
+#[inline]
+pub fn subscribe_with_ids_and_headers<T, F, G>(
+    topic: &str,
+    queue_size: usize,
+    on_message: F,
+    on_connect: G,
+) -> Result<Subscriber>
+where
+    T: Message,
+    F: Fn(T, &str) + Send + 'static,
+    G: Fn(HashMap<String, String>) + Send + 'static,
+{
+    ros!().subscribe_with_ids_and_headers::<T, F, G>(topic, queue_size, on_message, on_connect)
 }
 
 #[inline]
