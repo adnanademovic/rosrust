@@ -17,7 +17,7 @@ fn main() {
     let subscriber_info = rosrust::subscribe_with_ids_and_headers(
         "chatter",
         2,
-        |v: rosrust::RawSubMessage, id: &str| {
+        |v: rosrust::RawMessage, id: &str| {
             // Callback for handling received messages
             rosrust::ros_info!("Received from '{}': {:?}", id, v.0);
         },

@@ -2,9 +2,26 @@ use crate::{Message, RosMsg};
 use std::io;
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct RawSubMessage(pub Vec<u8>);
+pub struct RawMessage(pub Vec<u8>);
 
-impl Message for RawSubMessage {
+#[derive(Clone, Debug, PartialEq)]
+pub struct RawMessageDescription {
+    pub msg_definition: String,
+    pub md5sum: String,
+    pub msg_type: String,
+}
+
+impl RawMessageDescription {
+    pub fn from_message<T: Message>() -> Self {
+        Self {
+            msg_definition: T::msg_definition(),
+            md5sum: T::md5sum(),
+            msg_type: T::msg_type(),
+        }
+    }
+}
+
+impl Message for RawMessage {
     fn msg_definition() -> String {
         "*".into()
     }
@@ -18,7 +35,7 @@ impl Message for RawSubMessage {
     }
 }
 
-impl RosMsg for RawSubMessage {
+impl RosMsg for RawMessage {
     fn encode<W: io::Write>(&self, mut w: W) -> io::Result<()> {
         w.write_all(&self.0)
     }

@@ -2,7 +2,7 @@
 
 pub use crate::api::raii::{Publisher, Service, Subscriber};
 pub use crate::api::{error, Clock, Parameter};
-pub use crate::raw_sub_message::RawSubMessage;
+pub use crate::raw_message::{RawMessage, RawMessageDescription};
 #[doc(hidden)]
 pub use crate::rosmsg::RosMsg;
 pub use crate::singleton::*;
@@ -15,7 +15,7 @@ pub mod api;
 mod log_macros;
 #[doc(hidden)]
 pub mod msg;
-mod raw_sub_message;
+mod raw_message;
 #[doc(hidden)]
 pub mod rosmsg;
 mod rosxmlrpc;

@@ -4,6 +4,7 @@ use super::master::Master;
 use super::slave::Slave;
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
+use crate::RawMessageDescription;
 use log::error;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
@@ -25,8 +26,12 @@ impl<T: Message> Publisher<T> {
         hostname: &str,
         name: &str,
         queue_size: usize,
+        message_description: Option<RawMessageDescription>,
     ) -> Result<Self> {
-        let stream = slave.add_publication::<T>(hostname, name, queue_size)?;
+        let message_description =
+            message_description.unwrap_or_else(RawMessageDescription::from_message::<T>);
+        let stream =
+            slave.add_publication::<T>(hostname, name, queue_size, message_description.clone())?;
 
         let raii = Arc::new(InteractorRaii::new(PublisherInfo {
             master,
@@ -36,7 +41,7 @@ impl<T: Message> Publisher<T> {
 
         raii.interactor
             .master
-            .register_publisher(name, &T::msg_type())
+            .register_publisher(name, &message_description.msg_type)
             .map_err(|err| {
                 error!("Failed to register publisher for topic '{}': {}", name, err);
                 err

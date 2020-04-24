@@ -6,6 +6,7 @@ use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
+use crate::RawMessageDescription;
 use crossbeam::sync::ShardedLock;
 use ctrlc;
 use error_chain::bail;
@@ -190,6 +191,18 @@ where
     T: Message,
 {
     ros!().publish::<T>(topic, queue_size)
+}
+
+#[inline]
+pub fn publish_with_description<T>(
+    topic: &str,
+    queue_size: usize,
+    message_description: RawMessageDescription,
+) -> Result<Publisher<T>>
+where
+    T: Message,
+{
+    ros!().publish_with_description::<T>(topic, queue_size, message_description)
 }
 
 #[inline]

@@ -12,6 +12,7 @@ use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
+use crate::RawMessageDescription;
 use error_chain::bail;
 use log::error;
 use serde::{Deserialize, Serialize};
@@ -310,7 +311,31 @@ impl Ros {
         )
     }
 
-    pub fn publish<T>(&self, topic: &str, mut queue_size: usize) -> Result<Publisher<T>>
+    pub fn publish<T>(&self, topic: &str, queue_size: usize) -> Result<Publisher<T>>
+    where
+        T: Message,
+    {
+        self.publish_common(topic, queue_size, None)
+    }
+
+    pub fn publish_with_description<T>(
+        &self,
+        topic: &str,
+        queue_size: usize,
+        message_description: RawMessageDescription,
+    ) -> Result<Publisher<T>>
+    where
+        T: Message,
+    {
+        self.publish_common(topic, queue_size, Some(message_description))
+    }
+
+    fn publish_common<T>(
+        &self,
+        topic: &str,
+        mut queue_size: usize,
+        message_description: Option<RawMessageDescription>,
+    ) -> Result<Publisher<T>>
     where
         T: Message,
     {
@@ -325,6 +350,7 @@ impl Ros {
             &self.bind_address,
             &name,
             queue_size,
+            message_description,
         )
     }
 
