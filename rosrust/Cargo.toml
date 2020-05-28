@@ -6,7 +6,7 @@ license = "MIT"
 name = "rosrust"
 readme = "../README.md"
 repository = "https://github.com/adnanademovic/rosrust"
-version = "0.9.4"
+version = "0.9.5"
 
 [dependencies]
 byteorder = "1.3.2"
