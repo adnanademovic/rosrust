@@ -130,8 +130,15 @@ impl Service {
         let req_ident = Ident::new(&format!("{}Req", name), Span::call_site());
         let res_ident = Ident::new(&format!("{}Res", name), Span::call_site());
 
+        let serde_derives = if cfg!(feature = "derive-serde") {
+            quote! { #[derive(::serde::Serialize, ::serde::Deserialize)] }
+        } else {
+            quote! {}
+        };
+
         quote! {
             #[allow(dead_code,non_camel_case_types,non_snake_case)]
+            #serde_derives
             #[derive(Clone, Debug, Default, PartialEq)]
             pub struct #name_ident;
 
