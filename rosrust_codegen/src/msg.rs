@@ -395,6 +395,7 @@ fn match_lines(data: &str) -> Result<Vec<FieldInfo>> {
         .chain_err(|| "Failed to parse line in data string")
 }
 
+#[cfg_attr(feature = "derive-serde", derive(::serde::Serialize, ::serde::Deserialize))]
 #[derive(Debug, PartialEq)]
 struct FieldLine {
     field_type: String,
