@@ -15,7 +15,7 @@ error-chain = "0.12.1"
 lazy_static = "1.4.0"
 log = "0.4.8"
 nix = "0.15.0"
-rosrust_codegen = {path="../rosrust_codegen"}
+rosrust_codegen = 0.9.3
 serde = "1.0.102"
 serde_derive = "1.0.102"
 xml-rpc = "0.0.12"
