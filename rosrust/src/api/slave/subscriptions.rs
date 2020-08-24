@@ -51,10 +51,18 @@ impl SubscriptionsTracker {
             .collect()
     }
 
-    pub fn add<T, F>(&self, name: &str, topic: &str, queue_size: usize, callback: F) -> Result<()>
+    pub fn add<T, F, G>(
+        &self,
+        name: &str,
+        topic: &str,
+        queue_size: usize,
+        on_message: F,
+        on_connect: G,
+    ) -> Result<()>
     where
         T: Message,
         F: Fn(T, &str) + Send + 'static,
+        G: Fn(HashMap<String, String>) + Send + 'static,
     {
         use std::collections::hash_map::Entry;
         match self
@@ -68,7 +76,8 @@ impl SubscriptionsTracker {
                 Err(ErrorKind::Duplicate("subscription".into()).into())
             }
             Entry::Vacant(entry) => {
-                let subscriber = Subscriber::new::<T, F>(name, topic, queue_size, callback);
+                let subscriber =
+                    Subscriber::new::<T, F, G>(name, topic, queue_size, on_message, on_connect);
                 entry.insert(subscriber);
                 Ok(())
             }

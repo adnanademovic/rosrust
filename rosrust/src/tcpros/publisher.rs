@@ -4,6 +4,7 @@ use super::util::streamfork::{fork, DataStream, TargetList};
 use super::util::tcpconnection;
 use super::{Message, Topic};
 use crate::util::FAILED_TO_LOCK;
+use crate::RawMessageDescription;
 use error_chain::bail;
 use log::error;
 use std;
@@ -26,59 +27,75 @@ impl Drop for Publisher {
     }
 }
 
-fn match_headers<T: Message>(fields: &HashMap<String, String>, topic: &str) -> Result<()> {
-    header::match_field(fields, "md5sum", &T::md5sum())
+fn match_headers(
+    fields: &HashMap<String, String>,
+    topic: &str,
+    message_description: &RawMessageDescription,
+) -> Result<()> {
+    header::match_field(fields, "md5sum", &message_description.md5sum)
         .or_else(|e| header::match_field(fields, "md5sum", "*").or(Err(e)))?;
-    header::match_field(fields, "type", &T::msg_type())
+    header::match_field(fields, "type", &message_description.msg_type)
         .or_else(|e| header::match_field(fields, "type", "*").or(Err(e)))?;
     header::match_field(fields, "topic", topic)?;
     Ok(())
 }
 
-fn read_request<T: Message, U: std::io::Read>(mut stream: &mut U, topic: &str) -> Result<String> {
+fn read_request<U: std::io::Read>(
+    mut stream: &mut U,
+    topic: &str,
+    message_description: &RawMessageDescription,
+) -> Result<String> {
     let fields = header::decode(&mut stream)?;
-    match_headers::<T>(&fields, topic)?;
+    match_headers(&fields, topic, message_description)?;
     let caller_id = fields
         .get("callerid")
         .ok_or_else(|| ErrorKind::HeaderMissingField("callerid".into()))?;
     Ok(caller_id.clone())
 }
 
-fn write_response<T: Message, U: std::io::Write>(
+fn write_response<U: std::io::Write>(
     mut stream: &mut U,
     caller_id: &str,
+    message_description: &RawMessageDescription,
 ) -> Result<()> {
     let mut fields = HashMap::<String, String>::new();
-    fields.insert(String::from("md5sum"), T::md5sum());
-    fields.insert(String::from("type"), T::msg_type());
+    fields.insert(String::from("md5sum"), message_description.md5sum.clone());
+    fields.insert(String::from("type"), message_description.msg_type.clone());
     fields.insert(String::from("callerid"), caller_id.into());
-    fields.insert(String::from("message_definition"), T::msg_definition());
+    fields.insert(
+        String::from("message_definition"),
+        message_description.msg_definition.clone(),
+    );
     header::encode(&mut stream, &fields)?;
     Ok(())
 }
 
-fn exchange_headers<T, U>(mut stream: &mut U, topic: &str, pub_caller_id: &str) -> Result<String>
+fn exchange_headers<U>(
+    mut stream: &mut U,
+    topic: &str,
+    pub_caller_id: &str,
+    message_description: &RawMessageDescription,
+) -> Result<String>
 where
-    T: Message,
     U: std::io::Write + std::io::Read,
 {
-    let caller_id = read_request::<T, U>(&mut stream, topic)?;
-    write_response::<T, U>(&mut stream, pub_caller_id)?;
+    let caller_id = read_request(&mut stream, topic, message_description)?;
+    write_response(&mut stream, pub_caller_id, message_description)?;
     Ok(caller_id)
 }
 
-fn process_subscriber<T, U>(
+fn process_subscriber<U>(
     topic: &str,
     mut stream: U,
     targets: &TargetList<U>,
     last_message: &Mutex<Arc<Vec<u8>>>,
     pub_caller_id: &str,
+    message_description: &RawMessageDescription,
 ) -> tcpconnection::Feedback
 where
-    T: Message,
     U: std::io::Read + std::io::Write + Send,
 {
-    let result = exchange_headers::<T, _>(&mut stream, topic, pub_caller_id)
+    let result = exchange_headers(&mut stream, topic, pub_caller_id, message_description)
         .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
     let caller_id = match result {
         Ok(caller_id) => caller_id,
@@ -109,14 +126,14 @@ where
 }
 
 impl Publisher {
-    pub fn new<T, U>(
+    pub fn new<U>(
         address: U,
         topic: &str,
         queue_size: usize,
         caller_id: &str,
+        message_description: RawMessageDescription,
     ) -> Result<Publisher>
     where
-        T: Message,
         U: ToSocketAddrs,
     {
         let listener = TcpListener::bind(address)?;
@@ -133,12 +150,20 @@ impl Publisher {
             let topic = String::from(topic);
             let last_message = Arc::clone(&last_message);
             let caller_id = String::from(caller_id);
+            let message_description = message_description.clone();
 
             move |stream: TcpStream| {
                 if !publisher_exists.load(atomic::Ordering::SeqCst) {
                     return tcpconnection::Feedback::StopAccepting;
                 }
-                process_subscriber::<T, _>(&topic, stream, &targets, &last_message, &caller_id)
+                process_subscriber(
+                    &topic,
+                    stream,
+                    &targets,
+                    &last_message,
+                    &caller_id,
+                    &message_description,
+                )
             }
         };
 
@@ -146,7 +171,7 @@ impl Publisher {
 
         let topic = Topic {
             name: String::from(topic),
-            msg_type: T::msg_type(),
+            msg_type: message_description.msg_type,
         };
 
         Ok(Publisher {
@@ -159,8 +184,12 @@ impl Publisher {
         })
     }
 
-    pub fn stream<T: Message>(&self, queue_size: usize) -> Result<PublisherStream<T>> {
-        let mut stream = PublisherStream::new(self)?;
+    pub fn stream<T: Message>(
+        &self,
+        queue_size: usize,
+        message_description: RawMessageDescription,
+    ) -> Result<PublisherStream<T>> {
+        let mut stream = PublisherStream::new(self, message_description)?;
         stream.set_queue_size_max(queue_size);
         Ok(stream)
     }
@@ -183,12 +212,14 @@ pub struct PublisherStream<T: Message> {
 }
 
 impl<T: Message> PublisherStream<T> {
-    fn new(publisher: &Publisher) -> Result<PublisherStream<T>> {
-        let msg_type = T::msg_type();
-        if publisher.topic.msg_type != msg_type {
+    fn new(
+        publisher: &Publisher,
+        message_description: RawMessageDescription,
+    ) -> Result<PublisherStream<T>> {
+        if publisher.topic.msg_type != message_description.msg_type {
             bail!(ErrorKind::MessageTypeMismatch(
                 publisher.topic.msg_type.clone(),
-                msg_type,
+                message_description.msg_type,
             ));
         }
         let mut stream = PublisherStream {
