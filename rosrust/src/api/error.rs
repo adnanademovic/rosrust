@@ -21,6 +21,10 @@ error_chain::error_chain! {
             description("Could not add duplicate")
             display("Could not add duplicate {}", t)
         }
+        MismatchedType(topic: String, actual_type: String, attempted_type:String) {
+            description("Attempted to connect to topic with wrong message type")
+            display("Attempted to connect to {} topic '{}' with message type {}", actual_type, topic, attempted_type)
+        }
         MultipleInitialization {
             description("Cannot initialize multiple nodes")
             display("Cannot initialize multiple nodes")

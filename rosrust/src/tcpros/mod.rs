@@ -2,7 +2,7 @@ pub use self::client::{Client, ClientResponse};
 pub use self::error::Error;
 pub use self::publisher::{Publisher, PublisherStream};
 pub use self::service::Service;
-pub use self::subscriber::Subscriber;
+pub use self::subscriber::SubscriberRosConnection;
 
 use crate::rosmsg::RosMsg;
 use crate::Clock;
@@ -36,4 +36,5 @@ pub trait ServicePair: Clone + Debug + Default + PartialEq + Message {
 pub struct Topic {
     pub name: String,
     pub msg_type: String,
+    pub md5sum: String,
 }

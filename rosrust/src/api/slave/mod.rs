@@ -148,25 +148,25 @@ impl Slave {
     }
 
     #[inline]
-    pub fn add_subscription<T, F, G>(
+    pub fn add_subscription_2<T, F, G>(
         &self,
         topic: &str,
         queue_size: usize,
         on_message: F,
         on_connect: G,
-    ) -> Result<()>
+    ) -> Result<usize>
     where
         T: Message,
         F: Fn(T, &str) + Send + 'static,
         G: Fn(HashMap<String, String>) + Send + 'static,
     {
         self.subscriptions
-            .add(&self.name, topic, queue_size, on_message, on_connect)
+            .add_2(&self.name, topic, queue_size, on_message, on_connect)
     }
 
     #[inline]
-    pub fn remove_subscription(&self, topic: &str) {
-        self.subscriptions.remove(topic)
+    pub fn remove_subscription(&self, topic: &str, id: usize) {
+        self.subscriptions.remove(topic, id)
     }
 
     #[inline]
