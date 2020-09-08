@@ -114,7 +114,7 @@ impl Subscriber {
         F: Fn(T, &str) + Send + 'static,
         G: Fn(HashMap<String, String>) + Send + 'static,
     {
-        let id = slave.add_subscription_2::<T, F, G>(name, queue_size, on_message, on_connect)?;
+        let id = slave.add_subscription::<T, F, G>(name, queue_size, on_message, on_connect)?;
 
         let info = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,

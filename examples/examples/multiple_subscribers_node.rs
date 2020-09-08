@@ -1,6 +1,6 @@
 use env_logger;
 use rosrust;
-use rosrust::{sleep, Duration};
+use rosrust::{sleep, Duration, RawMessage};
 
 fn main() {
     env_logger::init();
@@ -13,9 +13,9 @@ fn main() {
     let subscriber_info_1 = rosrust::subscribe_with_ids_and_headers(
         "chatter",
         2,
-        |v: rosrust_msg::std_msgs::String, id| {
+        |v: RawMessage, id| {
             // Callback for handling received messages
-            rosrust::ros_info!("Received 1 from {}: {}", id, v.data);
+            rosrust::ros_info!("Received 1 from {}: {:?}", id, v.0);
         },
         |headers| {
             // Callback for handling received messages
@@ -24,7 +24,7 @@ fn main() {
     )
     .unwrap();
 
-    sleep(Duration::from_seconds(5));
+    sleep(Duration::from_seconds(2));
 
     // Create subscriber
     // The subscriber is stopped when all the returned objects are destroyed

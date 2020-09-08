@@ -148,7 +148,7 @@ impl Slave {
     }
 
     #[inline]
-    pub fn add_subscription_2<T, F, G>(
+    pub fn add_subscription<T, F, G>(
         &self,
         topic: &str,
         queue_size: usize,
@@ -161,7 +161,7 @@ impl Slave {
         G: Fn(HashMap<String, String>) + Send + 'static,
     {
         self.subscriptions
-            .add_2(&self.name, topic, queue_size, on_message, on_connect)
+            .add(&self.name, topic, queue_size, on_message, on_connect)
     }
 
     #[inline]

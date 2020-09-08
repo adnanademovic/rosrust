@@ -51,7 +51,7 @@ impl SubscriptionsTracker {
             .collect()
     }
 
-    pub fn add_2<T, F, G>(
+    pub fn add<T, F, G>(
         &self,
         name: &str,
         topic: &str,
@@ -78,12 +78,19 @@ impl SubscriptionsTracker {
             )
         });
         let connection_topic = connection.get_topic();
-        if connection_topic.msg_type != msg_type || connection_topic.md5sum != md5sum {
+        if !header_matches(&connection_topic.msg_type, &msg_type)
+            || !header_matches(&connection_topic.md5sum, &md5sum)
+        {
             error!(
                 "Attempted to connect to {} topic '{}' with message type {}",
                 connection_topic.msg_type, topic, msg_type
             );
-            Err(ErrorKind::Duplicate("subscription".into()).into())
+            Err(ErrorKind::MismatchedType(
+                topic.into(),
+                connection_topic.msg_type.clone(),
+                msg_type,
+            )
+            .into())
         } else {
             Ok(connection.add_subscriber(queue_size, on_message, on_connect))
         }
@@ -121,6 +128,10 @@ impl SubscriptionsTracker {
             .get(topic)
             .map_or_else(Vec::new, SubscriberRosConnection::publisher_uris)
     }
+}
+
+fn header_matches(first: &str, second: &str) -> bool {
+    first == "*" || second == "*" || first == second
 }
 
 fn connect_to_publisher(
