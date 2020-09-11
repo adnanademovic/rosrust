@@ -20,10 +20,17 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub fn new<T, F>(caller_id: &str, topic: &str, queue_size: usize, callback: F) -> Subscriber
+    pub fn new<T, F, G>(
+        caller_id: &str,
+        topic: &str,
+        queue_size: usize,
+        on_message: F,
+        on_connect: G,
+    ) -> Subscriber
     where
         T: Message,
         F: Fn(T, &str) + Send + 'static,
+        G: Fn(HashMap<String, String>) + Send + 'static,
     {
         let (data_tx, data_rx) = lossy_channel(queue_size);
         let publisher_connection_queue_size = 8;
@@ -31,8 +38,10 @@ impl Subscriber {
         let caller_id = String::from(caller_id);
         let topic_name = String::from(topic);
         let data_stream = data_tx.clone();
-        thread::spawn(move || join_connections::<T>(&data_tx, pub_rx, &caller_id, &topic_name));
-        thread::spawn(move || handle_data::<T, F>(data_rx, callback));
+        thread::spawn(move || {
+            join_connections::<T, G>(&data_tx, pub_rx, &caller_id, &topic_name, on_connect)
+        });
+        thread::spawn(move || handle_data::<T, F>(data_rx, on_message));
         let topic = Topic {
             name: String::from(topic),
             msg_type: T::msg_type(),
@@ -118,25 +127,30 @@ where
     }
 }
 
-fn join_connections<T>(
+fn join_connections<T, F>(
     data_stream: &LossySender<MessageInfo>,
     publishers: Receiver<SocketAddr>,
     caller_id: &str,
     topic: &str,
+    on_connect: F,
 ) where
     T: Message,
+    F: Fn(HashMap<String, String>) + Send + 'static,
 {
     // Ends when publisher sender is destroyed, which happens at Subscriber destruction
     for publisher in publishers {
         let result = join_connection::<T>(data_stream, &publisher, caller_id, topic)
             .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
-        if let Err(err) = result {
-            let info = err
-                .iter()
-                .map(|v| format!("{}", v))
-                .collect::<Vec<_>>()
-                .join("\nCaused by:");
-            error!("{}", info);
+        match result {
+            Ok(headers) => on_connect(headers),
+            Err(err) => {
+                let info = err
+                    .iter()
+                    .map(|v| format!("{}", v))
+                    .collect::<Vec<_>>()
+                    .join("\nCaused by:");
+                error!("{}", info);
+            }
         }
     }
 }
@@ -146,12 +160,13 @@ fn join_connection<T>(
     publisher: &SocketAddr,
     caller_id: &str,
     topic: &str,
-) -> Result<()>
+) -> Result<HashMap<String, String>>
 where
     T: Message,
 {
     let mut stream = TcpStream::connect(publisher)?;
-    let pub_caller_id = exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
+    let headers = exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
+    let pub_caller_id = headers.get("callerid").cloned();
     let target = data_stream.clone();
     thread::spawn(move || {
         let pub_caller_id = Arc::new(pub_caller_id.unwrap_or_default());
@@ -165,7 +180,7 @@ where
             }
         }
     });
-    Ok(())
+    Ok(headers)
 }
 
 fn write_request<T: Message, U: std::io::Write>(
@@ -183,14 +198,26 @@ fn write_request<T: Message, U: std::io::Write>(
     Ok(())
 }
 
-fn read_response<T: Message, U: std::io::Read>(mut stream: &mut U) -> Result<Option<String>> {
+fn read_response<T: Message, U: std::io::Read>(
+    mut stream: &mut U,
+) -> Result<HashMap<String, String>> {
     let fields = decode(&mut stream)?;
-    match_field(&fields, "md5sum", &T::md5sum())?;
-    match_field(&fields, "type", &T::msg_type())?;
-    Ok(fields.get("callerid").cloned())
+    let md5sum = T::md5sum();
+    let msg_type = T::msg_type();
+    if md5sum != "*" {
+        match_field(&fields, "md5sum", &md5sum)?;
+    }
+    if msg_type != "*" {
+        match_field(&fields, "type", &msg_type)?;
+    }
+    Ok(fields)
 }
 
-fn exchange_headers<T, U>(stream: &mut U, caller_id: &str, topic: &str) -> Result<Option<String>>
+fn exchange_headers<T, U>(
+    stream: &mut U,
+    caller_id: &str,
+    topic: &str,
+) -> Result<HashMap<String, String>>
 where
     T: Message,
     U: std::io::Write + std::io::Read,

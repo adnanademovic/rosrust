@@ -4,7 +4,9 @@ use super::master::Master;
 use super::slave::Slave;
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
+use crate::RawMessageDescription;
 use log::error;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
@@ -24,8 +26,12 @@ impl<T: Message> Publisher<T> {
         hostname: &str,
         name: &str,
         queue_size: usize,
+        message_description: Option<RawMessageDescription>,
     ) -> Result<Self> {
-        let stream = slave.add_publication::<T>(hostname, name, queue_size)?;
+        let message_description =
+            message_description.unwrap_or_else(RawMessageDescription::from_message::<T>);
+        let stream =
+            slave.add_publication::<T>(hostname, name, queue_size, message_description.clone())?;
 
         let raii = Arc::new(InteractorRaii::new(PublisherInfo {
             master,
@@ -35,7 +41,7 @@ impl<T: Message> Publisher<T> {
 
         raii.interactor
             .master
-            .register_publisher(name, &T::msg_type())
+            .register_publisher(name, &message_description.msg_type)
             .map_err(|err| {
                 error!("Failed to register publisher for topic '{}': {}", name, err);
                 err
@@ -95,14 +101,20 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub(crate) fn new<T: Message, F: Fn(T, &str) + Send + 'static>(
+    pub(crate) fn new<T, F, G>(
         master: Arc<Master>,
         slave: Arc<Slave>,
         name: &str,
         queue_size: usize,
-        callback: F,
-    ) -> Result<Self> {
-        slave.add_subscription::<T, F>(name, queue_size, callback)?;
+        on_message: F,
+        on_connect: G,
+    ) -> Result<Self>
+    where
+        T: Message,
+        F: Fn(T, &str) + Send + 'static,
+        G: Fn(HashMap<String, String>) + Send + 'static,
+    {
+        slave.add_subscription::<T, F, G>(name, queue_size, on_message, on_connect)?;
 
         let info = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,

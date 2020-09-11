@@ -465,7 +465,10 @@ impl FieldInfo {
         let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit | FieldCase::Vector => quote! { #name: Default::default(), },
-            FieldCase::Array(l) => quote! { #name: [Default::default(); #l], },
+            FieldCase::Array(l) => {
+                let instances = (0..l).map(|_| quote! {Default::default()});
+                quote! { #name: [#(#instances),*], }
+            }
             FieldCase::Const(_) => quote! {},
         }
     }

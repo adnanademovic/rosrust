@@ -8,8 +8,10 @@ readme = "README.md"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.9.3"
 
+
 [features]
 derive-serde = ["serde"]
+
 
 [dependencies]
 error-chain = "0.12.1"
