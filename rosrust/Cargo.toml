@@ -14,7 +14,7 @@ ctrlc = {version="3.1.3", features=["termination"]}
 error-chain = "0.12.1"
 lazy_static = "1.4.0"
 log = "0.4.8"
-nix = "0.15.0"
+nix = "0.18.0"
 rosrust_codegen = "0.9.3"
 serde = "1.0.102"
 serde_derive = "1.0.102"
@@ -22,7 +22,7 @@ xml-rpc = "0.0.12"
 yaml-rust = "0.4.3"
 crossbeam = "0.7.3"
 net2 = "0.2.33"
-colored = "1.8.0"
+colored = "2.0.0"
 
 [dev-dependencies]
 regex = "1.3.1"

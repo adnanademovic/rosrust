@@ -147,8 +147,8 @@ impl Msg {
         use md5::{Digest, Md5};
 
         let mut hasher = Md5::new();
-        hasher.input(&self.get_md5_representation(hashes)?);
-        Ok(hex::encode(hasher.result().as_slice()))
+        hasher.update(&self.get_md5_representation(hashes)?);
+        Ok(hex::encode(hasher.finalize().as_slice()))
     }
 
     pub fn get_md5_representation(
