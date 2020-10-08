@@ -53,8 +53,8 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
 fn calculate_md5_from_representation(v: &str) -> String {
     use md5::{Digest, Md5};
     let mut hasher = Md5::new();
-    hasher.input(v);
-    hex::encode(hasher.result())
+    hasher.update(v);
+    hex::encode(hasher.finalize())
 }
 
 pub fn generate_message_definition<S: std::hash::BuildHasher>(
