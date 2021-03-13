@@ -6,7 +6,6 @@ pub use crate::tcpros::error as tcpros;
 error_chain::error_chain! {
     foreign_links {
         Io(::std::io::Error);
-        Nix(::nix::Error);
         FromUTF8(::std::string::FromUtf8Error);
         Response(ResponseError);
         SigintOverride(::ctrlc::Error);
