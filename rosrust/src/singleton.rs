@@ -12,8 +12,8 @@ use ctrlc;
 use error_chain::bail;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
-use std::time;
 use std::thread;
+use std::time;
 
 lazy_static! {
     static ref ROS: ShardedLock<Option<Ros>> = ShardedLock::new(None);
@@ -30,10 +30,10 @@ pub fn loop_init(name: &str, wait_millis: u64) {
         if try_init(name).is_ok() {
             break;
         }
-        println!("roscore not found. Will retry until it becomes available...");
+        log::info!("roscore not found. Will retry until it becomes available...");
         thread::sleep(std::time::Duration::from_millis(wait_millis));
     }
-    println!("Connected to roscore");
+    log::info!("Connected to roscore");
 }
 
 #[inline]
