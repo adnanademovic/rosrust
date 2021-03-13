@@ -114,12 +114,13 @@ impl Subscriber {
         F: Fn(T, &str) + Send + 'static,
         G: Fn(HashMap<String, String>) + Send + 'static,
     {
-        slave.add_subscription::<T, F, G>(name, queue_size, on_message, on_connect)?;
+        let id = slave.add_subscription::<T, F, G>(name, queue_size, on_message, on_connect)?;
 
         let info = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,
             slave,
             name: name.into(),
+            id,
         }));
 
         let publishers = info
@@ -162,11 +163,12 @@ struct SubscriberInfo {
     master: Arc<Master>,
     slave: Arc<Slave>,
     name: String,
+    id: usize,
 }
 
 impl Interactor for SubscriberInfo {
     fn unregister(&mut self) -> Response<()> {
-        self.slave.remove_subscription(&self.name);
+        self.slave.remove_subscription(&self.name, self.id);
         self.master.unregister_subscriber(&self.name).map(|_| ())
     }
 }

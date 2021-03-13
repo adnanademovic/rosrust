@@ -1,5 +1,5 @@
 use crate::api::error::{self, ErrorKind, Result};
-use crate::tcpros::{Subscriber, Topic};
+use crate::tcpros::{SubscriberRosConnection, Topic};
 use crate::util::FAILED_TO_LOCK;
 use crate::Message;
 use error_chain::bail;
@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Default)]
 pub struct SubscriptionsTracker {
-    mapping: Arc<Mutex<HashMap<String, Subscriber>>>,
+    mapping: Arc<Mutex<HashMap<String, SubscriberRosConnection>>>,
 }
 
 impl SubscriptionsTracker {
@@ -46,7 +46,7 @@ impl SubscriptionsTracker {
             .lock()
             .expect(FAILED_TO_LOCK)
             .values()
-            .map(Subscriber::get_topic)
+            .map(SubscriberRosConnection::get_topic)
             .cloned()
             .collect()
     }
@@ -58,35 +58,57 @@ impl SubscriptionsTracker {
         queue_size: usize,
         on_message: F,
         on_connect: G,
-    ) -> Result<()>
+    ) -> Result<usize>
     where
         T: Message,
         F: Fn(T, &str) + Send + 'static,
         G: Fn(HashMap<String, String>) + Send + 'static,
     {
-        use std::collections::hash_map::Entry;
-        match self
-            .mapping
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .entry(String::from(topic))
+        let msg_definition = T::msg_definition();
+        let msg_type = T::msg_type();
+        let md5sum = T::md5sum();
+        let mut mapping = self.mapping.lock().expect(FAILED_TO_LOCK);
+        let connection = mapping.entry(String::from(topic)).or_insert_with(|| {
+            SubscriberRosConnection::new(
+                name,
+                topic,
+                msg_definition,
+                msg_type.clone(),
+                md5sum.clone(),
+            )
+        });
+        let connection_topic = connection.get_topic();
+        if !header_matches(&connection_topic.msg_type, &msg_type)
+            || !header_matches(&connection_topic.md5sum, &md5sum)
         {
-            Entry::Occupied(..) => {
-                error!("Duplicate subscription to topic '{}' attempted", topic);
-                Err(ErrorKind::Duplicate("subscription".into()).into())
-            }
-            Entry::Vacant(entry) => {
-                let subscriber =
-                    Subscriber::new::<T, F, G>(name, topic, queue_size, on_message, on_connect);
-                entry.insert(subscriber);
-                Ok(())
-            }
+            error!(
+                "Attempted to connect to {} topic '{}' with message type {}",
+                connection_topic.msg_type, topic, msg_type
+            );
+            Err(ErrorKind::MismatchedType(
+                topic.into(),
+                connection_topic.msg_type.clone(),
+                msg_type,
+            )
+            .into())
+        } else {
+            Ok(connection.add_subscriber(queue_size, on_message, on_connect))
         }
     }
 
     #[inline]
-    pub fn remove(&self, topic: &str) {
-        self.mapping.lock().expect(FAILED_TO_LOCK).remove(topic);
+    pub fn remove(&self, topic: &str, id: usize) {
+        let mut mapping = self.mapping.lock().expect(FAILED_TO_LOCK);
+        let has_subs = match mapping.get_mut(topic) {
+            None => return,
+            Some(val) => {
+                val.remove_subscriber(id);
+                val.has_subscribers()
+            }
+        };
+        if !has_subs {
+            mapping.remove(topic);
+        }
     }
 
     #[inline]
@@ -95,7 +117,7 @@ impl SubscriptionsTracker {
             .lock()
             .expect(FAILED_TO_LOCK)
             .get(topic)
-            .map_or(0, Subscriber::publisher_count)
+            .map_or(0, SubscriberRosConnection::publisher_count)
     }
 
     #[inline]
@@ -104,12 +126,16 @@ impl SubscriptionsTracker {
             .lock()
             .expect(FAILED_TO_LOCK)
             .get(topic)
-            .map_or_else(Vec::new, Subscriber::publisher_uris)
+            .map_or_else(Vec::new, SubscriberRosConnection::publisher_uris)
     }
 }
 
+fn header_matches(first: &str, second: &str) -> bool {
+    first == "*" || second == "*" || first == second
+}
+
 fn connect_to_publisher(
-    subscriber: &mut Subscriber,
+    subscriber: &mut SubscriberRosConnection,
     caller_id: &str,
     publisher: &str,
     topic: &str,

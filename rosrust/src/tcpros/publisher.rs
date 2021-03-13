@@ -172,6 +172,7 @@ impl Publisher {
         let topic = Topic {
             name: String::from(topic),
             msg_type: message_description.msg_type,
+            md5sum: message_description.md5sum,
         };
 
         Ok(Publisher {

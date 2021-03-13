@@ -4,54 +4,128 @@ use super::{Message, Topic};
 use crate::rosmsg::RosMsg;
 use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use crossbeam::channel::{bounded, Receiver, Sender, TrySendError};
+use crossbeam::channel::{bounded, select, Receiver, Sender, TrySendError};
 use log::error;
 use std;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread;
 
-pub struct Subscriber {
-    data_stream: LossySender<MessageInfo>,
+enum DataStreamConnectionChange {
+    Connect(
+        usize,
+        LossySender<MessageInfo>,
+        Sender<HashMap<String, String>>,
+    ),
+    Disconnect(usize),
+}
+
+pub struct SubscriberRosConnection {
+    next_data_stream_id: usize,
+    data_stream_tx: Sender<DataStreamConnectionChange>,
     publishers_stream: Sender<SocketAddr>,
-    pub topic: Topic,
+    topic: Topic,
+    pub connected_ids: BTreeSet<usize>,
     pub connected_publishers: BTreeSet<String>,
 }
 
-impl Subscriber {
-    pub fn new<T, F, G>(
+impl SubscriberRosConnection {
+    pub fn new(
         caller_id: &str,
         topic: &str,
+        msg_definition: String,
+        msg_type: String,
+        md5sum: String,
+    ) -> SubscriberRosConnection {
+        let subscriber_connection_queue_size = 8;
+        let (data_stream_tx, data_stream_rx) = bounded(subscriber_connection_queue_size);
+        let publisher_connection_queue_size = 8;
+        let (pub_tx, pub_rx) = bounded(publisher_connection_queue_size);
+        let caller_id = String::from(caller_id);
+        let topic_name = String::from(topic);
+        thread::spawn({
+            let msg_type = msg_type.clone();
+            let md5sum = md5sum.clone();
+            move || {
+                join_connections(
+                    data_stream_rx,
+                    pub_rx,
+                    &caller_id,
+                    &topic_name,
+                    &msg_definition,
+                    &md5sum,
+                    &msg_type,
+                )
+            }
+        });
+        let topic = Topic {
+            name: String::from(topic),
+            msg_type,
+            md5sum,
+        };
+        SubscriberRosConnection {
+            next_data_stream_id: 1,
+            data_stream_tx,
+            publishers_stream: pub_tx,
+            topic,
+            connected_ids: BTreeSet::new(),
+            connected_publishers: BTreeSet::new(),
+        }
+    }
+
+    // TODO: allow synchronous handling for subscribers
+    // This creates a new thread to call on_message. Next API change should
+    // allow subscribing with either callback or inline handler of the queue.
+    // The queue is lossy, so it wouldn't be blocking.
+    pub fn add_subscriber<T, F, G>(
+        &mut self,
         queue_size: usize,
         on_message: F,
         on_connect: G,
-    ) -> Subscriber
+    ) -> usize
     where
         T: Message,
         F: Fn(T, &str) + Send + 'static,
         G: Fn(HashMap<String, String>) + Send + 'static,
     {
+        let data_stream_id = self.next_data_stream_id;
+        self.connected_ids.insert(data_stream_id);
+        self.next_data_stream_id += 1;
         let (data_tx, data_rx) = lossy_channel(queue_size);
-        let publisher_connection_queue_size = 8;
-        let (pub_tx, pub_rx) = bounded(publisher_connection_queue_size);
-        let caller_id = String::from(caller_id);
-        let topic_name = String::from(topic);
-        let data_stream = data_tx.clone();
-        thread::spawn(move || {
-            join_connections::<T, G>(&data_tx, pub_rx, &caller_id, &topic_name, on_connect)
-        });
-        thread::spawn(move || handle_data::<T, F>(data_rx, on_message));
-        let topic = Topic {
-            name: String::from(topic),
-            msg_type: T::msg_type(),
-        };
-        Subscriber {
-            data_stream,
-            publishers_stream: pub_tx,
-            topic,
-            connected_publishers: BTreeSet::new(),
+        let (connection_tx, connection_rx) = bounded(8);
+        if self
+            .data_stream_tx
+            .send(DataStreamConnectionChange::Connect(
+                data_stream_id,
+                data_tx,
+                connection_tx,
+            ))
+            .is_err()
+        {
+            // TODO: we might want to panic here
+            error!("Subscriber failed to connect to data stream");
         }
+        thread::spawn(move || {
+            handle_data::<T, F, G>(data_rx, connection_rx, on_message, on_connect)
+        });
+        data_stream_id
+    }
+
+    pub fn remove_subscriber(&mut self, id: usize) {
+        self.connected_ids.remove(&id);
+        if self
+            .data_stream_tx
+            .send(DataStreamConnectionChange::Disconnect(id))
+            .is_err()
+        {
+            // TODO: we might want to panic here
+            error!("Subscriber failed to disconnect from data stream");
+        }
+    }
+
+    pub fn has_subscribers(&self) -> bool {
+        !self.connected_ids.is_empty()
     }
 
     #[inline]
@@ -103,69 +177,139 @@ impl Subscriber {
     }
 }
 
-impl Drop for Subscriber {
-    fn drop(&mut self) {
-        if self.data_stream.close().is_err() {
-            error!(
-                "Subscriber data stream to topic '{}' has already been killed",
-                self.topic.name
-            );
-        }
-    }
-}
-
-fn handle_data<T, F>(data: LossyReceiver<MessageInfo>, callback: F)
-where
+fn handle_data<T, F, G>(
+    data: LossyReceiver<MessageInfo>,
+    connections: Receiver<HashMap<String, String>>,
+    on_message: F,
+    on_connect: G,
+) where
     T: Message,
     F: Fn(T, &str),
+    G: Fn(HashMap<String, String>) + Send + 'static,
 {
-    for buffer in data {
-        match RosMsg::decode_slice(&buffer.data) {
-            Ok(value) => callback(value, &buffer.caller_id),
-            Err(err) => error!("Failed to decode message: {}", err),
+    loop {
+        select! {
+            recv(data.kill_rx.kill_rx) -> _ => break,
+            recv(data.data_rx) -> msg => match msg {
+                Err(_) => break,
+                Ok(buffer) => match RosMsg::decode_slice(&buffer.data) {
+                    Ok(value) => on_message(value, &buffer.caller_id),
+                    Err(err) => error!("Failed to decode message: {}", err),
+                },
+            },
+            recv(connections) -> msg => match msg {
+                Err(_) => break,
+                Ok(conn) => on_connect(conn),
+            },
         }
     }
 }
 
-fn join_connections<T, F>(
-    data_stream: &LossySender<MessageInfo>,
+fn join_connections(
+    subscribers: Receiver<DataStreamConnectionChange>,
     publishers: Receiver<SocketAddr>,
     caller_id: &str,
     topic: &str,
-    on_connect: F,
-) where
-    T: Message,
-    F: Fn(HashMap<String, String>) + Send + 'static,
-{
-    // Ends when publisher sender is destroyed, which happens at Subscriber destruction
-    for publisher in publishers {
-        let result = join_connection::<T>(data_stream, &publisher, caller_id, topic)
-            .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
-        match result {
-            Ok(headers) => on_connect(headers),
-            Err(err) => {
-                let info = err
-                    .iter()
-                    .map(|v| format!("{}", v))
-                    .collect::<Vec<_>>()
-                    .join("\nCaused by:");
-                error!("{}", info);
+    msg_definition: &str,
+    md5sum: &str,
+    msg_type: &str,
+) {
+    let mut subs: BTreeMap<usize, (LossySender<MessageInfo>, Sender<HashMap<String, String>>)> =
+        BTreeMap::new();
+    let mut existing_headers: Vec<HashMap<String, String>> = Vec::new();
+
+    let (data_tx, data_rx): (Sender<MessageInfo>, Receiver<MessageInfo>) = bounded(8);
+
+    // Ends when subscriber or publisher sender is destroyed, which happens at Subscriber destruction
+    loop {
+        select! {
+            recv(data_rx) -> msg => {
+                match msg {
+                    Err(_) => break,
+                    Ok(v) => for sub in subs.values() {
+                        if sub.0.try_send(v.clone()).is_err() {
+                            error!("Failed to send data to subscriber");
+                        }
+                    }
+                }
+            }
+            recv(subscribers) -> msg => {
+                match msg {
+                    Err(_) => break,
+                    Ok(DataStreamConnectionChange::Connect(id, data, conn)) => {
+                        for header in &existing_headers {
+                            if conn.send(header.clone()).is_err() {
+                                error!("Failed to send connection info for subscriber");
+                            };
+                        }
+                        subs.insert(id, (data, conn));
+                    }
+                    Ok(DataStreamConnectionChange::Disconnect(id)) => {
+                        if let Some((mut data, _)) = subs.remove(&id) {
+                            if data.close().is_err() {
+                                error!("Subscriber data stream to topic has already been killed");
+                            }
+                        }
+                    }
+                }
+            }
+            recv(publishers) -> msg => {
+                match msg {
+                    Err(_) => break,
+                    Ok(publisher) => {
+                        let result = join_connection(
+                            &data_tx,
+                            &publisher,
+                            caller_id,
+                            topic,
+                            msg_definition,
+                            md5sum,
+                            msg_type,
+                        )
+                        .chain_err(|| ErrorKind::TopicConnectionFail(topic.into()));
+                        match result {
+                            Ok(headers) => {
+                                for sub in subs.values() {
+                                    if sub.1.send(headers.clone()).is_err() {
+                                        error!("Failed to send connection info for subscriber");
+                                    }
+                                }
+                                existing_headers.push(headers);
+                            }
+                            Err(err) => {
+                                let info = err
+                                    .iter()
+                                    .map(|v| format!("{}", v))
+                                    .collect::<Vec<_>>()
+                                    .join("\nCaused by:");
+                                error!("{}", info);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-fn join_connection<T>(
-    data_stream: &LossySender<MessageInfo>,
+fn join_connection(
+    data_stream: &Sender<MessageInfo>,
     publisher: &SocketAddr,
     caller_id: &str,
     topic: &str,
-) -> Result<HashMap<String, String>>
-where
-    T: Message,
-{
+    msg_definition: &str,
+    md5sum: &str,
+    msg_type: &str,
+) -> Result<HashMap<String, String>> {
     let mut stream = TcpStream::connect(publisher)?;
-    let headers = exchange_headers::<T, _>(&mut stream, caller_id, topic)?;
+    let headers = exchange_headers::<_>(
+        &mut stream,
+        caller_id,
+        topic,
+        msg_definition,
+        md5sum,
+        msg_type,
+    )?;
     let pub_caller_id = headers.get("callerid").cloned();
     let target = data_stream.clone();
     thread::spawn(move || {
@@ -183,47 +327,52 @@ where
     Ok(headers)
 }
 
-fn write_request<T: Message, U: std::io::Write>(
+fn write_request<U: std::io::Write>(
     mut stream: &mut U,
     caller_id: &str,
     topic: &str,
+    msg_definition: &str,
+    md5sum: &str,
+    msg_type: &str,
 ) -> Result<()> {
     let mut fields = HashMap::<String, String>::new();
-    fields.insert(String::from("message_definition"), T::msg_definition());
-    fields.insert(String::from("callerid"), String::from(caller_id));
-    fields.insert(String::from("topic"), String::from(topic));
-    fields.insert(String::from("md5sum"), T::md5sum());
-    fields.insert(String::from("type"), T::msg_type());
+    fields.insert(String::from("message_definition"), msg_definition.into());
+    fields.insert(String::from("callerid"), caller_id.into());
+    fields.insert(String::from("topic"), topic.into());
+    fields.insert(String::from("md5sum"), md5sum.into());
+    fields.insert(String::from("type"), msg_type.into());
     encode(&mut stream, &fields)?;
     Ok(())
 }
 
-fn read_response<T: Message, U: std::io::Read>(
+fn read_response<U: std::io::Read>(
     mut stream: &mut U,
+    md5sum: &str,
+    msg_type: &str,
 ) -> Result<HashMap<String, String>> {
     let fields = decode(&mut stream)?;
-    let md5sum = T::md5sum();
-    let msg_type = T::msg_type();
     if md5sum != "*" {
-        match_field(&fields, "md5sum", &md5sum)?;
+        match_field(&fields, "md5sum", md5sum)?;
     }
     if msg_type != "*" {
-        match_field(&fields, "type", &msg_type)?;
+        match_field(&fields, "type", msg_type)?;
     }
     Ok(fields)
 }
 
-fn exchange_headers<T, U>(
+fn exchange_headers<U>(
     stream: &mut U,
     caller_id: &str,
     topic: &str,
+    msg_definition: &str,
+    md5sum: &str,
+    msg_type: &str,
 ) -> Result<HashMap<String, String>>
 where
-    T: Message,
     U: std::io::Write + std::io::Read,
 {
-    write_request::<T, U>(stream, caller_id, topic)?;
-    read_response::<T, U>(stream)
+    write_request::<U>(stream, caller_id, topic, msg_definition, md5sum, msg_type)?;
+    read_response::<U>(stream, &md5sum, &msg_type)
 }
 
 #[inline]
