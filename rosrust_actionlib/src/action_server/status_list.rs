@@ -1,7 +1,7 @@
 use super::StatusTracker;
-use crate::msg::actionlib_msgs::GoalStatusArray;
 use crate::static_messages::MUTEX_LOCK_FAIL;
 use crate::{Action, GoalBody};
+use rosrust_msg::actionlib_msgs::GoalStatusArray;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 

@@ -1,7 +1,7 @@
 use crate::api::error;
 use crate::tcpros::{Publisher, PublisherStream, Topic};
 use crate::util::FAILED_TO_LOCK;
-use crate::Message;
+use crate::{Message, RawMessageDescription};
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
@@ -48,6 +48,7 @@ impl PublicationsTracker {
         topic: &str,
         queue_size: usize,
         caller_id: &str,
+        message_description: RawMessageDescription,
     ) -> error::tcpros::Result<PublisherStream<T>> {
         use std::collections::hash_map::Entry;
         match self
@@ -56,15 +57,20 @@ impl PublicationsTracker {
             .expect(FAILED_TO_LOCK)
             .entry(String::from(topic))
         {
-            Entry::Occupied(publisher_entry) => publisher_entry.get().stream(queue_size),
+            Entry::Occupied(publisher_entry) => publisher_entry
+                .get()
+                .stream(queue_size, message_description),
             Entry::Vacant(entry) => {
-                let publisher = Publisher::new::<T, _>(
+                let publisher = Publisher::new(
                     format!("{}:0", hostname).as_str(),
                     topic,
                     queue_size,
                     caller_id,
+                    message_description.clone(),
                 )?;
-                entry.insert(publisher).stream(queue_size)
+                entry
+                    .insert(publisher)
+                    .stream(queue_size, message_description)
             }
         }
     }

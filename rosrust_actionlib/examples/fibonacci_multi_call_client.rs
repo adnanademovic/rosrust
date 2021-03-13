@@ -1,13 +1,6 @@
 use rosrust_actionlib::SimpleActionClient;
+use rosrust_msg::actionlib_tutorials as alt;
 use std::sync::mpsc::channel;
-
-mod msg {
-    rosrust::rosmsg_include!(actionlib_tutorials / FibonacciAction);
-
-    rosrust_actionlib::action!(self; actionlib_tutorials: Fibonacci);
-}
-
-use msg::actionlib_tutorials as alt;
 
 fn fibonacci_client() {
     let mut client = SimpleActionClient::<alt::FibonacciAction>::new("fibonacci").unwrap();

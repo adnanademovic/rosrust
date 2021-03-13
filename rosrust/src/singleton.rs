@@ -6,10 +6,12 @@ use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
+use crate::RawMessageDescription;
 use crossbeam::sync::ShardedLock;
 use ctrlc;
 use error_chain::bail;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::time;
 
 lazy_static! {
@@ -169,11 +171,38 @@ where
 }
 
 #[inline]
+pub fn subscribe_with_ids_and_headers<T, F, G>(
+    topic: &str,
+    queue_size: usize,
+    on_message: F,
+    on_connect: G,
+) -> Result<Subscriber>
+where
+    T: Message,
+    F: Fn(T, &str) + Send + 'static,
+    G: Fn(HashMap<String, String>) + Send + 'static,
+{
+    ros!().subscribe_with_ids_and_headers::<T, F, G>(topic, queue_size, on_message, on_connect)
+}
+
+#[inline]
 pub fn publish<T>(topic: &str, queue_size: usize) -> Result<Publisher<T>>
 where
     T: Message,
 {
     ros!().publish::<T>(topic, queue_size)
+}
+
+#[inline]
+pub fn publish_with_description<T>(
+    topic: &str,
+    queue_size: usize,
+    message_description: RawMessageDescription,
+) -> Result<Publisher<T>>
+where
+    T: Message,
+{
+    ros!().publish_with_description::<T>(topic, queue_size, message_description)
 }
 
 #[inline]

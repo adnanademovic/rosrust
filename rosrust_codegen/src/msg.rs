@@ -14,6 +14,12 @@ pub struct Msg {
     pub source: String,
 }
 
+#[derive(Clone, Debug)]
+pub struct Srv {
+    pub path: MessagePath,
+    pub source: String,
+}
+
 impl Msg {
     pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
         let fields = match_lines(source)?;
@@ -294,7 +300,7 @@ fn match_const_string(data: &str) -> Option<(FieldLine, String)> {
 fn match_const_numeric(data: &str) -> Option<(FieldLine, String)> {
     lazy_static! {
         static ref MATCHER: String = format!(
-            r"^{}{}{}{}={}(-?[0-9]+)$",
+            r"^{}{}{}{}={}(-?[0-9\.eE\+\-]+)$",
             FIELD_TYPE, ANY_WHITESPACE, FIELD_NAME, IGNORE_WHITESPACE, IGNORE_WHITESPACE
         );
         static ref RE: Regex = Regex::new(&MATCHER).unwrap();
@@ -450,7 +456,10 @@ impl FieldInfo {
         let name = self.create_identifier(Span::call_site());
         match self.case {
             FieldCase::Unit | FieldCase::Vector => quote! { #name: Default::default(), },
-            FieldCase::Array(l) => quote! { #name: [Default::default(); #l], },
+            FieldCase::Array(l) => {
+                let instances = (0..l).map(|_| quote! {Default::default()});
+                quote! { #name: [#(#instances),*], }
+            }
             FieldCase::Const(_) => quote! {},
         }
     }

@@ -1,10 +1,7 @@
 extern crate env_logger;
 #[macro_use]
 extern crate rosrust;
-
-mod msg {
-    rosrust::rosmsg_include!(roscpp_tutorials / TwoInts);
-}
+extern crate rosrust_msg;
 
 fn main() {
     env_logger::init();
@@ -15,14 +12,14 @@ fn main() {
     // Create service
     // The service is stopped when the returned object is destroyed
     let _service_raii =
-        rosrust::service::<msg::roscpp_tutorials::TwoInts, _>("add_two_ints", move |req| {
+        rosrust::service::<rosrust_msg::roscpp_tutorials::TwoInts, _>("add_two_ints", move |req| {
             // Callback for handling requests
             let sum = req.a + req.b;
 
             // Log each request
             ros_info!("{} + {} = {}", req.a, req.b, sum);
 
-            Ok(msg::roscpp_tutorials::TwoIntsRes { sum })
+            Ok(rosrust_msg::roscpp_tutorials::TwoIntsRes { sum })
         })
         .unwrap();
 

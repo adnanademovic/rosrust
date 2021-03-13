@@ -6,10 +6,6 @@ use rosrust;
 use std::sync::Mutex;
 use std::time::Instant;
 
-mod msg {
-    rosrust::rosmsg_include!(sensor_msgs / Image);
-}
-
 fn main() {
     env_logger::init();
 
@@ -23,7 +19,7 @@ fn main() {
     let _subscriber_raii = rosrust::subscribe(
         "/usb_cam/image_raw",
         1,
-        move |v: msg::sensor_msgs::Image| {
+        move |v: rosrust_msg::sensor_msgs::Image| {
             // Callback for handling received messages
             let mut now = now.lock().unwrap();
             let duration = now.elapsed();

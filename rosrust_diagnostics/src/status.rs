@@ -1,5 +1,5 @@
-use crate::msg::diagnostic_msgs::{DiagnosticStatus, KeyValue};
 use crate::Level;
+use rosrust_msg::diagnostic_msgs::{DiagnosticStatus, KeyValue};
 
 /// Higher level description of an individual diagnostic status.
 #[derive(Clone)]

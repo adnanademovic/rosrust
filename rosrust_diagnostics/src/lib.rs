@@ -10,7 +10,8 @@ support ownership models with the minimum amounts of allocation and dynamic inte
 
 pub use composite_task::{CompositeTask, CompositeTaskRunner};
 pub use function_task::{FunctionExt, FunctionTask};
-pub use msg::diagnostic_msgs::KeyValue;
+pub use rosrust_msg::diagnostic_msgs::{DiagnosticArray, DiagnosticStatus, KeyValue};
+pub use rosrust_msg::std_msgs::Header;
 pub use status::Status;
 pub use task::Task;
 pub use tasks::{FrequencyStatus, Heartbeat, TimestampStatus};
@@ -20,7 +21,6 @@ mod composite_task;
 mod function_task;
 #[macro_use]
 mod macros;
-pub mod msg;
 mod status;
 mod task;
 pub mod tasks;
@@ -31,9 +31,9 @@ mod updater;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Level {
     /// The diagnostic concluded that all checks passed.
-    Ok = msg::diagnostic_msgs::DiagnosticStatus::OK,
+    Ok = DiagnosticStatus::OK,
     /// Checks resulted in a warning.
-    Warn = msg::diagnostic_msgs::DiagnosticStatus::WARN,
+    Warn = DiagnosticStatus::WARN,
     /// Checks determined an error happened.
-    Error = msg::diagnostic_msgs::DiagnosticStatus::ERROR,
+    Error = DiagnosticStatus::ERROR,
 }
