@@ -526,7 +526,7 @@ impl FieldInfo {
                 } else {
                     quote! { false }
                 };
-                quote! { #name; bool = #bool_value }
+                quote! { #name: bool = #bool_value }
             }
             DataType::String => quote! { #name: &'static str = #value },
             DataType::Time
