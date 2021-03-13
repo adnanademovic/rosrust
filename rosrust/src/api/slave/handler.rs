@@ -4,7 +4,6 @@ use crate::rosxmlrpc::{self, Response, ResponseError, Server};
 use crate::tcpros::Service;
 use crate::util::kill;
 use log::{error, info};
-use nix::unistd::getpid;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -68,7 +67,7 @@ impl SlaveHandler {
             }
         });
 
-        server.register_value("getPid", "PID", |_args| Ok(Value::Int(getpid().into())));
+        server.register_value("getPid", "PID", |_args| Ok(Value::Int(std::process::id() as i32)));
 
         let subscriptions = SubscriptionsTracker::default();
         let subs = subscriptions.clone();
