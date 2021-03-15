@@ -30,6 +30,9 @@ criterion = "0.3.0"
 env_logger = "0.7.1"
 nix = "0.15.0"
 
+[features]
+derive-serde = ["rosrust_codegen/derive-serde"]
+
 [[bench]]
 name = "benchmarks"
 harness = false
