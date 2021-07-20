@@ -49,8 +49,11 @@ pub fn try_init_with_options(name: &str, capture_sigint: bool) -> Result<()> {
     let client = Ros::new(name)?;
     if capture_sigint {
         let shutdown_sender = client.shutdown_sender();
+        let logger = client.logger();
         ctrlc::set_handler(move || {
             shutdown_sender.shutdown();
+            // Drop rosout publisher
+            *logger.lock().unwrap() = None;
         })?;
     }
     *ros = Some(client);

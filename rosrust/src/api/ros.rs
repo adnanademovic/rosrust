@@ -17,7 +17,7 @@ use error_chain::bail;
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use xml_rpc;
 use yaml_rust::{Yaml, YamlLoader};
@@ -31,7 +31,7 @@ pub struct Ros {
     name: String,
     clock: Arc<dyn Clock>,
     static_subs: Vec<Subscriber>,
-    logger: Option<Publisher<Log>>,
+    logger: Arc<Mutex<Option<Publisher<Log>>>>,
     shutdown_manager: Arc<ShutdownManager>,
 }
 
@@ -76,7 +76,7 @@ impl Ros {
             ros.clock = ros_clock;
         }
 
-        ros.logger = Some(ros.publish("/rosout", 100)?);
+        ros.logger = Arc::new(Mutex::new(Some(ros.publish("/rosout", 100)?)));
 
         Ok(ros)
     }
@@ -122,7 +122,7 @@ impl Ros {
             name,
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
-            logger: None,
+            logger: Arc::new(Mutex::new(None)),
             shutdown_manager,
         })
     }
@@ -165,6 +165,11 @@ impl Ros {
     #[inline]
     pub fn shutdown_sender(&self) -> Arc<ShutdownManager> {
         Arc::clone(&self.shutdown_manager)
+    }
+
+    #[inline]
+    pub fn logger(&self) -> Arc<Mutex<Option<Publisher<Log>>>> {
+        self.logger.clone()
     }
 
     pub fn rate(&self, rate: f64) -> Rate {
@@ -372,7 +377,8 @@ impl Ros {
 
     pub fn log(&self, level: i8, msg: String, file: &str, line: u32) {
         self.log_to_terminal(level, &msg, file, line);
-        let logger = &match self.logger {
+        let logger_opt = self.logger.lock().unwrap();
+        let logger = match *logger_opt {
             Some(ref v) => v,
             None => return,
         };
