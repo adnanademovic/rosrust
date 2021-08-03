@@ -15,7 +15,6 @@ error-chain = "0.12.4"
 lazy_static = "1.4.0"
 log = "0.4.14"
 hostname = "0.3.1"
-rosrust_codegen = {path="../rosrust_codegen"}
 serde = "1.0.127"
 serde_derive = "1.0.127"
 xml-rpc = "0.0.12"
@@ -23,6 +22,10 @@ yaml-rust = "0.4.5"
 crossbeam = "0.8.1"
 socket2 = "0.4.1"
 colored = "2.0.0"
+
+[dependencies.rosrust_codegen]
+path = "../rosrust_codegen"
+version = "0.9.5"
 
 [dev-dependencies]
 regex = "1.5.4"
