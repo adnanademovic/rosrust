@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use crossbeam::unbounded;
+use crossbeam::channel::unbounded;
 use lazy_static::lazy_static;
 use rosrust;
 use std::process::Command;

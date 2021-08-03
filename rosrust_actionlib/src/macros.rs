@@ -4,7 +4,7 @@ macro_rules! action {
         $($crate::action!(INNER, $root, $package, $action);)*
     };
     (INNER, $root:path, $package: ident, $action: ident) => {
-        $crate::paste::item! {
+        $crate::paste::paste! {
             impl $crate::Action for $root::$package::[<$action Action>] {
                 type Goal = $root::$package::[<$action ActionGoal>];
                 type Result = $root::$package::[<$action ActionResult>];
@@ -27,7 +27,7 @@ macro_rules! action {
         }
     };
     (ACTION_GOAL, $root:path, $package: ident, $action: ident, $sub_message: ident, $body_key: ident) => {
-        $crate::paste::item! {
+        $crate::paste::paste! {
             impl $crate::ActionGoal for $root::$package::[<$action Action $sub_message>] {
                 type Body = $root::$package::[<$action $sub_message>];
 
@@ -64,7 +64,7 @@ macro_rules! action {
         }
     };
     (ACTION_RESPONSE, $root:path, $package: ident, $action: ident, $sub_message: ident, $body_key: ident) => {
-        $crate::paste::item! {
+        $crate::paste::paste! {
             impl $crate::ActionResponse for $root::$package::[<$action Action $sub_message>] {
                 type Body = $root::$package::[<$action $sub_message>];
 
