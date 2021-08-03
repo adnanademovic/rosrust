@@ -9,15 +9,14 @@ repository = "https://github.com/adnanademovic/rosrust"
 version = "0.9.4"
 
 [dependencies]
-error-chain = "0.12.1"
+error-chain = "0.12.4"
 lazy_static = "1.4.0"
-regex = "1.3.1"
-quote = "1.0.2"
-syn = "1.0.7"
-proc-macro2 = "1.0.6"
-digest = "0.8.1"
-md-5 = "0.8.0"
-hex = "0.4.0"
+regex = "1.5.4"
+quote = "1.0.9"
+syn = "1.0.74"
+proc-macro2 = "1.0.28"
+md-5 = "0.9.1"
+hex = "0.4.3"
 
 [lib]
 proc-macro = true

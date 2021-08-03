@@ -7,8 +7,8 @@ name = "examples"
 version = "0.0.1"
 
 [dependencies]
-env_logger = "0.7.1"
+env_logger = "0.9.0"
 rosrust = {path="../rosrust"}
 rosrust_msg = {path="../rosrust_msg"}
-serde = "1.0.102"
-serde_derive = "1.0.102"
+serde = "1.0.127"
+serde_derive = "1.0.127"

@@ -13,4 +13,4 @@ rosrust_msg = {path="../rosrust_msg"}
 [dev-dependencies]
 quickcheck = "0.9.0"
 quickcheck_macros = "0.8.0"
-nix = "0.15.0"
+nix = "0.22.0"
