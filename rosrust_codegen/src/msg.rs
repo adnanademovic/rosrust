@@ -1,9 +1,10 @@
+use crate::alerts::MESSAGE_NAME_SHOULD_BE_VALID;
 use crate::error::{Result, ResultExt};
-use crate::message_path::MessagePath;
 use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
 use quote::{quote, ToTokens};
 use regex::Regex;
+use ros_msg_parser::MessagePath;
 use std::collections::{BTreeSet, HashMap};
 use syn::Ident;
 
@@ -31,7 +32,7 @@ impl Msg {
     }
 
     pub fn name_ident(&self) -> Ident {
-        Ident::new(&self.path.name, Span::call_site())
+        Ident::new(self.path.name(), Span::call_site())
     }
 
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
@@ -125,15 +126,18 @@ impl Msg {
     }
 
     pub fn get_type(&self) -> String {
-        format!("{}/{}", self.path.package, self.path.name)
+        format!("{}/{}", self.path.package(), self.path.name())
     }
 
-    pub fn dependencies(&self) -> Vec<MessagePath> {
+    pub fn dependencies(&self) -> Result<Vec<MessagePath>> {
         self.fields
             .iter()
             .filter_map(|field| match field.datatype {
-                DataType::LocalStruct(ref name) => Some(MessagePath::new(&self.path.package, name)),
-                DataType::RemoteStruct(ref message) => Some(message.clone()),
+                DataType::LocalStruct(ref name) => Some(
+                    MessagePath::new(self.path.package(), name)
+                        .chain_err(|| "Invalid message path"),
+                ),
+                DataType::RemoteStruct(ref message) => Some(Ok(message.clone())),
                 _ => None,
             })
             .collect()
@@ -159,13 +163,13 @@ impl Msg {
             .fields
             .iter()
             .filter(|v| v.is_constant())
-            .map(|v| v.md5_string(&self.path.package, hashes))
+            .map(|v| v.md5_string(self.path.package(), hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
         let fields = self
             .fields
             .iter()
             .filter(|v| !v.is_constant())
-            .map(|v| v.md5_string(&self.path.package, hashes))
+            .map(|v| v.md5_string(self.path.package(), hashes))
             .collect::<::std::result::Result<Vec<String>, ()>>()?;
         let representation = constants
             .into_iter()
@@ -201,12 +205,12 @@ impl Msg {
     }
 }
 
-static IGNORE_WHITESPACE: &'static str = r"\s*";
-static ANY_WHITESPACE: &'static str = r"\s+";
-static FIELD_TYPE: &'static str = r"([a-zA-Z0-9_/]+)";
-static FIELD_NAME: &'static str = r"([a-zA-Z][a-zA-Z0-9_]*)";
-static EMPTY_BRACKETS: &'static str = r"\[\s*\]";
-static NUMBER_BRACKETS: &'static str = r"\[\s*([0-9]+)\s*\]";
+static IGNORE_WHITESPACE: &str = r"\s*";
+static ANY_WHITESPACE: &str = r"\s+";
+static FIELD_TYPE: &str = r"([a-zA-Z0-9_/]+)";
+static FIELD_NAME: &str = r"([a-zA-Z][a-zA-Z0-9_]*)";
+static EMPTY_BRACKETS: &str = r"\[\s*\]";
+static NUMBER_BRACKETS: &str = r"\[\s*([0-9]+)\s*\]";
 
 lazy_static! {
     static ref RESERVED_KEYWORDS: BTreeSet<String> = [
@@ -331,7 +335,7 @@ fn match_line(data: &str) -> Option<Result<FieldInfo>> {
         Err(v) => return Some(Err(v)),
     };
 
-    if data == "" {
+    if data.is_empty() {
         return None;
     }
     if let Some(info) = match_field(data) {
@@ -418,10 +422,7 @@ impl FieldInfo {
     }
 
     fn is_constant(&self) -> bool {
-        match self.case {
-            FieldCase::Const(..) => true,
-            _ => false,
-        }
+        matches!(self.case, FieldCase::Const(..))
     }
 
     pub fn field_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
@@ -597,7 +598,10 @@ impl FieldInfo {
     fn is_header(&self) -> bool {
         self.case == FieldCase::Unit
             && self.name == "header"
-            && self.datatype == DataType::RemoteStruct(MessagePath::new("std_msgs", "Header"))
+            && self.datatype
+                == DataType::RemoteStruct(
+                    MessagePath::new("std_msgs", "Header").expect(MESSAGE_NAME_SHOULD_BE_VALID),
+                )
     }
 
     fn new(datatype: &str, name: &str, case: FieldCase) -> Result<FieldInfo> {
@@ -648,12 +652,12 @@ impl DataType {
             DataType::Time => quote! { #crate_prefix Time },
             DataType::Duration => quote! { #crate_prefix Duration },
             DataType::LocalStruct(ref name) => {
-                let name = Ident::new(&name, Span::call_site());
+                let name = Ident::new(name, Span::call_site());
                 quote! { #name }
             }
             DataType::RemoteStruct(ref message) => {
-                let name = Ident::new(&message.name, Span::call_site());
-                let pkg = Ident::new(&message.package, Span::call_site());
+                let name = Ident::new(message.name(), Span::call_site());
+                let pkg = Ident::new(message.package(), Span::call_site());
                 quote! { super::#pkg::#name }
             }
         }
@@ -702,10 +706,10 @@ impl DataType {
             DataType::Time => "time",
             DataType::Duration => "duration",
             DataType::LocalStruct(ref name) => hashes
-                .get(&MessagePath::new(package, name))
+                .get(&MessagePath::new(package, name).map_err(|_| ())?)
                 .ok_or(())?
                 .as_str(),
-            DataType::RemoteStruct(ref message) => hashes.get(&message).ok_or(())?.as_str(),
+            DataType::RemoteStruct(ref message) => hashes.get(message).ok_or(())?.as_str(),
         }
         .into())
     }
@@ -729,17 +733,19 @@ fn parse_datatype(datatype: &str) -> Option<DataType> {
         "string" => Some(DataType::String),
         "time" => Some(DataType::Time),
         "duration" => Some(DataType::Duration),
-        "Header" => Some(DataType::RemoteStruct(MessagePath::new(
-            "std_msgs", "Header",
-        ))),
+        "Header" => MessagePath::new("std_msgs", "Header")
+            .ok()
+            .map(DataType::RemoteStruct),
         _ => {
             let parts = datatype.split('/').collect::<Vec<_>>();
             if parts.iter().any(|v| v.is_empty()) {
                 return None;
             }
-            match parts.as_slice() {
-                &[package, name] => Some(DataType::RemoteStruct(MessagePath::new(package, name))),
-                &[name] => Some(DataType::LocalStruct(name.into())),
+            match *parts.as_slice() {
+                [package, name] => MessagePath::new(package, name)
+                    .ok()
+                    .map(DataType::RemoteStruct),
+                [name] => Some(DataType::LocalStruct(name.into())),
                 _ => None,
             }
         }
@@ -1086,8 +1092,8 @@ mod tests {
         );
     }
 
-    fn get_dependency_set(message: &Msg) -> HashSet<MessagePath> {
-        message.dependencies().into_iter().collect()
+    fn get_dependency_set(message: &Msg) -> Result<HashSet<MessagePath>> {
+        Ok(message.dependencies()?.into_iter().collect())
     }
 
     #[test]
@@ -1114,7 +1120,7 @@ mod tests {
                 },
             ]
         );
-        let dependencies = get_dependency_set(&data);
+        let dependencies = get_dependency_set(&data)?;
         assert_eq!(dependencies.len(), 1);
         assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Twist")));
 
@@ -1140,7 +1146,7 @@ mod tests {
                 },
             ]
         );
-        let dependencies = get_dependency_set(&data);
+        let dependencies = get_dependency_set(&data)?;
         assert_eq!(dependencies.len(), 2);
         assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Pose")));
         assert!(dependencies.contains(&MessagePath::new("std_msgs", "Header")));
@@ -1195,7 +1201,7 @@ mod tests {
                 },
             ]
         );
-        let dependencies = get_dependency_set(&data);
+        let dependencies = get_dependency_set(&data)?;
         assert_eq!(dependencies.len(), 3);
         assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Vector3")));
         assert!(dependencies.contains(&MessagePath::new("geometry_msgs", "Quaternion")));

@@ -1,0 +1,13 @@
+[package]
+edition = "2018"
+authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
+description = "MSG parser for ROS"
+license = "MIT"
+name = "ros_msg_parser"
+repository = "https://github.com/adnanademovic/rosrust"
+version = "0.1.0"
+
+[dependencies]
+lazy_static = "1.4.0"
+regex = "1.5.4"
+thiserror = "1.0.26"

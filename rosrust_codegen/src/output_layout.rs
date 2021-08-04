@@ -126,7 +126,7 @@ impl Service {
             msg_type,
             source: _,
         } = self;
-        let name_ident = Ident::new(&name, Span::call_site());
+        let name_ident = Ident::new(name, Span::call_site());
         let req_ident = Ident::new(&format!("{}Req", name), Span::call_site());
         let res_ident = Ident::new(&format!("{}Res", name), Span::call_site());
 

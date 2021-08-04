@@ -1,10 +1,10 @@
+use crate::alerts::MESSAGE_NAME_SHOULD_BE_VALID;
 use crate::error::{ErrorKind, Result, ResultExt};
-use crate::message_path::MessagePath;
 use crate::msg::{Msg, Srv};
 use error_chain::bail;
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
-use std;
+use ros_msg_parser::MessagePath;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::{read_dir, File};
 use std::path::{Path, PathBuf};
@@ -29,8 +29,14 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
         }
     }
     for message in message_map.services.keys() {
-        let key_req = MessagePath::new(&message.package, format!("{}Req", message.name));
-        let key_res = MessagePath::new(&message.package, format!("{}Res", message.name));
+        let key_req = MessagePath::new(message.package(), format!("{}Req", message.name()))
+            .chain_err(|| {
+                "Failed to create service request message! This is unexpected and probably a reportable bug."
+            })?;
+        let key_res = MessagePath::new(message.package(), format!("{}Res", message.name()))
+            .chain_err(|| {
+                "Failed to create service response message! This is unexpected and probably a reportable bug."
+            })?;
         let req = match representations.get(&key_req) {
             Some(v) => v,
             None => bail!("Message map does not contain all needed elements"),
@@ -64,7 +70,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
     let mut handled_messages = HashSet::<MessagePath>::new();
     let mut result = message.source.clone();
     let mut pending = message
-        .dependencies()
+        .dependencies()?
         .into_iter()
         .collect::<LinkedList<_>>();
     while let Some(value) = pending.pop_front() {
@@ -79,7 +85,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
             Some(msg) => msg,
             None => bail!("Message map does not contain all needed elements"),
         };
-        for dependency in message.dependencies() {
+        for dependency in message.dependencies()? {
             pending.push_back(dependency);
         }
         result += &message.source;
@@ -128,16 +134,16 @@ pub fn get_message_map(
             message_path,
         )? {
             MessageCase::Message(message) => {
-                for dependency in &message.dependencies() {
+                for dependency in &message.dependencies()? {
                     pending.push(dependency.clone());
                 }
                 messages.insert(message.path.clone(), message);
             }
             MessageCase::Service(service, req, res) => {
-                for dependency in &req.dependencies() {
+                for dependency in &req.dependencies()? {
                     pending.push(dependency.clone());
                 }
-                for dependency in &res.dependencies() {
+                for dependency in &res.dependencies()? {
                     pending.push(dependency.clone());
                 }
                 messages.insert(req.path.clone(), req);
@@ -182,7 +188,7 @@ fn identify_message_or_service(filename: &Path) -> Option<(MessagePath, PathBuf,
         _ => return None,
     };
     Some((
-        MessagePath::new(package.to_str()?, message.to_str()?),
+        MessagePath::new(package.to_str()?, message.to_str()?).ok()?,
         filename.into(),
         message_type,
     ))
@@ -201,15 +207,15 @@ lazy_static! {
 fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
     let mut output = HashMap::new();
     output.insert(
-        MessagePath::new("rosgraph_msgs", "Clock"),
+        MessagePath::new("rosgraph_msgs", "Clock").expect(MESSAGE_NAME_SHOULD_BE_VALID),
         include_str!("msg_examples/rosgraph_msgs/msg/Clock.msg"),
     );
     output.insert(
-        MessagePath::new("rosgraph_msgs", "Log"),
+        MessagePath::new("rosgraph_msgs", "Log").expect(MESSAGE_NAME_SHOULD_BE_VALID),
         include_str!("msg_examples/rosgraph_msgs/msg/Log.msg"),
     );
     output.insert(
-        MessagePath::new("std_msgs", "Header"),
+        MessagePath::new("std_msgs", "Header").expect(MESSAGE_NAME_SHOULD_BE_VALID),
         include_str!("msg_examples/std_msgs/msg/Header.msg"),
     );
     output
@@ -225,8 +231,8 @@ fn get_message_or_service(
 ) -> Result<MessageCase> {
     use std::io::Read;
 
-    let package = &message.package;
-    let name = &message.name;
+    let package = message.package();
+    let name = message.name();
 
     if let Some(full_path) = message_locations.get(&message) {
         if let Ok(mut f) = File::open(full_path) {
@@ -250,12 +256,16 @@ fn get_message_or_service(
                 v => bail!("Service {} is split into {} parts", message, v.len()),
             };
             let req = create_message(
-                MessagePath::new(package, format!("{}Req", name)),
+                MessagePath::new(package, format!("{}Req", name)).chain_err(|| {
+                        "Failed to create service request message! This is unexpected and probably a reportable bug."
+                })?  ,
                 req,
                 ignore_bad_messages,
             )?;
             let res = create_message(
-                MessagePath::new(package, format!("{}Res", name)),
+                MessagePath::new(package, format!("{}Res", name)).chain_err(|| {
+                    "Failed to create service response message! This is unexpected and probably a reportable bug."
+                })?,
                 res,
                 ignore_bad_messages,
             )?;

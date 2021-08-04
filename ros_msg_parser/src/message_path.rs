@@ -1,5 +1,4 @@
-use crate::error::{Error, ErrorKind, Result};
-use error_chain::bail;
+use crate::{Error, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::convert::TryFrom;
@@ -8,55 +7,63 @@ use std::hash::Hash;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct MessagePath {
-    pub package: String,
-    pub name: String,
+    package: String,
+    name: String,
+}
+
+fn is_valid_package_name(package: &str) -> bool {
+    lazy_static! {
+        static ref RE_PACKAGE_CORRECT_CHAR_SET_AND_LENGTH: Regex =
+            Regex::new("^[a-z][a-z0-9_]+$").unwrap();
+        static ref RE_PACKAGE_CONSECUTIVE_UNDERSCORE: Regex = Regex::new("__").unwrap();
+    }
+    RE_PACKAGE_CORRECT_CHAR_SET_AND_LENGTH.is_match(package)
+        && !RE_PACKAGE_CONSECUTIVE_UNDERSCORE.is_match(package)
 }
 
 impl MessagePath {
-    pub fn new(package: impl Into<String>, name: impl Into<String>) -> Self {
-        Self {
-            package: package.into(),
-            name: name.into(),
+    /// Create full message path, with naming rules checked
+    ///
+    /// Naming rules are based on [REP 144](https://www.ros.org/reps/rep-0144.html).
+    pub fn new(package: impl Into<String>, name: impl Into<String>) -> Result<Self> {
+        let package = package.into();
+        let name = name.into();
+        if !is_valid_package_name(&package) {
+            return Err(Error::InvalidMessagePath  {
+                name: format!("{}/{}",package,name),
+                  reason: "package name needs to follow REP 144 rules (https://www.ros.org/reps/rep-0144.html)".into(),
+            });
         }
+        Ok(Self { package, name })
     }
 
     fn from_combined(input: &str) -> Result<Self> {
-        let mut parts = input.splitn(2, '/');
-        let package = match parts.next() {
-            Some(v) => v,
-            None => bail!("Package string constains no parts: {}", input),
-        };
-        let name = match parts.next() {
-            Some(v) => v,
-            None => bail!(
-                "Package string needs to be in package/name format: {}",
-                input
-            ),
-        };
-        let output = Self::new(package, name);
-        output.validate()?;
-        Ok(output)
-    }
-
-    /// Perform package name validity checks
-    ///
-    /// Based on [REP 144](https://www.ros.org/reps/rep-0144.html).
-    fn has_valid_package_name(&self) -> bool {
-        RE_PACKAGE_CORRECT_CHAR_SET_AND_LENGTH.is_match(&self.package)
-            && !RE_PACKAGE_CONSECUTIVE_UNDERSCORE.is_match(&self.package)
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        if !self.has_valid_package_name() {
-            bail!(ErrorKind::PackageNameInvalid(self.package.clone()));
+        let parts = input.splitn(2, '/').collect::<Vec<&str>>();
+        match parts[..] {
+            [package, name] => Self::new(package, name),
+            _ => Err(Error::InvalidMessagePath {
+                name: input.into(),
+                reason: "string needs to be in package/name format".into(),
+            }),
         }
-        Ok(())
+    }
+
+    pub fn package(&self) -> &str {
+        &self.package
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn into_inner(self) -> (String, String) {
+        (self.package, self.name)
     }
 }
 
 impl Display for MessagePath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{}", self.package, self.name)
+        write!(f, "{}/{}", self.package(), self.name())
     }
 }
 
@@ -68,19 +75,9 @@ impl<'a> TryFrom<&'a str> for MessagePath {
     }
 }
 
-lazy_static! {
-    static ref RE_PACKAGE_CORRECT_CHAR_SET_AND_LENGTH: Regex =
-        Regex::new("^[a-z][a-z0-9_]+$").unwrap();
-    static ref RE_PACKAGE_CONSECUTIVE_UNDERSCORE: Regex = Regex::new("__").unwrap();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn is_valid_package_name(package: &str) -> bool {
-        MessagePath::new(package, "anything").has_valid_package_name()
-    }
 
     #[test]
     fn package_names_must_be_at_least_two_characters() {

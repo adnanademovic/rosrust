@@ -5,6 +5,7 @@ members = [
     "rosrust_msg",
     "rosrust_actionlib",
     "rosrust_diagnostics",
+    "ros_msg_parser",
     "examples",
 ]
 
@@ -14,4 +15,5 @@ members = [
 "rosrust_msg" = { path = "rosrust_msg" }
 "rosrust_actionlib" = { path = "rosrust_actionlib" }
 "rosrust_diagnostics" = { path = "rosrust_diagnostics" }
+"ros_msg_parser" = { path = "ros_msg_parser" }
 "examples" = { path = "examples" }
