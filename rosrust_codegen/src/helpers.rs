@@ -1,10 +1,9 @@
 use crate::alerts::MESSAGE_NAME_SHOULD_BE_VALID;
 use crate::error::{ErrorKind, Result, ResultExt};
-use crate::msg::{Msg, Srv};
+use crate::msg::Msg;
 use error_chain::bail;
 use lazy_static::lazy_static;
-use regex::RegexBuilder;
-use ros_msg_parser::MessagePath;
+use ros_msg_parser::{MessagePath, Srv};
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::{read_dir, File};
 use std::path::{Path, PathBuf};
@@ -68,7 +67,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
     message: &Msg,
 ) -> Result<String> {
     let mut handled_messages = HashSet::<MessagePath>::new();
-    let mut result = message.source.clone();
+    let mut result = message.0.source.clone();
     let mut pending = message
         .dependencies()?
         .into_iter()
@@ -88,7 +87,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
         for dependency in message.dependencies()? {
             pending.push_back(dependency);
         }
-        result += &message.source;
+        result += &message.0.source;
     }
     result += "\n";
     Ok(result)
@@ -137,7 +136,7 @@ pub fn get_message_map(
                 for dependency in &message.dependencies()? {
                     pending.push(dependency.clone());
                 }
-                messages.insert(message.path.clone(), message);
+                messages.insert(message.0.path.clone(), message);
             }
             MessageCase::Service(service, req, res) => {
                 for dependency in &req.dependencies()? {
@@ -146,8 +145,8 @@ pub fn get_message_map(
                 for dependency in &res.dependencies()? {
                     pending.push(dependency.clone());
                 }
-                messages.insert(req.path.clone(), req);
-                messages.insert(res.path.clone(), res);
+                messages.insert(req.0.path.clone(), req);
+                messages.insert(res.0.path.clone(), res);
                 services.insert(service.path.clone(), service);
             }
         }
@@ -208,15 +207,15 @@ fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
     let mut output = HashMap::new();
     output.insert(
         MessagePath::new("rosgraph_msgs", "Clock").expect(MESSAGE_NAME_SHOULD_BE_VALID),
-        include_str!("msg_examples/rosgraph_msgs/msg/Clock.msg"),
+        include_str!("in_memory_messages/Clock.msg"),
     );
     output.insert(
         MessagePath::new("rosgraph_msgs", "Log").expect(MESSAGE_NAME_SHOULD_BE_VALID),
-        include_str!("msg_examples/rosgraph_msgs/msg/Log.msg"),
+        include_str!("in_memory_messages/Log.msg"),
     );
     output.insert(
         MessagePath::new("std_msgs", "Header").expect(MESSAGE_NAME_SHOULD_BE_VALID),
-        include_str!("msg_examples/std_msgs/msg/Header.msg"),
+        include_str!("in_memory_messages/Header.msg"),
     );
     output
 }
@@ -230,9 +229,6 @@ fn get_message_or_service(
     message: MessagePath,
 ) -> Result<MessageCase> {
     use std::io::Read;
-
-    let package = message.package();
-    let name = message.name();
 
     if let Some(full_path) = message_locations.get(&message) {
         if let Ok(mut f) = File::open(full_path) {
@@ -248,32 +244,23 @@ fn get_message_or_service(
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            let re = RegexBuilder::new("^---$").multi_line(true).build()?;
-            let (req, res) = match re.split(&contents).collect::<Vec<_>>().as_slice() {
-                &[req] => (req, ""),
-                &[req, res] => (req, res),
-                &[] => bail!("Service {} does not have any content", message),
-                v => bail!("Service {} is split into {} parts", message, v.len()),
+            let service = Srv::new(message, &contents);
+
+            let service_messages = match (service.build_messages(), ignore_bad_messages) {
+                (Ok(v), _) => v,
+                (Err(_), true) => Srv::new(service.path.clone(), "\n\n---\n\n")
+                    .build_messages()
+                    .chain_err(|| "Failed to build service messages")?,
+                (Err(v), false) => {
+                    return Err(v).chain_err(|| "Failed to build service messages");
+                }
             };
-            let req = create_message(
-                MessagePath::new(package, format!("{}Req", name)).chain_err(|| {
-                        "Failed to create service request message! This is unexpected and probably a reportable bug."
-                })?  ,
-                req,
-                ignore_bad_messages,
-            )?;
-            let res = create_message(
-                MessagePath::new(package, format!("{}Res", name)).chain_err(|| {
-                    "Failed to create service response message! This is unexpected and probably a reportable bug."
-                })?,
-                res,
-                ignore_bad_messages,
-            )?;
-            let service = Srv {
-                path: message,
-                source: contents,
-            };
-            return Ok(MessageCase::Service(service, req, res));
+
+            return Ok(MessageCase::Service(
+                service,
+                Msg(service_messages.req),
+                Msg(service_messages.res),
+            ));
         }
     }
     if let Some(contents) = IN_MEMORY_MESSAGES.get(&message) {
@@ -301,20 +288,21 @@ fn create_message(message: MessagePath, contents: &str, ignore_bad_messages: boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ros_msg_parser::MessagePath;
 
-    static FILEPATH: &'static str = "src/msg_examples";
+    static FILEPATH: &'static str = "../msg_examples";
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
         let message_map = get_message_map(
             false,
             &[FILEPATH],
-            &[MessagePath::new("geometry_msgs", "Point")],
+            &[MessagePath::new("geometry_msgs", "Point").unwrap()],
         )
         .unwrap()
         .messages;
         assert_eq!(message_map.len(), 1);
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point").unwrap()));
     }
 
     #[test]
@@ -322,14 +310,14 @@ mod tests {
         let message_map = get_message_map(
             false,
             &[FILEPATH],
-            &[MessagePath::new("geometry_msgs", "Pose")],
+            &[MessagePath::new("geometry_msgs", "Pose").unwrap()],
         )
         .unwrap()
         .messages;
         assert_eq!(message_map.len(), 3);
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Quaternion")));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Quaternion").unwrap()));
     }
 
     #[test]
@@ -337,16 +325,18 @@ mod tests {
         let message_map = get_message_map(
             false,
             &[FILEPATH],
-            &[MessagePath::new("geometry_msgs", "PoseStamped")],
+            &[MessagePath::new("geometry_msgs", "PoseStamped").unwrap()],
         )
         .unwrap()
         .messages;
         assert_eq!(message_map.len(), 5);
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "PoseStamped")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Quaternion")));
-        assert!(message_map.contains_key(&MessagePath::new("std_msgs", "Header")));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose").unwrap()));
+        assert!(
+            message_map.contains_key(&MessagePath::new("geometry_msgs", "PoseStamped").unwrap())
+        );
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Quaternion").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("std_msgs", "Header").unwrap()));
     }
 
     #[test]
@@ -355,24 +345,26 @@ mod tests {
             false,
             &[FILEPATH],
             &[
-                MessagePath::new("geometry_msgs", "PoseStamped"),
-                MessagePath::new("sensor_msgs", "Imu"),
-                MessagePath::new("rosgraph_msgs", "Clock"),
-                MessagePath::new("rosgraph_msgs", "Log"),
+                MessagePath::new("geometry_msgs", "PoseStamped").unwrap(),
+                MessagePath::new("sensor_msgs", "Imu").unwrap(),
+                MessagePath::new("rosgraph_msgs", "Clock").unwrap(),
+                MessagePath::new("rosgraph_msgs", "Log").unwrap(),
             ],
         )
         .unwrap()
         .messages;
         assert_eq!(message_map.len(), 9);
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Vector3")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "PoseStamped")));
-        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Quaternion")));
-        assert!(message_map.contains_key(&MessagePath::new("sensor_msgs", "Imu")));
-        assert!(message_map.contains_key(&MessagePath::new("std_msgs", "Header")));
-        assert!(message_map.contains_key(&MessagePath::new("rosgraph_msgs", "Clock")));
-        assert!(message_map.contains_key(&MessagePath::new("rosgraph_msgs", "Log")));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Vector3").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Point").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Pose").unwrap()));
+        assert!(
+            message_map.contains_key(&MessagePath::new("geometry_msgs", "PoseStamped").unwrap())
+        );
+        assert!(message_map.contains_key(&MessagePath::new("geometry_msgs", "Quaternion").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("sensor_msgs", "Imu").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("std_msgs", "Header").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("rosgraph_msgs", "Clock").unwrap()));
+        assert!(message_map.contains_key(&MessagePath::new("rosgraph_msgs", "Log").unwrap()));
     }
 
     #[test]
@@ -381,10 +373,10 @@ mod tests {
             false,
             &[FILEPATH],
             &[
-                MessagePath::new("geometry_msgs", "PoseStamped"),
-                MessagePath::new("sensor_msgs", "Imu"),
-                MessagePath::new("rosgraph_msgs", "Clock"),
-                MessagePath::new("rosgraph_msgs", "Log"),
+                MessagePath::new("geometry_msgs", "PoseStamped").unwrap(),
+                MessagePath::new("sensor_msgs", "Imu").unwrap(),
+                MessagePath::new("rosgraph_msgs", "Clock").unwrap(),
+                MessagePath::new("rosgraph_msgs", "Log").unwrap(),
             ],
         )
         .unwrap();
@@ -392,51 +384,55 @@ mod tests {
         assert_eq!(hashes.len(), 9);
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("geometry_msgs", "Vector3"))
+                .get(&MessagePath::new("geometry_msgs", "Vector3").unwrap())
                 .unwrap(),
             "4a842b65f413084dc2b10fb484ea7f17".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("geometry_msgs", "Point"))
+                .get(&MessagePath::new("geometry_msgs", "Point").unwrap())
                 .unwrap(),
             "4a842b65f413084dc2b10fb484ea7f17".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("geometry_msgs", "Quaternion"))
+                .get(&MessagePath::new("geometry_msgs", "Quaternion").unwrap())
                 .unwrap(),
             "a779879fadf0160734f906b8c19c7004".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("geometry_msgs", "Pose"))
+                .get(&MessagePath::new("geometry_msgs", "Pose").unwrap())
                 .unwrap(),
             "e45d45a5a1ce597b249e23fb30fc871f".to_owned()
         );
         assert_eq!(
-            *hashes.get(&MessagePath::new("std_msgs", "Header")).unwrap(),
+            *hashes
+                .get(&MessagePath::new("std_msgs", "Header").unwrap())
+                .unwrap(),
             "2176decaecbce78abc3b96ef049fabed".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("geometry_msgs", "PoseStamped"))
+                .get(&MessagePath::new("geometry_msgs", "PoseStamped").unwrap())
                 .unwrap(),
             "d3812c3cbc69362b77dc0b19b345f8f5".to_owned()
         );
         assert_eq!(
-            *hashes.get(&MessagePath::new("sensor_msgs", "Imu")).unwrap(),
+            *hashes
+                .get(&MessagePath::new("sensor_msgs", "Imu").unwrap())
+                .unwrap(),
             "6a62c6daae103f4ff57a132d6f95cec2".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("rosgraph_msgs", "Clock"))
+                .get(&MessagePath::new("rosgraph_msgs", "Clock").unwrap())
                 .unwrap(),
             "a9c97c1d230cfc112e270351a944ee47".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("rosgraph_msgs", "Log"))
+                .get(&MessagePath::new("rosgraph_msgs", "Log").unwrap())
                 .unwrap(),
             "acffd30cd6b6de30f120938c17c593fb".to_owned()
         );
@@ -447,14 +443,14 @@ mod tests {
         let message_map = get_message_map(
             false,
             &[FILEPATH],
-            &[MessagePath::new("geometry_msgs", "Vector3")],
+            &[MessagePath::new("geometry_msgs", "Vector3").unwrap()],
         )
         .unwrap()
         .messages;
         let definition = generate_message_definition(
             &message_map,
             &message_map
-                .get(&MessagePath::new("geometry_msgs", "Vector3"))
+                .get(&MessagePath::new("geometry_msgs", "Vector3").unwrap())
                 .unwrap(),
         )
         .unwrap();
@@ -470,14 +466,14 @@ mod tests {
         let message_map = get_message_map(
             false,
             &[FILEPATH],
-            &[MessagePath::new("geometry_msgs", "PoseStamped")],
+            &[MessagePath::new("geometry_msgs", "PoseStamped").unwrap()],
         )
         .unwrap()
         .messages;
         let definition = generate_message_definition(
             &message_map,
             &message_map
-                .get(&MessagePath::new("geometry_msgs", "PoseStamped"))
+                .get(&MessagePath::new("geometry_msgs", "PoseStamped").unwrap())
                 .unwrap(),
         )
         .unwrap();
@@ -536,8 +532,8 @@ float64 w\n\
             false,
             &[FILEPATH],
             &[
-                MessagePath::new("diagnostic_msgs", "AddDiagnostics"),
-                MessagePath::new("simple_srv", "Something"),
+                MessagePath::new("diagnostic_msgs", "AddDiagnostics").unwrap(),
+                MessagePath::new("simple_srv", "Something").unwrap(),
             ],
         )
         .unwrap();
@@ -545,13 +541,13 @@ float64 w\n\
         assert_eq!(hashes.len(), 11);
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("diagnostic_msgs", "AddDiagnostics"))
+                .get(&MessagePath::new("diagnostic_msgs", "AddDiagnostics").unwrap())
                 .unwrap(),
             "e6ac9bbde83d0d3186523c3687aecaee".to_owned()
         );
         assert_eq!(
             *hashes
-                .get(&MessagePath::new("simple_srv", "Something"))
+                .get(&MessagePath::new("simple_srv", "Something").unwrap())
                 .unwrap(),
             "63715c08716373d8624430cde1434192".to_owned()
         );
@@ -563,9 +559,9 @@ float64 w\n\
             false,
             &[FILEPATH],
             &[
-                MessagePath::new("empty_srv", "Empty"),
-                MessagePath::new("empty_req_srv", "EmptyRequest"),
-                MessagePath::new("tricky_comment_srv", "TrickyComment"),
+                MessagePath::new("empty_srv", "Empty").unwrap(),
+                MessagePath::new("empty_req_srv", "EmptyRequest").unwrap(),
+                MessagePath::new("tricky_comment_srv", "TrickyComment").unwrap(),
             ],
         )
         .unwrap();

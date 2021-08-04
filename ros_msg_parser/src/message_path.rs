@@ -11,7 +11,7 @@ pub struct MessagePath {
     name: String,
 }
 
-fn is_valid_package_name(package: &str) -> bool {
+pub fn is_valid_package_name(package: &str) -> bool {
     lazy_static! {
         static ref RE_PACKAGE_CORRECT_CHAR_SET_AND_LENGTH: Regex =
             Regex::new("^[a-z][a-z0-9_]+$").unwrap();
@@ -43,7 +43,7 @@ impl MessagePath {
             [package, name] => Self::new(package, name),
             _ => Err(Error::InvalidMessagePath {
                 name: input.into(),
-                reason: "string needs to be in package/name format".into(),
+                reason: "string needs to be in `package/name` format".into(),
             }),
         }
     }
@@ -72,46 +72,5 @@ impl<'a> TryFrom<&'a str> for MessagePath {
 
     fn try_from(value: &'a str) -> Result<Self> {
         Self::from_combined(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn package_names_must_be_at_least_two_characters() {
-        assert!(is_valid_package_name("foo"));
-        assert!(is_valid_package_name("fo"));
-        assert!(!is_valid_package_name("f"));
-    }
-
-    #[test]
-    fn package_names_must_start_with_lowercase_alphabetic() {
-        assert!(is_valid_package_name("foo_123"));
-        assert!(!is_valid_package_name("Foo_123"));
-        assert!(!is_valid_package_name("1oo_123"));
-        assert!(!is_valid_package_name("_oo_123"));
-    }
-
-    #[test]
-    fn package_names_must_not_contain_uppercase_anywhere() {
-        assert!(is_valid_package_name("foo_123"));
-        assert!(!is_valid_package_name("foO_123"));
-    }
-
-    #[test]
-    fn package_names_are_limited_to_lowercase_alphanumeric_and_underscore() {
-        assert!(is_valid_package_name("foo_123"));
-        assert!(!is_valid_package_name("foO_123"));
-        assert!(!is_valid_package_name("foo-123"));
-    }
-
-    #[test]
-    fn package_names_must_not_contain_multiple_underscores_in_a_row() {
-        assert!(is_valid_package_name("foo_123_"));
-        assert!(is_valid_package_name("f_o_o_1_2_3_"));
-        assert!(!is_valid_package_name("foo__123_"));
-        assert!(!is_valid_package_name("foo___123_"));
     }
 }

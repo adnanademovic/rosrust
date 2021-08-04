@@ -55,7 +55,7 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
             .messages
             .iter()
             .filter(|&(message, _value)| message.package() == package)
-            .map(|(message, value)| (message.name().into(), value.source.clone()))
+            .map(|(message, value)| (message.name().into(), value.0.source.clone()))
             .collect::<HashMap<String, String>>();
         for (name, source) in names {
             let key = MessagePath::new(&package, name).chain_err(|| "Invalid message path")?;
