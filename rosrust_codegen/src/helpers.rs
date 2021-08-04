@@ -220,7 +220,6 @@ fn generate_in_memory_messages() -> HashMap<MessagePath, &'static str> {
     output
 }
 
-#[allow(clippy::trivial_regex)]
 fn get_message_or_service(
     ignore_bad_messages: bool,
     folders: &[&str],

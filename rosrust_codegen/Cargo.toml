@@ -11,7 +11,6 @@ version = "0.9.5"
 [dependencies]
 error-chain = "0.12.4"
 lazy_static = "1.4.0"
-regex = "1.5.4"
 quote = "1.0.9"
 syn = "1.0.74"
 proc-macro2 = "1.0.28"
