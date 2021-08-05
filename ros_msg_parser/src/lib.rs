@@ -7,6 +7,7 @@ mod parse_msg;
 mod srv;
 #[cfg(test)]
 mod tests;
+mod value;
 
 pub use data_type::DataType;
 pub use error::{Error, Result};
@@ -14,3 +15,4 @@ pub use field_info::{FieldCase, FieldInfo};
 pub use message_path::MessagePath;
 pub use msg::Msg;
 pub use srv::Srv;
+pub use value::Value;
