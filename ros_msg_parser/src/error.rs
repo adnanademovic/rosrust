@@ -8,6 +8,8 @@ pub enum Error {
     BadMessageContent(String),
     #[error("message dependency missing: {package}/{name}")]
     MessageDependencyMissing { package: String, name: String },
+    #[error("bad constant value `{value}` in field {name}")]
+    BadConstant { name: String, value: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

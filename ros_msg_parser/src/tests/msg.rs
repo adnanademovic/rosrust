@@ -1,4 +1,4 @@
-use crate::{DataType, FieldCase, FieldInfo, MessagePath, Msg, Result};
+use crate::{DataType, FieldCase, FieldInfo, MessagePath, Msg, Result, Value};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
@@ -274,4 +274,31 @@ fn full_name_returns_the_full_message_name() {
     )
     .unwrap();
     assert_eq!(msg.full_name(), "geometry_msgs/PoseStamped");
+}
+
+#[test]
+fn constants_returns_a_map_of_all_constants_in_message_root() {
+    let msg = Msg::new(
+        "benchmark_msgs/Overall".try_into().unwrap(),
+        include_str!("../../../msg_examples/benchmark_msgs/msg/Overall.msg"),
+    )
+    .unwrap();
+    let mut constants = HashMap::new();
+    constants.insert("c_bool_t".into(), Value::Bool(true));
+    constants.insert("c_bool_f".into(), Value::Bool(false));
+    constants.insert("c_int8".into(), Value::I8(-55));
+    constants.insert("c_int16".into(), Value::I16(-55));
+    constants.insert("c_int32".into(), Value::I32(-55));
+    constants.insert("c_int64".into(), Value::I64(-55));
+    constants.insert("c_uint8".into(), Value::U8(55));
+    constants.insert("c_uint16".into(), Value::U16(55));
+    constants.insert("c_uint32".into(), Value::U32(55));
+    constants.insert("c_uint64".into(), Value::U64(55));
+    constants.insert("c_float32".into(), Value::F32(-55.0));
+    constants.insert("c_float64".into(), Value::F64(-55.0));
+    constants.insert(
+        "c_string".into(),
+        Value::String("Things 'in' here should \"be able\" # to go crazy with \\ escapes".into()),
+    );
+    assert_eq!(msg.constants().unwrap(), constants);
 }
