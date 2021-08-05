@@ -19,7 +19,7 @@ impl Msg {
         })
     }
 
-    pub fn get_type(&self) -> String {
+    pub fn full_name(&self) -> String {
         format!("{}/{}", self.path.package(), self.path.name())
     }
 

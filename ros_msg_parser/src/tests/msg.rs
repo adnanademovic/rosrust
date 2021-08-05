@@ -233,3 +233,45 @@ fn constructor_parses_real_message() {
     assert!(dependencies
         .contains(&MessagePath::new("std_msgs", "Header").expect("Unexpected bad message path")));
 }
+
+#[test]
+fn has_header_checks_if_there_is_a_header_in_the_message_root() {
+    let without_header = Msg::new(
+        "geometry_msgs/TwistWithCovariance".try_into().unwrap(),
+        include_str!("../../../msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"),
+    )
+    .unwrap();
+    assert!(!without_header.has_header());
+    let with_header = Msg::new(
+        "sensor_msgs/Imu".try_into().unwrap(),
+        include_str!("../../../msg_examples/sensor_msgs/msg/Imu.msg"),
+    )
+    .unwrap();
+    assert!(with_header.has_header());
+}
+
+#[test]
+fn dependencies_lists_all_fields_the_message_depends_upon() {
+    let msg = Msg::new(
+        "geometry_msgs/PoseStamped".try_into().unwrap(),
+        include_str!("../../../msg_examples/geometry_msgs/msg/PoseStamped.msg"),
+    )
+    .unwrap();
+    assert_eq!(
+        msg.dependencies().unwrap(),
+        vec![
+            "std_msgs/Header".try_into().unwrap(),
+            "geometry_msgs/Pose".try_into().unwrap(),
+        ]
+    );
+}
+
+#[test]
+fn full_name_returns_the_full_message_name() {
+    let msg = Msg::new(
+        "geometry_msgs/PoseStamped".try_into().unwrap(),
+        include_str!("../../../msg_examples/geometry_msgs/msg/PoseStamped.msg"),
+    )
+    .unwrap();
+    assert_eq!(msg.full_name(), "geometry_msgs/PoseStamped");
+}

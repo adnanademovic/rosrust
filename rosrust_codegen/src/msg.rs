@@ -116,55 +116,23 @@ impl Msg {
         }
     }
 
-    pub fn get_type(&self) -> String {
-        format!("{}/{}", self.0.path.package(), self.0.path.name())
+    pub fn full_name(&self) -> String {
+        self.0.full_name()
     }
 
     pub fn dependencies(&self) -> Result<Vec<MessagePath>> {
-        self.0
-            .fields
-            .iter()
-            .filter_map(|field| match field.datatype {
-                DataType::LocalStruct(ref name) => Some(
-                    MessagePath::new(self.0.path.package(), name)
-                        .chain_err(|| "Invalid message path"),
-                ),
-                DataType::RemoteStruct(ref message) => Some(Ok(message.clone())),
-                _ => None,
-            })
-            .collect()
+        self.0.dependencies().chain_err(|| "invalid dependencies")
     }
 
     pub fn get_md5_representation(
         &self,
         hashes: &HashMap<MessagePath, String>,
     ) -> ::std::result::Result<String, ()> {
-        let constants = self
-            .0
-            .fields
-            .iter()
-            .filter(|v| v.is_constant())
-            .map(|v| v.md5_string(self.0.path.package(), hashes))
-            .collect::<::std::result::Result<Vec<String>, _>>()
-            .map_err(|_| ())?;
-        let fields = self
-            .0
-            .fields
-            .iter()
-            .filter(|v| !v.is_constant())
-            .map(|v| v.md5_string(self.0.path.package(), hashes))
-            .collect::<::std::result::Result<Vec<String>, _>>()
-            .map_err(|_| ())?;
-        let representation = constants
-            .into_iter()
-            .chain(fields)
-            .collect::<Vec<_>>()
-            .join("\n");
-        Ok(representation)
+        self.0.get_md5_representation(hashes).map_err(|_| ())
     }
 
     pub fn has_header(&self) -> bool {
-        self.0.fields.iter().any(FieldInfo::is_header)
+        self.0.has_header()
     }
 
     pub fn header_token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {

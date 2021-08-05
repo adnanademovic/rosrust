@@ -70,7 +70,7 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
                 .clone();
             let msg_definition =
                 helpers::generate_message_definition(&message_map.messages, &message)?;
-            let msg_type = message.get_type();
+            let msg_type = message.full_name();
             package_data.messages.push(output_layout::Message {
                 message,
                 msg_definition,
