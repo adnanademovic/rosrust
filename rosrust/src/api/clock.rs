@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
-static BEFORE_EPOCH: &'static str = "Requested time is before UNIX epoch.";
+static BEFORE_EPOCH: &str = "Requested time is before UNIX epoch.";
 
 pub struct Delay {
     clock: Arc<dyn Clock>,

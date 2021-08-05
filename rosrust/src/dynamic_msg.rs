@@ -90,7 +90,7 @@ impl DynamicMsg {
     }
 
     fn get_dependency(&self, path: &MessagePath) -> io::Result<&Msg> {
-        self.dependencies.get(&path).ok_or_else(|| {
+        self.dependencies.get(path).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
                 format!("Missing message dependency: {}", path),
@@ -160,7 +160,7 @@ impl DynamicMsg {
                 self.encode_message(dependency, v, w)
             }
             (DataType::RemoteStruct(path), Value::Message(v)) => {
-                let dependency = self.get_dependency(&path)?;
+                let dependency = self.get_dependency(path)?;
                 self.encode_message(dependency, v, w)
             }
             _ => Err(io::Error::new(
@@ -268,7 +268,7 @@ impl DynamicMsg {
                 Value::Message(self.decode_message(dependency, r)?)
             }
             DataType::RemoteStruct(path) => {
-                let dependency = self.get_dependency(&path)?;
+                let dependency = self.get_dependency(path)?;
                 Value::Message(self.decode_message(dependency, r)?)
             }
         })

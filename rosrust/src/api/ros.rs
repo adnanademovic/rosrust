@@ -54,9 +54,7 @@ impl Ros {
                 .into_iter()
                 .next()
                 .ok_or_else(|| ErrorKind::BadYamlData(dest.clone()))?;
-            let param = ros
-                .param(&src)
-                .ok_or_else(|| ErrorKind::CannotResolveName(src))?;
+            let param = ros.param(&src).ok_or(ErrorKind::CannotResolveName(src))?;
             param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
 

@@ -1,6 +1,5 @@
 use super::error::{Error, ErrorKind};
 use error_chain::bail;
-use std;
 use std::fmt;
 use std::ops::{Add, AddAssign};
 
@@ -131,11 +130,11 @@ fn process_name(name: &str) -> Result<String, Error> {
 }
 
 fn is_legal_first_char(v: u8) -> bool {
-    v >= b'A' && v <= b'Z'
-        || v >= b'a' && v <= b'z'
+    (b'A'..=b'Z').contains(&v)
+        || (b'a'..=b'z').contains(&v)
         || v == b'/'
         || v == b'~'
-        || v >= b'0' && v <= b'9'
+        || (b'0'..=b'9').contains(&v)
 }
 
 fn is_legal_char(v: u8) -> bool {

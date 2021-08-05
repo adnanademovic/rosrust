@@ -37,7 +37,7 @@ impl<T: Action> SimpleActionClient<T> {
         self.action_client.wait_for_server(timeout)
     }
 
-    pub fn build_goal_sender<'a>(&'a mut self, goal: GoalBody<T>) -> SendGoalBuilder<'a, T> {
+    pub fn build_goal_sender(&mut self, goal: GoalBody<T>) -> SendGoalBuilder<T> {
         SendGoalBuilder::new(self, goal)
     }
 

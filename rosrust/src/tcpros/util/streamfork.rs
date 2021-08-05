@@ -41,7 +41,7 @@ impl<T: Write + Send + 'static> ForkThread<T> {
     fn publish_buffer_and_prune_targets(&mut self, buffer: &[u8]) {
         let mut dropped_targets = vec![];
         for (idx, target) in self.targets.iter_mut().enumerate() {
-            if target.stream.write_all(&buffer).is_err() {
+            if target.stream.write_all(buffer).is_err() {
                 dropped_targets.push(idx);
             }
         }

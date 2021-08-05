@@ -1,6 +1,5 @@
 use crate::time::{Duration, Time};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std;
 use std::collections::HashMap;
 use std::io;
 

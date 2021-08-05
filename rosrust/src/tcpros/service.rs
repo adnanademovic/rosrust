@@ -6,7 +6,6 @@ use crate::rosmsg::{encode_str, RosMsg};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use error_chain::bail;
 use log::error;
-use std;
 use std::collections::HashMap;
 use std::io;
 use std::net::{TcpListener, TcpStream};
@@ -91,9 +90,7 @@ where
                     service, err
                 );
             }
-            return;
         }
-
         // Spawn a thread for handling requests
         Ok(RequestType::Action) => spawn_request_handler::<T, U, F>(stream, Arc::clone(&handler)),
         Ok(RequestType::Probe) => (),

@@ -6,7 +6,6 @@ use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use crossbeam::channel::{bounded, select, Receiver, Sender, TrySendError};
 use log::error;
-use std;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
@@ -138,7 +137,7 @@ impl SubscriberRosConnection {
         self.connected_publishers.iter().cloned().collect()
     }
 
-    #[allow(clippy::identity_conversion)]
+    #[allow(clippy::useless_conversion)]
     pub fn connect_to<U: ToSocketAddrs>(
         &mut self,
         publisher: &str,
@@ -214,8 +213,8 @@ fn join_connections(
     md5sum: &str,
     msg_type: &str,
 ) {
-    let mut subs: BTreeMap<usize, (LossySender<MessageInfo>, Sender<HashMap<String, String>>)> =
-        BTreeMap::new();
+    type Sub = (LossySender<MessageInfo>, Sender<HashMap<String, String>>);
+    let mut subs: BTreeMap<usize, Sub> = BTreeMap::new();
     let mut existing_headers: Vec<HashMap<String, String>> = Vec::new();
 
     let (data_tx, data_rx): (Sender<MessageInfo>, Receiver<MessageInfo>) = bounded(8);
@@ -372,7 +371,7 @@ where
     U: std::io::Write + std::io::Read,
 {
     write_request::<U>(stream, caller_id, topic, msg_definition, md5sum, msg_type)?;
-    read_response::<U>(stream, &md5sum, &msg_type)
+    read_response::<U>(stream, md5sum, msg_type)
 }
 
 #[inline]
@@ -421,7 +420,6 @@ impl MessageInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std;
 
     static FAILED_TO_READ_WRITE_VECTOR: &'static str = "Failed to read or write from vector";
 

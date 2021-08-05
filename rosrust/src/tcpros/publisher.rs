@@ -7,7 +7,6 @@ use crate::util::FAILED_TO_LOCK;
 use crate::RawMessageDescription;
 use error_chain::bail;
 use log::error;
-use std;
 use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::sync::{atomic, Arc, Mutex};
