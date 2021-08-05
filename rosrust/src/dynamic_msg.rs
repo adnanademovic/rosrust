@@ -47,6 +47,14 @@ impl DynamicMsg {
         Ok(DynamicMsg { msg, dependencies })
     }
 
+    pub fn from_headers(headers: HashMap<String, String>) -> Result<Self> {
+        let message_type = headers.get("type").chain_err(|| "Missing header `type`")?;
+        let message_definition = headers
+            .get("message_definition")
+            .chain_err(|| "Missing header `message_definition`")?;
+        Self::new(message_type, message_definition)
+    }
+
     fn parse_msg(message_type: &str, message_src: &str) -> Result<Msg> {
         let message_path = message_type
             .try_into()
