@@ -203,14 +203,14 @@ lazy_static! {
     .collect();
 }
 
-pub fn field_info_create_identifier(field_info: &FieldInfo, span: Span) -> Ident {
+fn field_info_create_identifier(field_info: &FieldInfo, span: Span) -> Ident {
     if RESERVED_KEYWORDS.contains(&field_info.name) {
         return Ident::new(&format!("{}_", field_info.name), span);
     }
     Ident::new(&field_info.name, span)
 }
 
-pub fn field_info_field_token_stream<T: ToTokens>(
+fn field_info_field_token_stream<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
@@ -224,7 +224,7 @@ pub fn field_info_field_token_stream<T: ToTokens>(
     }
 }
 
-pub fn field_info_field_name_eq_and_debug_token_stream(
+fn field_info_field_name_eq_and_debug_token_stream(
     field_info: &FieldInfo,
 ) -> Option<(impl ToTokens, impl ToTokens, impl ToTokens)> {
     let name = field_info_create_identifier(field_info, Span::call_site());
@@ -241,7 +241,7 @@ pub fn field_info_field_name_eq_and_debug_token_stream(
     }
 }
 
-pub fn field_info_field_default_token_stream<T: ToTokens>(
+fn field_info_field_default_token_stream<T: ToTokens>(
     field_info: &FieldInfo,
     _crate_prefix: &T,
 ) -> impl ToTokens {
@@ -256,7 +256,7 @@ pub fn field_info_field_default_token_stream<T: ToTokens>(
     }
 }
 
-pub fn field_info_field_token_stream_encode<T: ToTokens>(
+fn field_info_field_token_stream_encode<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
@@ -282,7 +282,7 @@ pub fn field_info_field_token_stream_encode<T: ToTokens>(
     }
 }
 
-pub fn field_info_field_token_stream_decode<T: ToTokens>(
+fn field_info_field_token_stream_decode<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
@@ -310,7 +310,7 @@ pub fn field_info_field_token_stream_decode<T: ToTokens>(
     }
 }
 
-pub fn field_info_const_token_stream<T: ToTokens>(
+fn field_info_const_token_stream<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
@@ -381,7 +381,7 @@ pub fn field_info_const_token_stream<T: ToTokens>(
     }
 }
 
-pub fn datatype_token_stream<T: ToTokens>(data_type: &DataType, crate_prefix: &T) -> impl ToTokens {
+fn datatype_token_stream<T: ToTokens>(data_type: &DataType, crate_prefix: &T) -> impl ToTokens {
     match data_type {
         DataType::Bool => quote! { bool },
         DataType::I8(_) => quote! { i8 },
