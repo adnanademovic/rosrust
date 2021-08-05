@@ -15,4 +15,4 @@ pub use field_info::{FieldCase, FieldInfo};
 pub use message_path::MessagePath;
 pub use msg::Msg;
 pub use srv::Srv;
-pub use value::Value;
+pub use value::{MessageValue, Value};

@@ -19,7 +19,6 @@ hex = "0.4.3"
 
 [dependencies.ros_msg_parser]
 path = "../ros_msg_parser"
-version = "0.1.0"
 
 [lib]
 proc-macro = true

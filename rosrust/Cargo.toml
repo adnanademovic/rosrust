@@ -15,6 +15,7 @@ error-chain = "0.12.4"
 lazy_static = "1.4.0"
 log = "0.4.14"
 hostname = "0.3.1"
+regex = "1.5.4"
 serde = "1.0.127"
 serde_derive = "1.0.127"
 xml-rpc = "0.0.12"
@@ -23,12 +24,14 @@ crossbeam = "0.8.1"
 socket2 = "0.4.1"
 colored = "2.0.0"
 
+[dependencies.ros_msg_parser]
+path = "../ros_msg_parser"
+
 [dependencies.rosrust_codegen]
 path = "../rosrust_codegen"
 version = "0.9.5"
 
 [dev-dependencies]
-regex = "1.5.4"
 criterion = "0.3.5"
 env_logger = "0.9.0"
 nix = "0.22.0"

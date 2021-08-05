@@ -1,4 +1,5 @@
 use crate::{Error, MessagePath, Msg, Result};
+use lazy_static::lazy_static;
 use regex::RegexBuilder;
 
 #[derive(Clone, Debug)]
@@ -22,11 +23,13 @@ impl Srv {
     }
 
     pub fn build_messages(&self) -> Result<SrvMessages> {
-        let re = RegexBuilder::new("^---$")
-            .multi_line(true)
-            .build()
-            .expect("Invalid regex `^---$`");
-        let (req, res) = match re.split(&self.source).collect::<Vec<_>>().as_slice() {
+        lazy_static! {
+            static ref RE_SPLIT: regex::Regex = RegexBuilder::new("^---$")
+                .multi_line(true)
+                .build()
+                .expect("Invalid regex `^---$`");
+        }
+        let (req, res) = match RE_SPLIT.split(&self.source).collect::<Vec<_>>().as_slice() {
             &[req] => (req, ""),
             &[req, res] => (req, res),
             &[] => {

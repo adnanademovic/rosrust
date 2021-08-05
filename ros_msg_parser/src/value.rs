@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+pub type MessageValue = HashMap<String, Value>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(bool),
@@ -17,5 +19,5 @@ pub enum Value {
     Time { sec: u32, nsec: u32 },
     Duration { sec: i32, nsec: i32 },
     Array(Vec<Value>),
-    Message(HashMap<String, Value>),
+    Message(MessageValue),
 }
