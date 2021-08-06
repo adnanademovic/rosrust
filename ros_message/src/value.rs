@@ -1,6 +1,9 @@
 use crate::{Duration, Time};
+use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::iter::FromIterator;
 
 pub type MessageValue = HashMap<String, Value>;
@@ -23,6 +26,49 @@ pub enum Value {
     Duration(Duration),
     Array(Vec<Value>),
     Message(MessageValue),
+}
+
+impl Value {
+    fn fmt_indented(&self, indentation: usize, step: usize, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Bool(v) => v.fmt(f),
+            Value::I8(v) => v.fmt(f),
+            Value::I16(v) => v.fmt(f),
+            Value::I32(v) => v.fmt(f),
+            Value::I64(v) => v.fmt(f),
+            Value::U8(v) => v.fmt(f),
+            Value::U16(v) => v.fmt(f),
+            Value::U32(v) => v.fmt(f),
+            Value::U64(v) => v.fmt(f),
+            Value::F32(v) => v.fmt(f),
+            Value::F64(v) => v.fmt(f),
+            Value::String(v) => write!(f, "{:?}", v),
+            Value::Time(v) => v.fmt(f),
+            Value::Duration(v) => v.fmt(f),
+            Value::Array(items) => {
+                for item in items {
+                    writeln!(f, "")?;
+                    write!(f, "{:indent$}- ", "", indent = indentation)?;
+                    item.fmt_indented(indentation + step, step, f)?;
+                }
+                Ok(())
+            }
+            Value::Message(items) => {
+                for (key, item) in items.iter().sorted_by(|a, b| Ord::cmp(&a.0, &b.0)) {
+                    writeln!(f, "")?;
+                    write!(f, "{:indent$}{}: ", "", key, indent = indentation)?;
+                    item.fmt_indented(indentation + step, step, f)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_indented(0, 2, f)
+    }
 }
 
 impl From<bool> for Value {

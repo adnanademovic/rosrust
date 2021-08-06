@@ -9,6 +9,7 @@ version = "0.1.0"
 
 [dependencies]
 hex = "0.4.3"
+itertools = "0.10.1"
 lazy_static = "1.4.0"
 md-5 = "0.9.1"
 regex = "1.5.4"
