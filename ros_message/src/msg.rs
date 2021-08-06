@@ -27,8 +27,8 @@ fn parse_constant<T: std::str::FromStr>(name: &str, value: &str) -> Result<T> {
 }
 
 impl Msg {
-    pub fn new(path: MessagePath, source: impl Into<String>) -> Result<Msg> {
-        let source = source.into();
+    pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
+        let source = source.trim().to_owned();
         let fields = match_lines(&source)?;
         Ok(Msg {
             path,
