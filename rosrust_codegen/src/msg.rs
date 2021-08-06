@@ -188,7 +188,7 @@ fn field_info_field_token_stream<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
-    let datatype = datatype_token_stream(&field_info.datatype(), crate_prefix);
+    let datatype = datatype_token_stream(field_info.datatype(), crate_prefix);
     let name = field_info_create_identifier(field_info, Span::call_site());
     match field_info.case() {
         FieldCase::Unit => quote! { pub #name: #datatype, },
@@ -293,7 +293,7 @@ fn field_info_const_token_stream<T: ToTokens>(
         _ => return quote! {},
     };
     let name = field_info_create_identifier(field_info, Span::call_site());
-    let datatype = datatype_token_stream(&field_info.datatype(), crate_prefix);
+    let datatype = datatype_token_stream(field_info.datatype(), crate_prefix);
     let insides = match field_info.datatype() {
         DataType::Bool => {
             let bool_value = if value != "0" {

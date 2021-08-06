@@ -10,43 +10,41 @@ fn main() {
     let mut updater = Updater::new().unwrap();
     updater.set_verbose(true);
 
-    let mut freq_statuses = vec![];
-
-    freq_statuses.push(Arc::new(
-        FrequencyStatus::builder().name("No limits").build(),
-    ));
-    freq_statuses.push(Arc::new(
-        FrequencyStatus::builder()
-            .name("No limits allowing empty")
-            .allow_no_events(true)
-            .build(),
-    ));
-    freq_statuses.push(Arc::new(
-        FrequencyStatus::builder()
-            .name("Only max")
-            .max_frequency(10.0)
-            .build(),
-    ));
-    freq_statuses.push(Arc::new(
-        FrequencyStatus::builder()
-            .name("Only max allowing empty")
-            .max_frequency(10.0)
-            .allow_no_events(true)
-            .build(),
-    ));
-    freq_statuses.push(Arc::new(
-        FrequencyStatus::builder()
-            .name("Only min")
-            .min_frequency(5.0)
-            .build(),
-    ));
-    freq_statuses.push(Arc::new(
-        FrequencyStatus::builder()
-            .name("Both limits")
-            .min_frequency(5.0)
-            .max_frequency(10.0)
-            .build(),
-    ));
+    let freq_statuses = vec![
+        Arc::new(FrequencyStatus::builder().name("No limits").build()),
+        Arc::new(
+            FrequencyStatus::builder()
+                .name("No limits allowing empty")
+                .allow_no_events(true)
+                .build(),
+        ),
+        Arc::new(
+            FrequencyStatus::builder()
+                .name("Only max")
+                .max_frequency(10.0)
+                .build(),
+        ),
+        Arc::new(
+            FrequencyStatus::builder()
+                .name("Only max allowing empty")
+                .max_frequency(10.0)
+                .allow_no_events(true)
+                .build(),
+        ),
+        Arc::new(
+            FrequencyStatus::builder()
+                .name("Only min")
+                .min_frequency(5.0)
+                .build(),
+        ),
+        Arc::new(
+            FrequencyStatus::builder()
+                .name("Both limits")
+                .min_frequency(5.0)
+                .max_frequency(10.0)
+                .build(),
+        ),
+    ];
 
     let updater_freq_statuses = freq_statuses.clone();
     for task in &updater_freq_statuses {

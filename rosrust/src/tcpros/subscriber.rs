@@ -421,7 +421,7 @@ impl MessageInfo {
 mod tests {
     use super::*;
 
-    static FAILED_TO_READ_WRITE_VECTOR: &'static str = "Failed to read or write from vector";
+    static FAILED_TO_READ_WRITE_VECTOR: &str = "Failed to read or write from vector";
 
     #[test]
     fn package_to_vector_creates_right_buffer_from_reader() {

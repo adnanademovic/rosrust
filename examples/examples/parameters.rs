@@ -1,4 +1,3 @@
-use env_logger;
 use rosrust::{self, ros_info};
 use serde_derive::{Deserialize, Serialize};
 

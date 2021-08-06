@@ -1,8 +1,5 @@
 // Example that requires a lot of processing power to handle all the data received.
 
-use env_logger;
-use rosrust;
-
 use std::sync::Mutex;
 use std::time::Instant;
 

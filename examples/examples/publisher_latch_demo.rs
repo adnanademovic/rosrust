@@ -1,4 +1,3 @@
-use env_logger;
 use rosrust::{self, ros_info};
 
 fn main() {
@@ -12,8 +11,9 @@ fn main() {
     let chatter_pub_unlatched = rosrust::publish("chatter", 2).unwrap();
     chatter_pub_latched.set_latching(true);
 
-    let mut msg = rosrust_msg::std_msgs::String::default();
-    msg.data = String::from("hello world latched");
+    let mut msg = rosrust_msg::std_msgs::String {
+        data: String::from("hello world latched"),
+    };
 
     // Log event
     ros_info!("Publishing: {}", msg.data);

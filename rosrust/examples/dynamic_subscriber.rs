@@ -1,5 +1,3 @@
-use env_logger;
-use rosrust;
 use rosrust::{DynamicMsg, MsgValue};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -26,7 +24,7 @@ fn main() {
             move |v: rosrust::RawMessage, id: &str| {
                 rosrust::ros_info!("Received from '{}'", id);
                 let current_msg = dynamic_msg.lock().unwrap();
-                if let Some(ref current_msg) = current_msg.get(id) {
+                if let Some(current_msg) = current_msg.get(id) {
                     if let Ok(data) = current_msg.decode(std::io::Cursor::new(v.0)) {
                         // Callback for handling received messages
                         rosrust::ros_info!("Decoded as: {}", MsgValue::Message(data));

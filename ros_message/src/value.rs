@@ -47,7 +47,7 @@ impl Value {
             Value::Duration(v) => v.fmt(f),
             Value::Array(items) => {
                 for item in items {
-                    writeln!(f, "")?;
+                    writeln!(f)?;
                     write!(f, "{:indent$}- ", "", indent = indentation)?;
                     item.fmt_indented(indentation + step, step, f)?;
                 }
@@ -55,7 +55,7 @@ impl Value {
             }
             Value::Message(items) => {
                 for (key, item) in items.iter().sorted_by(|a, b| Ord::cmp(&a.0, &b.0)) {
-                    writeln!(f, "")?;
+                    writeln!(f)?;
                     write!(f, "{:indent$}{}: ", "", key, indent = indentation)?;
                     item.fmt_indented(indentation + step, step, f)?;
                 }

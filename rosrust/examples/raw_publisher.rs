@@ -1,5 +1,3 @@
-use env_logger;
-use rosrust;
 use rosrust::RawMessageDescription;
 
 mod msg {

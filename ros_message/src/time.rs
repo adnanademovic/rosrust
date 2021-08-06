@@ -2,15 +2,22 @@ use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::fmt;
 use std::fmt::Formatter;
+use std::hash::{Hash, Hasher};
 use std::ops;
 use std::time;
 
 const BILLION: i64 = 1_000_000_000;
 
-#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq, Hash)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq)]
 pub struct Time {
     pub sec: u32,
     pub nsec: u32,
+}
+
+impl Hash for Time {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.nanos().hash(state)
+    }
 }
 
 impl Time {
@@ -43,10 +50,10 @@ fn display_nanos(nanos: &str, f: &mut Formatter<'_>) -> fmt::Result {
     let characters = nanos.chars();
     let (left, right) = characters.as_str().split_at(split_point);
     let right = right.trim_end_matches('0');
-    if right.len() > 0 {
-        write!(f, "{}.{}", left, right)
-    } else {
+    if right.is_empty() {
         write!(f, "{}", left)
+    } else {
+        write!(f, "{}.{}", left, right)
     }
 }
 
@@ -74,10 +81,16 @@ impl cmp::Ord for Time {
     }
 }
 
-#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq, Hash)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq)]
 pub struct Duration {
     pub sec: i32,
     pub nsec: i32,
+}
+
+impl Hash for Duration {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.nanos().hash(state)
+    }
 }
 
 impl fmt::Display for Duration {

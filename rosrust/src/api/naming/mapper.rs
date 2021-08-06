@@ -41,7 +41,7 @@ mod tests {
     use super::super::path::{Buffer, Path};
     use super::*;
 
-    static FAILED_TO_MAP: &'static str = "Failed to map";
+    static FAILED_TO_MAP: &str = "Failed to map";
 
     #[test]
     fn matches_existing_paths() {

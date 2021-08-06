@@ -1,5 +1,4 @@
 use crossbeam::channel::unbounded;
-use rosrust;
 use std::process::Command;
 
 mod util;
@@ -61,7 +60,7 @@ fn subscriber_to_multiple_publishers() {
         false,
     );
     println!("Checking rostopic publisher");
-    util::test_subscriber_detailed(rx.clone(), r"^hello world from rostopic$", false, 10, false);
+    util::test_subscriber_detailed(rx, r"^hello world from rostopic$", false, 10, false);
 
     assert_eq!(subscriber.publisher_count(), 4);
 }

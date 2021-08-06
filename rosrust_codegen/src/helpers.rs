@@ -288,7 +288,7 @@ mod tests {
     use super::*;
     use ros_message::MessagePath;
 
-    static FILEPATH: &'static str = "../msg_examples";
+    static FILEPATH: &str = "../msg_examples";
 
     #[test]
     fn get_message_map_fetches_leaf_message() {
@@ -447,7 +447,7 @@ mod tests {
         .messages;
         let definition = generate_message_definition(
             &message_map,
-            &message_map
+            message_map
                 .get(&MessagePath::new("geometry_msgs", "Vector3").unwrap())
                 .unwrap(),
         )
@@ -470,7 +470,7 @@ mod tests {
         .messages;
         let definition = generate_message_definition(
             &message_map,
-            &message_map
+            message_map
                 .get(&MessagePath::new("geometry_msgs", "PoseStamped").unwrap())
                 .unwrap(),
         )
