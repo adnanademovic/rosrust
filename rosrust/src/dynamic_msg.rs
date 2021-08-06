@@ -47,6 +47,14 @@ impl DynamicMsg {
         Ok(DynamicMsg { msg, dependencies })
     }
 
+    pub fn msg(&self) -> &Msg {
+        &self.msg
+    }
+
+    pub fn dependency(&self, path: &MessagePath) -> Option<&Msg> {
+        self.dependencies.get(path)
+    }
+
     pub fn from_headers(headers: HashMap<String, String>) -> Result<Self> {
         let message_type = headers.get("type").chain_err(|| "Missing header `type`")?;
         let message_definition = headers
