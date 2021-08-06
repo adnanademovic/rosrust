@@ -8,7 +8,7 @@ pub use crate::rosmsg::RosMsg;
 pub use crate::singleton::*;
 pub use crate::tcpros::{Client, ClientResponse, Message, ServicePair};
 pub use dynamic_msg::DynamicMsg;
-pub use ros_message::{Duration, Time};
+pub use ros_message::{Duration, MessageValue as MsgMessage, Time, Value as MsgValue};
 #[doc(hidden)]
 pub use rosrust_codegen::*;
 
