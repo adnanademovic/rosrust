@@ -24,8 +24,8 @@ crossbeam = "0.8.1"
 socket2 = "0.4.1"
 colored = "2.0.0"
 
-[dependencies.ros_msg_parser]
-path = "../ros_msg_parser"
+[dependencies.ros_message]
+path = "../ros_message"
 
 [dependencies.rosrust_codegen]
 path = "../rosrust_codegen"

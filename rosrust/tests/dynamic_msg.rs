@@ -1,4 +1,4 @@
-use ros_msg_parser::{MessageValue, Value};
+use ros_message::{MessageValue, Value};
 use rosrust::{DynamicMsg, Message};
 
 mod msg {

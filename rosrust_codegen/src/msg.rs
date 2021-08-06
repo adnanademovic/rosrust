@@ -2,16 +2,16 @@ use crate::error::{Result, ResultExt};
 use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
 use quote::{quote, ToTokens};
-use ros_msg_parser::{DataType, FieldCase, FieldInfo, MessagePath};
+use ros_message::{DataType, FieldCase, FieldInfo, MessagePath};
 use std::collections::{BTreeSet, HashMap};
 use syn::Ident;
 
 #[derive(Clone, Debug)]
-pub struct Msg(pub ros_msg_parser::Msg);
+pub struct Msg(pub ros_message::Msg);
 
 impl Msg {
     pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
-        ros_msg_parser::Msg::new(path, source)
+        ros_message::Msg::new(path, source)
             .map(Self)
             .chain_err(|| "Failed to parse message")
     }

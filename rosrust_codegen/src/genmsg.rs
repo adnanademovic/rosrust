@@ -2,7 +2,7 @@ use crate::error::{Result, ResultExt};
 use crate::helpers;
 use crate::helpers::MessageMap;
 use crate::output_layout;
-use ros_msg_parser::MessagePath;
+use ros_message::MessagePath;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
@@ -24,7 +24,7 @@ fn message_names_to_message_map(
         .iter()
         .copied()
         .map(TryInto::try_into)
-        .collect::<ros_msg_parser::Result<Vec<MessagePath>>>()
+        .collect::<ros_message::Result<Vec<MessagePath>>>()
         .chain_err(|| "Failed to parse all message paths")?;
     helpers::get_message_map(ignore_bad_messages, folders, &message_pairs)
 }

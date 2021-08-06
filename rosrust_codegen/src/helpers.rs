@@ -3,7 +3,7 @@ use crate::error::{ErrorKind, Result, ResultExt};
 use crate::msg::Msg;
 use error_chain::bail;
 use lazy_static::lazy_static;
-use ros_msg_parser::{MessagePath, Srv};
+use ros_message::{MessagePath, Srv};
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::{read_dir, File};
 use std::path::{Path, PathBuf};
@@ -287,7 +287,7 @@ fn create_message(message: MessagePath, contents: &str, ignore_bad_messages: boo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ros_msg_parser::MessagePath;
+    use ros_message::MessagePath;
 
     static FILEPATH: &'static str = "../msg_examples";
 

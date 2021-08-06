@@ -1,9 +1,9 @@
 [package]
 edition = "2018"
 authors = ["Adnan Ademovic <adnanademovic100@gmail.com>"]
-description = "MSG parser for ROS"
+description = "Utilities for handling MSG and SRV files in ROS"
 license = "MIT"
-name = "ros_msg_parser"
+name = "ros_message"
 repository = "https://github.com/adnanademovic/rosrust"
 version = "0.1.0"
 

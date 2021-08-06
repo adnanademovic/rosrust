@@ -2,7 +2,7 @@ use crate::error::{Result, ResultExt};
 use crate::{Duration, RosMsg, Time};
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
-use ros_msg_parser::{DataType, FieldCase, FieldInfo, MessagePath, MessageValue, Msg, Value};
+use ros_message::{DataType, FieldCase, FieldInfo, MessagePath, MessageValue, Msg, Value};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io;
