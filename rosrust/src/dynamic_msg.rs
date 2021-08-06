@@ -143,16 +143,8 @@ impl DynamicMsg {
             (DataType::F32, Value::F32(v)) => v.encode(w),
             (DataType::F64, Value::F64(v)) => v.encode(w),
             (DataType::String, Value::String(v)) => v.encode(w),
-            (DataType::Time, Value::Time { sec, nsec }) => Time {
-                sec: *sec,
-                nsec: *nsec,
-            }
-            .encode(w),
-            (DataType::Duration, Value::Duration { sec, nsec }) => Duration {
-                sec: *sec,
-                nsec: *nsec,
-            }
-            .encode(w),
+            (DataType::Time, Value::Time(time)) => time.encode(w),
+            (DataType::Duration, Value::Duration(duration)) => duration.encode(w),
             (DataType::LocalStruct(name), Value::Message(v)) => {
                 let path = MessagePath::new(self.msg.path.package(), name)
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
@@ -235,41 +227,29 @@ impl DynamicMsg {
 
     fn decode_field(&self, field: &FieldInfo, r: &mut impl io::Read) -> io::Result<Value> {
         Ok(match &field.datatype {
-            DataType::Bool => Value::Bool(bool::decode(r)?),
-            DataType::I8(_) => Value::I8(i8::decode(r)?),
-            DataType::I16 => Value::I16(i16::decode(r)?),
-            DataType::I32 => Value::I32(i32::decode(r)?),
-            DataType::I64 => Value::I64(i64::decode(r)?),
-            DataType::U8(_) => Value::U8(u8::decode(r)?),
-            DataType::U16 => Value::U16(u16::decode(r)?),
-            DataType::U32 => Value::U32(u32::decode(r)?),
-            DataType::U64 => Value::U64(u64::decode(r)?),
-            DataType::F32 => Value::F32(f32::decode(r)?),
-            DataType::F64 => Value::F64(f64::decode(r)?),
-            DataType::String => Value::String(String::decode(r)?),
-            DataType::Time => {
-                let v = Time::decode(r)?;
-                Value::Time {
-                    sec: v.sec,
-                    nsec: v.nsec,
-                }
-            }
-            DataType::Duration => {
-                let v = Duration::decode(r)?;
-                Value::Duration {
-                    sec: v.sec,
-                    nsec: v.nsec,
-                }
-            }
+            DataType::Bool => bool::decode(r)?.into(),
+            DataType::I8(_) => i8::decode(r)?.into(),
+            DataType::I16 => i16::decode(r)?.into(),
+            DataType::I32 => i32::decode(r)?.into(),
+            DataType::I64 => i64::decode(r)?.into(),
+            DataType::U8(_) => u8::decode(r)?.into(),
+            DataType::U16 => u16::decode(r)?.into(),
+            DataType::U32 => u32::decode(r)?.into(),
+            DataType::U64 => u64::decode(r)?.into(),
+            DataType::F32 => f32::decode(r)?.into(),
+            DataType::F64 => f64::decode(r)?.into(),
+            DataType::String => String::decode(r)?.into(),
+            DataType::Time => Time::decode(r)?.into(),
+            DataType::Duration => Duration::decode(r)?.into(),
             DataType::LocalStruct(name) => {
                 let path = MessagePath::new(self.msg.path.package(), name)
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
                 let dependency = self.get_dependency(&path)?;
-                Value::Message(self.decode_message(dependency, r)?)
+                self.decode_message(dependency, r)?.into()
             }
             DataType::RemoteStruct(path) => {
                 let dependency = self.get_dependency(path)?;
-                Value::Message(self.decode_message(dependency, r)?)
+                self.decode_message(dependency, r)?.into()
             }
         })
     }
@@ -285,10 +265,8 @@ impl DynamicMsg {
             None => u32::decode(r.by_ref())? as usize,
         };
         // TODO: optimize by checking data type only once
-        let items = (0..array_length)
+        (0..array_length)
             .map(|_| self.decode_field(field, r))
-            .collect::<io::Result<Vec<_>>>()?;
-
-        Ok(Value::Array(items))
+            .collect()
     }
 }

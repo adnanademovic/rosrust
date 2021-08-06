@@ -1,4 +1,4 @@
-use ros_message::{MessageValue, Value};
+use ros_message::{MessageValue, Time, Value};
 use rosrust::{DynamicMsg, Message};
 
 mod msg {
@@ -16,7 +16,7 @@ fn make_message() -> DynamicMsg {
 fn get_message_structure() -> MessageValue {
     let mut header = MessageValue::new();
     header.insert("seq".into(), Value::U32(22));
-    header.insert("stamp".into(), Value::Time { sec: 123, nsec: 0 });
+    header.insert("stamp".into(), Value::Time(Time { sec: 123, nsec: 0 }));
     header.insert("frame_id".into(), Value::String("abc".into()));
 
     let mut position1 = MessageValue::new();

@@ -1,6 +1,6 @@
-use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
 use crossbeam::sync::{Parker, Unparker};
+use ros_message::{Duration, Time};
 use std::cell::Cell;
 use std::cmp;
 use std::collections::BinaryHeap;

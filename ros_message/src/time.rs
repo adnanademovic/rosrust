@@ -5,7 +5,7 @@ use std::time;
 
 const BILLION: i64 = 1_000_000_000;
 
-#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq)]
 pub struct Time {
     pub sec: u32,
     pub nsec: u32,
@@ -48,15 +48,13 @@ impl cmp::PartialOrd for Time {
     }
 }
 
-impl cmp::Eq for Time {}
-
 impl cmp::Ord for Time {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.nanos().cmp(&other.nanos())
     }
 }
 
-#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq)]
 pub struct Duration {
     pub sec: i32,
     pub nsec: i32,
@@ -82,7 +80,7 @@ impl Duration {
     }
 
     #[inline]
-    fn nanos(self) -> i64 {
+    pub fn nanos(self) -> i64 {
         i64::from(self.sec) * BILLION + i64::from(self.nsec)
     }
 
@@ -103,8 +101,6 @@ impl cmp::PartialOrd for Duration {
         self.nanos().partial_cmp(&other.nanos())
     }
 }
-
-impl cmp::Eq for Duration {}
 
 impl cmp::Ord for Duration {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
@@ -163,56 +159,5 @@ impl From<time::Duration> for Duration {
             sec: std_duration.as_secs() as i32,
             nsec: std_duration.subsec_nanos() as i32,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Duration, Time};
-    use std::time;
-
-    #[test]
-    fn from_nanos_works() {
-        let time = Time::from_nanos(123456789987654321);
-        assert_eq!(time.sec, 123456789);
-        assert_eq!(time.nsec, 987654321);
-        let time = Duration::from_nanos(123456789987654321);
-        assert_eq!(time.sec, 123456789);
-        assert_eq!(time.nsec, 987654321);
-    }
-
-    #[test]
-    fn nanos_works() {
-        let time = Time {
-            sec: 123456789,
-            nsec: 987654321,
-        };
-        assert_eq!(time.nanos(), 123456789987654321);
-        let time = Duration {
-            sec: 123456789,
-            nsec: 987654321,
-        };
-        assert_eq!(time.nanos(), 123456789987654321);
-    }
-
-    #[test]
-    fn duration_works_with_negative() {
-        let time = Duration::from_nanos(-123456789987654321);
-        assert_eq!(time.sec, -123456789);
-        assert_eq!(time.nsec, -987654321);
-        assert_eq!(time.nanos(), -123456789987654321);
-    }
-
-    #[test]
-    fn convert_works() {
-        let std_duration = time::Duration::new(123, 456);
-        let msg_duration = Duration::from(std_duration);
-        assert_eq!(msg_duration.sec, 123);
-        assert_eq!(msg_duration.nsec, 456);
-
-        let std_duration2 = time::Duration::new(9876, 54321);
-        let msg_duration2: Duration = std_duration2.into();
-        assert_eq!(msg_duration2.sec, 9876);
-        assert_eq!(msg_duration2.nsec, 54321);
     }
 }

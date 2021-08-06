@@ -1,5 +1,5 @@
-use crate::time::{Duration, Time};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use ros_message::{Duration, Time};
 use std::collections::HashMap;
 use std::io;
 
