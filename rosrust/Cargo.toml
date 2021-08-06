@@ -26,6 +26,7 @@ colored = "2.0.0"
 
 [dependencies.ros_message]
 path = "../ros_message"
+version = "0.1.0"
 
 [dependencies.rosrust_codegen]
 path = "../rosrust_codegen"
