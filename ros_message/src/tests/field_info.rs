@@ -62,3 +62,56 @@ fn md5_string_is_correct() {
         "EFGH abc".to_owned()
     );
 }
+
+#[test]
+fn display() {
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("int64", "abc", FieldCase::Unit).unwrap()
+        ),
+        "int64 abc".to_owned()
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("float32", "abc", FieldCase::Array(3)).unwrap()
+        ),
+        "float32[3] abc".to_owned()
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("int32", "abc", FieldCase::Vector).unwrap()
+        ),
+        "int32[] abc".to_owned()
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("string", "abc", FieldCase::Const("something".into())).unwrap()
+        ),
+        "string abc=something".to_owned()
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("xx", "abc", FieldCase::Vector).unwrap()
+        ),
+        "xx[] abc".to_owned()
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("xx", "abc", FieldCase::Array(3)).unwrap()
+        ),
+        "xx[3] abc".to_owned()
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            FieldInfo::new("p2/xx", "abc", FieldCase::Unit).unwrap()
+        ),
+        "p2/xx abc".to_owned()
+    );
+}

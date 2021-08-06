@@ -1,9 +1,9 @@
 use crate::alerts::MESSAGE_NAME_SHOULD_BE_VALID;
 use crate::error::{ErrorKind, Result, ResultExt};
-use crate::msg::Msg;
+use crate::msg::{Msg, Srv};
 use error_chain::bail;
 use lazy_static::lazy_static;
-use ros_message::{MessagePath, Srv};
+use ros_message::MessagePath;
 use std::collections::{HashMap, HashSet, LinkedList};
 use std::fs::{read_dir, File};
 use std::path::{Path, PathBuf};
@@ -67,7 +67,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
     message: &Msg,
 ) -> Result<String> {
     let mut handled_messages = HashSet::<MessagePath>::new();
-    let mut result = message.0.source.clone();
+    let mut result = message.0.source().to_owned();
     let mut pending = message
         .dependencies()?
         .into_iter()
@@ -87,7 +87,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
         for dependency in message.dependencies()? {
             pending.push_back(dependency);
         }
-        result += &message.0.source;
+        result += message.0.source();
     }
     result += "\n";
     Ok(result)
@@ -136,7 +136,7 @@ pub fn get_message_map(
                 for dependency in &message.dependencies()? {
                     pending.push(dependency.clone());
                 }
-                messages.insert(message.0.path.clone(), message);
+                messages.insert(message.0.path().clone(), message);
             }
             MessageCase::Service(service, req, res) => {
                 for dependency in &req.dependencies()? {
@@ -145,8 +145,8 @@ pub fn get_message_map(
                 for dependency in &res.dependencies()? {
                     pending.push(dependency.clone());
                 }
-                messages.insert(req.0.path.clone(), req);
-                messages.insert(res.0.path.clone(), res);
+                messages.insert(req.0.path().clone(), req);
+                messages.insert(res.0.path().clone(), res);
                 services.insert(service.path.clone(), service);
             }
         }
@@ -225,51 +225,50 @@ fn get_message_or_service(
     folders: &[&str],
     message_locations: &HashMap<MessagePath, PathBuf>,
     service_locations: &HashMap<MessagePath, PathBuf>,
-    message: MessagePath,
+    path: MessagePath,
 ) -> Result<MessageCase> {
     use std::io::Read;
 
-    if let Some(full_path) = message_locations.get(&message) {
+    if let Some(full_path) = message_locations.get(&path) {
         if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            return create_message(message, &contents, ignore_bad_messages)
-                .map(MessageCase::Message);
+            return create_message(path, &contents, ignore_bad_messages).map(MessageCase::Message);
         }
     }
-    if let Some(full_path) = service_locations.get(&message) {
+    if let Some(full_path) = service_locations.get(&path) {
         if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
-            let service = Srv::new(message, &contents);
 
-            let service_messages = match (service.build_messages(), ignore_bad_messages) {
-                (Ok(v), _) => v,
-                (Err(_), true) => Srv::new(service.path.clone(), "\n\n---\n\n")
-                    .build_messages()
-                    .chain_err(|| "Failed to build service messages")?,
-                (Err(v), false) => {
-                    return Err(v).chain_err(|| "Failed to build service messages");
-                }
-            };
+            let (path, source, req, res) = ros_message::Srv::new(path.clone(), &contents)
+                .or_else(|err| {
+                    if ignore_bad_messages {
+                        ros_message::Srv::new(path.clone(), "\n\n---\n\n")
+                    } else {
+                        Err(err)
+                    }
+                })
+                .chain_err(|| "Failed to build service messages")?
+                .into_inner();
 
             return Ok(MessageCase::Service(
-                service,
-                Msg(service_messages.req),
-                Msg(service_messages.res),
+                Srv { path, source },
+                Msg(req),
+                Msg(res),
             ));
         }
     }
-    if let Some(contents) = IN_MEMORY_MESSAGES.get(&message) {
-        return Msg::new(message, contents).map(MessageCase::Message);
+    if let Some(contents) = IN_MEMORY_MESSAGES.get(&path) {
+        return Msg::new(path, contents).map(MessageCase::Message);
     }
     if ignore_bad_messages {
-        return Msg::new(message, "").map(MessageCase::Message);
+        return Msg::new(path, "").map(MessageCase::Message);
     }
     bail!(ErrorKind::MessageNotFound(
-        message.to_string(),
+        path.to_string(),
         folders.join("\n"),
     ))
 }

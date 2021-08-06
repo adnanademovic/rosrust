@@ -1,7 +1,10 @@
 use crate::{Error, MessagePath, Result};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::fmt::Formatter;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DataType {
     Bool,
     I8(bool),
@@ -19,6 +22,31 @@ pub enum DataType {
     Duration,
     LocalStruct(String),
     RemoteStruct(MessagePath),
+}
+
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DataType::Bool => BOOL_KEY.fmt(f),
+            DataType::I8(true) => INT8_KEY.fmt(f),
+            DataType::I8(false) => BYTE_KEY.fmt(f),
+            DataType::I16 => INT16_KEY.fmt(f),
+            DataType::I32 => INT32_KEY.fmt(f),
+            DataType::I64 => INT64_KEY.fmt(f),
+            DataType::U8(true) => UINT8_KEY.fmt(f),
+            DataType::U8(false) => CHAR_KEY.fmt(f),
+            DataType::U16 => UINT16_KEY.fmt(f),
+            DataType::U32 => UINT32_KEY.fmt(f),
+            DataType::U64 => UINT64_KEY.fmt(f),
+            DataType::F32 => FLOAT32_KEY.fmt(f),
+            DataType::F64 => FLOAT64_KEY.fmt(f),
+            DataType::String => STRING_KEY.fmt(f),
+            DataType::Time => TIME_KEY.fmt(f),
+            DataType::Duration => DURATION_KEY.fmt(f),
+            DataType::LocalStruct(ref name) => name.fmt(f),
+            DataType::RemoteStruct(ref message) => message.fmt(f),
+        }
+    }
 }
 
 const BOOL_KEY: &str = "bool";

@@ -9,6 +9,9 @@ fn from_nanos_works() {
     let time = Duration::from_nanos(123456789987654321);
     assert_eq!(time.sec, 123456789);
     assert_eq!(time.nsec, 987654321);
+    let time = Duration::from_nanos(-123456789987654321);
+    assert_eq!(time.sec, -123456789);
+    assert_eq!(time.nsec, -987654321);
 }
 
 #[test]
@@ -44,4 +47,94 @@ fn convert_works() {
     let msg_duration2: Duration = std_duration2.into();
     assert_eq!(msg_duration2.sec, 9876);
     assert_eq!(msg_duration2.nsec, 54321);
+}
+
+#[test]
+fn display_zero() {
+    let time = Time::from_nanos(0);
+    assert_eq!(format!("{}", time), "0");
+    let time = Duration::from_nanos(0);
+    assert_eq!(format!("{}", time), "0");
+}
+
+#[test]
+fn display_full() {
+    let time = Time::from_nanos(123456789987654321);
+    assert_eq!(format!("{}", time), "123456789.987654321");
+    let time = Duration::from_nanos(123456789987654321);
+    assert_eq!(format!("{}", time), "123456789.987654321");
+    let time = Duration::from_nanos(-123456789987654321);
+    assert_eq!(format!("{}", time), "-123456789.987654321");
+}
+
+#[test]
+fn display_trailing_zeros() {
+    let time = Time::from_nanos(123456789987654321);
+    assert_eq!(format!("{}", time), "123456789.987654321");
+    let time = Time::from_nanos(123456789987654000);
+    assert_eq!(format!("{}", time), "123456789.987654");
+    let time = Time::from_nanos(123456789000000000);
+    assert_eq!(format!("{}", time), "123456789");
+    let time = Time::from_nanos(123456700000000000);
+    assert_eq!(format!("{}", time), "123456700");
+
+    let time = Duration::from_nanos(-123456789987654321);
+    assert_eq!(format!("{}", time), "-123456789.987654321");
+    let time = Duration::from_nanos(-123456789987654000);
+    assert_eq!(format!("{}", time), "-123456789.987654");
+    let time = Duration::from_nanos(-123456789000000000);
+    assert_eq!(format!("{}", time), "-123456789");
+    let time = Duration::from_nanos(-123456700000000000);
+    assert_eq!(format!("{}", time), "-123456700");
+
+    let time = Duration::from_nanos(-123456789987654321);
+    assert_eq!(format!("{}", time), "-123456789.987654321");
+    let time = Duration::from_nanos(-123456789987654000);
+    assert_eq!(format!("{}", time), "-123456789.987654");
+    let time = Duration::from_nanos(-123456789000000000);
+    assert_eq!(format!("{}", time), "-123456789");
+    let time = Duration::from_nanos(-123456700000000000);
+    assert_eq!(format!("{}", time), "-123456700");
+}
+
+#[test]
+fn display_decimals() {
+    let time = Time::from_nanos(9987654321);
+    assert_eq!(format!("{}", time), "9.987654321");
+    let time = Time::from_nanos(987654321);
+    assert_eq!(format!("{}", time), "0.987654321");
+    let time = Time::from_nanos(654321);
+    assert_eq!(format!("{}", time), "0.000654321");
+    let time = Time::from_nanos(9987654000);
+    assert_eq!(format!("{}", time), "9.987654");
+    let time = Time::from_nanos(987654000);
+    assert_eq!(format!("{}", time), "0.987654");
+    let time = Time::from_nanos(654000);
+    assert_eq!(format!("{}", time), "0.000654");
+
+    let time = Duration::from_nanos(-9987654321);
+    assert_eq!(format!("{}", time), "-9.987654321");
+    let time = Duration::from_nanos(-987654321);
+    assert_eq!(format!("{}", time), "-0.987654321");
+    let time = Duration::from_nanos(-654321);
+    assert_eq!(format!("{}", time), "-0.000654321");
+    let time = Duration::from_nanos(-9987654000);
+    assert_eq!(format!("{}", time), "-9.987654");
+    let time = Duration::from_nanos(-987654000);
+    assert_eq!(format!("{}", time), "-0.987654");
+    let time = Duration::from_nanos(-654000);
+    assert_eq!(format!("{}", time), "-0.000654");
+
+    let time = Duration::from_nanos(-9987654321);
+    assert_eq!(format!("{}", time), "-9.987654321");
+    let time = Duration::from_nanos(-987654321);
+    assert_eq!(format!("{}", time), "-0.987654321");
+    let time = Duration::from_nanos(-654321);
+    assert_eq!(format!("{}", time), "-0.000654321");
+    let time = Duration::from_nanos(-9987654000);
+    assert_eq!(format!("{}", time), "-9.987654");
+    let time = Duration::from_nanos(-987654000);
+    assert_eq!(format!("{}", time), "-0.987654");
+    let time = Duration::from_nanos(-654000);
+    assert_eq!(format!("{}", time), "-0.000654");
 }

@@ -1,4 +1,4 @@
-use crate::{DataType, FieldCase, FieldInfo, MessagePath, Msg, Result, Value};
+use crate::{FieldCase, FieldInfo, MessagePath, Msg, Result, Value};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
@@ -109,21 +109,13 @@ fn constructor_parses_real_message() {
         include_str!("../../../msg_examples/geometry_msgs/msg/TwistWithCovariance.msg"),
     )
     .unwrap();
-    assert_eq!(data.path.package(), "geometry_msgs");
-    assert_eq!(data.path.name(), "TwistWithCovariance");
+    assert_eq!(data.path().package(), "geometry_msgs");
+    assert_eq!(data.path().name(), "TwistWithCovariance");
     assert_eq!(
-        data.fields,
+        data.fields(),
         vec![
-            FieldInfo {
-                datatype: DataType::LocalStruct("Twist".into()),
-                name: "twist".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::F64,
-                name: "covariance".into(),
-                case: FieldCase::Array(36),
-            },
+            FieldInfo::new("Twist", "twist", FieldCase::Unit).unwrap(),
+            FieldInfo::new("float64", "covariance", FieldCase::Array(36)).unwrap(),
         ]
     );
     let dependencies = get_dependency_set(&data).expect("Failed to get dependency set");
@@ -137,23 +129,13 @@ fn constructor_parses_real_message() {
         include_str!("../../../msg_examples/geometry_msgs/msg/PoseStamped.msg"),
     )
     .unwrap();
-    assert_eq!(data.path.package(), "geometry_msgs");
-    assert_eq!(data.path.name(), "PoseStamped");
+    assert_eq!(data.path().package(), "geometry_msgs");
+    assert_eq!(data.path().name(), "PoseStamped");
     assert_eq!(
-        data.fields,
+        data.fields(),
         vec![
-            FieldInfo {
-                datatype: DataType::RemoteStruct(
-                    MessagePath::new("std_msgs", "Header").expect("Unexpected bad message path")
-                ),
-                name: "header".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::LocalStruct("Pose".into()),
-                name: "pose".into(),
-                case: FieldCase::Unit,
-            },
+            FieldInfo::new("std_msgs/Header", "header", FieldCase::Unit).unwrap(),
+            FieldInfo::new("Pose", "pose", FieldCase::Unit).unwrap(),
         ]
     );
     let dependencies = get_dependency_set(&data).expect("Failed to get dependency set");
@@ -169,57 +151,33 @@ fn constructor_parses_real_message() {
         include_str!("../../../msg_examples/sensor_msgs/msg/Imu.msg"),
     )
     .unwrap();
-    assert_eq!(data.path.package(), "sensor_msgs");
-    assert_eq!(data.path.name(), "Imu");
+    assert_eq!(data.path().package(), "sensor_msgs");
+    assert_eq!(data.path().name(), "Imu");
     assert_eq!(
-        data.fields,
+        data.fields(),
         vec![
-            FieldInfo {
-                datatype: DataType::RemoteStruct(
-                    MessagePath::new("std_msgs", "Header").expect("Unexpected bad message path")
-                ),
-                name: "header".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::RemoteStruct(
-                    MessagePath::new("geometry_msgs", "Quaternion")
-                        .expect("Unexpected bad message path")
-                ),
-                name: "orientation".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::F64,
-                name: "orientation_covariance".into(),
-                case: FieldCase::Array(9),
-            },
-            FieldInfo {
-                datatype: DataType::RemoteStruct(
-                    MessagePath::new("geometry_msgs", "Vector3")
-                        .expect("Unexpected bad message path")
-                ),
-                name: "angular_velocity".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::F64,
-                name: "angular_velocity_covariance".into(),
-                case: FieldCase::Array(9),
-            },
-            FieldInfo {
-                datatype: DataType::RemoteStruct(
-                    MessagePath::new("geometry_msgs", "Vector3")
-                        .expect("Unexpected bad message path")
-                ),
-                name: "linear_acceleration".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::F64,
-                name: "linear_acceleration_covariance".into(),
-                case: FieldCase::Array(9),
-            },
+            FieldInfo::new("std_msgs/Header", "header", FieldCase::Unit).unwrap(),
+            FieldInfo::new("geometry_msgs/Quaternion", "orientation", FieldCase::Unit).unwrap(),
+            FieldInfo::new("float64", "orientation_covariance", FieldCase::Array(9)).unwrap(),
+            FieldInfo::new("geometry_msgs/Vector3", "angular_velocity", FieldCase::Unit).unwrap(),
+            FieldInfo::new(
+                "float64",
+                "angular_velocity_covariance",
+                FieldCase::Array(9),
+            )
+            .unwrap(),
+            FieldInfo::new(
+                "geometry_msgs/Vector3",
+                "linear_acceleration",
+                FieldCase::Unit,
+            )
+            .unwrap(),
+            FieldInfo::new(
+                "float64",
+                "linear_acceleration_covariance",
+                FieldCase::Array(9),
+            )
+            .unwrap(),
         ]
     );
     let dependencies = get_dependency_set(&data).expect("Failed to get dependency set");

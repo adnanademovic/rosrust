@@ -1,5 +1,4 @@
 use super::*;
-use crate::{DataType, MessagePath};
 
 #[test]
 fn match_field_matches_legal_field() {
@@ -72,59 +71,38 @@ fn match_line_works_on_legal_data() {
     assert!(match_line("      ").is_none());
 
     assert_eq!(
-        FieldInfo {
-            datatype: DataType::RemoteStruct(
-                MessagePath::new("geom_msgs", "Twist").expect("Unexpected bad message path")
-            ),
-            name: "myname".into(),
-            case: FieldCase::Unit,
-        },
+        FieldInfo::new("geom_msgs/Twist", "myname", FieldCase::Unit).unwrap(),
         match_line("  geom_msgs/Twist   myname    # this clearly should succeed")
             .unwrap()
             .unwrap()
     );
 
     assert_eq!(
-        FieldInfo {
-            datatype: DataType::RemoteStruct(
-                MessagePath::new("geom_msgs", "Twist").expect("Unexpected bad message path")
-            ),
-            name: "myname".into(),
-            case: FieldCase::Vector,
-        },
+        FieldInfo::new("geom_msgs/Twist", "myname", FieldCase::Vector).unwrap(),
         match_line("  geom_msgs/Twist [  ]   myname  # ...")
             .unwrap()
             .unwrap()
     );
 
     assert_eq!(
-        FieldInfo {
-            datatype: DataType::U8(false),
-            name: "myname".into(),
-            case: FieldCase::Array(127),
-        },
+        FieldInfo::new("char", "myname", FieldCase::Array(127)).unwrap(),
         match_line("  char   [   127 ]   myname# comment")
             .unwrap()
             .unwrap()
     );
     assert_eq!(
-        FieldInfo {
-            datatype: DataType::String,
-            name: "myname".into(),
-            case: FieldCase::Const("this is # data".into()),
-        },
+        FieldInfo::new(
+            "string",
+            "myname",
+            FieldCase::Const("this is # data".into()),
+        )
+        .unwrap(),
         match_line("  string  myname =   this is # data  ")
             .unwrap()
             .unwrap()
     );
     assert_eq!(
-        FieldInfo {
-            datatype: DataType::RemoteStruct(
-                MessagePath::new("geom_msgs", "Twist").expect("Unexpected bad message path")
-            ),
-            name: "myname".into(),
-            case: FieldCase::Const("-444".into()),
-        },
+        FieldInfo::new("geom_msgs/Twist", "myname", FieldCase::Const("-444".into())).unwrap(),
         match_line("  geom_msgs/Twist  myname =   -444 # data  ")
             .unwrap()
             .unwrap()
@@ -139,16 +117,8 @@ fn match_lines_parses_real_messages() {
     .unwrap();
     assert_eq!(
         vec![
-            FieldInfo {
-                datatype: DataType::LocalStruct("Twist".into()),
-                name: "twist".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::F64,
-                name: "covariance".into(),
-                case: FieldCase::Array(36),
-            },
+            FieldInfo::new("Twist", "twist", FieldCase::Unit).unwrap(),
+            FieldInfo::new("float64", "covariance", FieldCase::Array(36)).unwrap(),
         ],
         data
     );
@@ -159,18 +129,8 @@ fn match_lines_parses_real_messages() {
     .unwrap();
     assert_eq!(
         vec![
-            FieldInfo {
-                datatype: DataType::RemoteStruct(
-                    MessagePath::new("std_msgs", "Header").expect("Unexpected bad message path")
-                ),
-                name: "header".into(),
-                case: FieldCase::Unit,
-            },
-            FieldInfo {
-                datatype: DataType::LocalStruct("Pose".into()),
-                name: "pose".into(),
-                case: FieldCase::Unit,
-            },
+            FieldInfo::new("std_msgs/Header", "header", FieldCase::Unit).unwrap(),
+            FieldInfo::new("Pose", "pose", FieldCase::Unit).unwrap(),
         ],
         data
     );

@@ -41,7 +41,7 @@ impl DynamicMsg {
         let mut dependencies = HashMap::new();
         for message_body in message_bodies {
             let dependency = Self::parse_dependency(message_body)?;
-            dependencies.insert(dependency.path.clone(), dependency);
+            dependencies.insert(dependency.path().clone(), dependency);
         }
 
         Ok(DynamicMsg { msg, dependencies })
@@ -104,20 +104,20 @@ impl DynamicMsg {
         value: &MessageValue,
         w: &mut impl io::Write,
     ) -> io::Result<()> {
-        for field in &msg.fields {
-            match field.case {
+        for field in msg.fields() {
+            match field.case() {
                 FieldCase::Const(_) => continue,
                 FieldCase::Unit => {
-                    let field_value = get_field(value, &field.name)?;
+                    let field_value = get_field(value, field.name())?;
                     self.encode_field(field, field_value, w)?;
                 }
                 FieldCase::Vector => {
-                    let field_value = get_field(value, &field.name)?;
+                    let field_value = get_field(value, field.name())?;
                     self.encode_field_array(field, field_value, None, w)?;
                 }
                 FieldCase::Array(l) => {
-                    let field_value = get_field(value, &field.name)?;
-                    self.encode_field_array(field, field_value, Some(l), w)?;
+                    let field_value = get_field(value, field.name())?;
+                    self.encode_field_array(field, field_value, Some(*l), w)?;
                 }
             }
         }
@@ -130,7 +130,7 @@ impl DynamicMsg {
         value: &Value,
         w: &mut impl std::io::Write,
     ) -> io::Result<()> {
-        match (&field.datatype, value) {
+        match (field.datatype(), value) {
             (DataType::Bool, Value::Bool(v)) => v.encode(w),
             (DataType::I8(_), Value::I8(v)) => v.encode(w),
             (DataType::I16, Value::I16(v)) => v.encode(w),
@@ -146,7 +146,7 @@ impl DynamicMsg {
             (DataType::Time, Value::Time(time)) => time.encode(w),
             (DataType::Duration, Value::Duration(duration)) => duration.encode(w),
             (DataType::LocalStruct(name), Value::Message(v)) => {
-                let path = MessagePath::new(self.msg.path.package(), name)
+                let path = MessagePath::new(self.msg.path().package(), name)
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
                 let dependency = self.get_dependency(&path)?;
                 self.encode_message(dependency, v, w)
@@ -213,20 +213,20 @@ impl DynamicMsg {
 
     fn decode_message(&self, msg: &Msg, r: &mut impl io::Read) -> io::Result<MessageValue> {
         let mut output = MessageValue::new();
-        for field in &msg.fields {
-            let value = match field.case {
+        for field in msg.fields() {
+            let value = match field.case() {
                 FieldCase::Const(_) => continue,
                 FieldCase::Unit => self.decode_field(field, r)?,
                 FieldCase::Vector => self.decode_field_array(field, None, r)?,
-                FieldCase::Array(l) => self.decode_field_array(field, Some(l), r)?,
+                FieldCase::Array(l) => self.decode_field_array(field, Some(*l), r)?,
             };
-            output.insert(field.name.clone(), value);
+            output.insert(field.name().into(), value);
         }
         Ok(output)
     }
 
     fn decode_field(&self, field: &FieldInfo, r: &mut impl io::Read) -> io::Result<Value> {
-        Ok(match &field.datatype {
+        Ok(match field.datatype() {
             DataType::Bool => bool::decode(r)?.into(),
             DataType::I8(_) => i8::decode(r)?.into(),
             DataType::I16 => i16::decode(r)?.into(),
@@ -242,7 +242,7 @@ impl DynamicMsg {
             DataType::Time => Time::decode(r)?.into(),
             DataType::Duration => Duration::decode(r)?.into(),
             DataType::LocalStruct(name) => {
-                let path = MessagePath::new(self.msg.path.package(), name)
+                let path = MessagePath::new(self.msg.path().package(), name)
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
                 let dependency = self.get_dependency(&path)?;
                 self.decode_message(dependency, r)?.into()

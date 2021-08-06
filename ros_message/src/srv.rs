@@ -1,61 +1,90 @@
 use crate::{Error, MessagePath, Msg, Result};
 use lazy_static::lazy_static;
 use regex::RegexBuilder;
+use serde_derive::{Deserialize, Serialize};
+use std::fmt;
+use std::fmt::Formatter;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Srv {
-    pub path: MessagePath,
-    pub source: String,
+    path: MessagePath,
+    source: String,
+    req: Msg,
+    res: Msg,
 }
 
-#[derive(Clone, Debug)]
-pub struct SrvMessages {
-    pub req: Msg,
-    pub res: Msg,
+impl fmt::Display for Srv {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.source.fmt(f)
+    }
 }
 
 impl Srv {
-    pub fn new(path: MessagePath, source: impl Into<String>) -> Srv {
-        Srv {
+    pub fn new(path: MessagePath, source: impl Into<String>) -> Result<Srv> {
+        let source = source.into();
+        let (req, res) = Self::build_req_res(&path, &source)?;
+        Ok(Srv {
             path,
-            source: source.into(),
-        }
+            source,
+            req,
+            res,
+        })
     }
 
-    pub fn build_messages(&self) -> Result<SrvMessages> {
+    pub fn into_inner(self) -> (MessagePath, String, Msg, Msg) {
+        (self.path, self.source, self.req, self.res)
+    }
+
+    pub fn path(&self) -> &MessagePath {
+        &self.path
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn req(&self) -> &Msg {
+        &self.req
+    }
+
+    pub fn res(&self) -> &Msg {
+        &self.res
+    }
+
+    fn build_req_res(path: &MessagePath, source: &str) -> Result<(Msg, Msg)> {
         lazy_static! {
             static ref RE_SPLIT: regex::Regex = RegexBuilder::new("^---$")
                 .multi_line(true)
                 .build()
                 .expect("Invalid regex `^---$`");
         }
-        let (req, res) = match RE_SPLIT.split(&self.source).collect::<Vec<_>>().as_slice() {
+        let (req, res) = match RE_SPLIT.split(source).collect::<Vec<_>>().as_slice() {
             &[req] => (req, ""),
             &[req, res] => (req, res),
             &[] => {
                 return Err(Error::BadMessageContent(format!(
                     "Service {} does not have any content",
-                    self.path
+                    path
                 )))
             }
             v => {
                 return Err(Error::BadMessageContent(format!(
                     "Service {} is split into {} parts",
-                    self.path,
+                    path,
                     v.len()
                 )))
             }
         };
 
-        Ok(SrvMessages {
-            req: Msg::new(
-                MessagePath::new(self.path.package(), format!("{}Req", self.path.name()))?,
+        Ok((
+            Msg::new(
+                MessagePath::new(path.package(), format!("{}Req", path.name()))?,
                 req,
             )?,
-            res: Msg::new(
-                MessagePath::new(self.path.package(), format!("{}Res", self.path.name()))?,
+            Msg::new(
+                MessagePath::new(path.package(), format!("{}Res", path.name()))?,
                 res,
             )?,
-        })
+        ))
     }
 }

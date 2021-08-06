@@ -9,6 +9,12 @@ use syn::Ident;
 #[derive(Clone, Debug)]
 pub struct Msg(pub ros_message::Msg);
 
+#[derive(Clone, Debug)]
+pub struct Srv {
+    pub path: MessagePath,
+    pub source: String,
+}
+
 impl Msg {
     pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
         ros_message::Msg::new(path, source)
@@ -17,26 +23,26 @@ impl Msg {
     }
 
     pub fn name_ident(&self) -> Ident {
-        Ident::new(self.0.path.name(), Span::call_site())
+        Ident::new(self.0.path().name(), Span::call_site())
     }
 
     pub fn token_stream<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let name = self.name_ident();
         let fields = self
             .0
-            .fields
+            .fields()
             .iter()
             .map(|v| field_info_field_token_stream(v, crate_prefix))
             .collect::<Vec<_>>();
         let field_defaults = self
             .0
-            .fields
+            .fields()
             .iter()
             .map(|v| field_info_field_default_token_stream(v, crate_prefix))
             .collect::<Vec<_>>();
         let fields_for_eq_and_debug = self
             .0
-            .fields
+            .fields()
             .iter()
             .filter_map(|v| field_info_field_name_eq_and_debug_token_stream(v))
             .collect::<Vec<_>>();
@@ -50,7 +56,7 @@ impl Msg {
             .collect::<Vec<_>>();
         let const_fields = self
             .0
-            .fields
+            .fields()
             .iter()
             .map(|v| field_info_const_token_stream(v, crate_prefix))
             .collect::<Vec<_>>();
@@ -92,7 +98,7 @@ impl Msg {
     pub fn token_stream_encode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let fields = self
             .0
-            .fields
+            .fields()
             .iter()
             .map(|v| field_info_field_token_stream_encode(v, crate_prefix))
             .collect::<Vec<_>>();
@@ -105,7 +111,7 @@ impl Msg {
     pub fn token_stream_decode<T: ToTokens>(&self, crate_prefix: &T) -> impl ToTokens {
         let fields = self
             .0
-            .fields
+            .fields()
             .iter()
             .map(|v| field_info_field_token_stream_decode(v, crate_prefix))
             .collect::<Vec<_>>();
@@ -172,19 +178,19 @@ lazy_static! {
 }
 
 fn field_info_create_identifier(field_info: &FieldInfo, span: Span) -> Ident {
-    if RESERVED_KEYWORDS.contains(&field_info.name) {
-        return Ident::new(&format!("{}_", field_info.name), span);
+    if RESERVED_KEYWORDS.contains(field_info.name()) {
+        return Ident::new(&format!("{}_", field_info.name()), span);
     }
-    Ident::new(&field_info.name, span)
+    Ident::new(field_info.name(), span)
 }
 
 fn field_info_field_token_stream<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
-    let datatype = datatype_token_stream(&field_info.datatype, crate_prefix);
+    let datatype = datatype_token_stream(&field_info.datatype(), crate_prefix);
     let name = field_info_create_identifier(field_info, Span::call_site());
-    match field_info.case {
+    match field_info.case() {
         FieldCase::Unit => quote! { pub #name: #datatype, },
         FieldCase::Vector => quote! { pub #name: Vec<#datatype>, },
         FieldCase::Array(l) => quote! { pub #name: [#datatype; #l], },
@@ -196,7 +202,7 @@ fn field_info_field_name_eq_and_debug_token_stream(
     field_info: &FieldInfo,
 ) -> Option<(impl ToTokens, impl ToTokens, impl ToTokens)> {
     let name = field_info_create_identifier(field_info, Span::call_site());
-    match field_info.case {
+    match field_info.case() {
         FieldCase::Unit | FieldCase::Vector => {
             Some((quote! { #name }, quote! { #name }, quote! { &self.#name }))
         }
@@ -214,10 +220,10 @@ fn field_info_field_default_token_stream<T: ToTokens>(
     _crate_prefix: &T,
 ) -> impl ToTokens {
     let name = field_info_create_identifier(field_info, Span::call_site());
-    match field_info.case {
+    match field_info.case() {
         FieldCase::Unit | FieldCase::Vector => quote! { #name: Default::default(), },
         FieldCase::Array(l) => {
-            let instances = (0..l).map(|_| quote! {Default::default()});
+            let instances = (0..*l).map(|_| quote! {Default::default()});
             quote! { #name: [#(#instances),*], }
         }
         FieldCase::Const(_) => quote! {},
@@ -229,9 +235,9 @@ fn field_info_field_token_stream_encode<T: ToTokens>(
     crate_prefix: &T,
 ) -> impl ToTokens {
     let name = field_info_create_identifier(field_info, Span::call_site());
-    match field_info.case {
+    match field_info.case() {
         FieldCase::Unit => quote! { self.#name.encode(w.by_ref())?; },
-        FieldCase::Vector => match field_info.datatype {
+        FieldCase::Vector => match field_info.datatype() {
             DataType::String
             | DataType::Time
             | DataType::Duration
@@ -255,9 +261,9 @@ fn field_info_field_token_stream_decode<T: ToTokens>(
     crate_prefix: &T,
 ) -> impl ToTokens {
     let name = field_info_create_identifier(field_info, Span::call_site());
-    match field_info.case {
+    match field_info.case() {
         FieldCase::Unit => quote! { #name: #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, },
-        FieldCase::Vector => match field_info.datatype {
+        FieldCase::Vector => match field_info.datatype() {
             DataType::String
             | DataType::Time
             | DataType::Duration
@@ -271,7 +277,7 @@ fn field_info_field_token_stream_decode<T: ToTokens>(
         },
         FieldCase::Array(l) => {
             let lines =
-                (0..l).map(|_| quote! { #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, });
+                (0..*l).map(|_| quote! { #crate_prefix rosmsg::RosMsg::decode(r.by_ref())?, });
             quote! { #name: [#(#lines)*], }
         }
         FieldCase::Const(_) => quote! {},
@@ -282,13 +288,13 @@ fn field_info_const_token_stream<T: ToTokens>(
     field_info: &FieldInfo,
     crate_prefix: &T,
 ) -> impl ToTokens {
-    let value = match field_info.case {
+    let value = match field_info.case() {
         FieldCase::Const(ref value) => value,
         _ => return quote! {},
     };
     let name = field_info_create_identifier(field_info, Span::call_site());
-    let datatype = datatype_token_stream(&field_info.datatype, crate_prefix);
-    let insides = match field_info.datatype {
+    let datatype = datatype_token_stream(&field_info.datatype(), crate_prefix);
+    let insides = match field_info.datatype() {
         DataType::Bool => {
             let bool_value = if value != "0" {
                 quote! { true }
