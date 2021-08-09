@@ -8,6 +8,7 @@ use std::iter::FromIterator;
 
 pub type MessageValue = HashMap<String, Value>;
 
+/// Represents an arbitrary ROS message or value in it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Bool(bool),
@@ -61,6 +62,292 @@ impl Value {
                 }
                 Ok(())
             }
+        }
+    }
+
+    /// Returns the content if `Value` is a `bool`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::Bool(true).as_bool(), Some(true));
+    /// assert_eq!(Value::Bool(false).as_bool(), Some(false));
+    /// assert!(Value::U32(12).as_bool().is_none());
+    /// ```
+    pub fn as_bool(&self) -> Option<bool> {
+        if let Value::Bool(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is an `i8`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::I8(12).as_i8(), Some(12));
+    /// assert!(Value::U32(12).as_i8().is_none());
+    /// ```
+    pub fn as_i8(&self) -> Option<i8> {
+        if let Value::I8(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is an `i16`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::I16(12).as_i16(), Some(12));
+    /// assert!(Value::U32(12).as_i16().is_none());
+    /// ```
+    pub fn as_i16(&self) -> Option<i16> {
+        if let Value::I16(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is an `i32`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::I32(12).as_i32(), Some(12));
+    /// assert!(Value::U32(12).as_i32().is_none());
+    /// ```
+    pub fn as_i32(&self) -> Option<i32> {
+        if let Value::I32(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is an `i64`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::I64(12).as_i64(), Some(12));
+    /// assert!(Value::U32(12).as_i64().is_none());
+    /// ```
+    pub fn as_i64(&self) -> Option<i64> {
+        if let Value::I64(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a `u8`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::U8(12).as_u8(), Some(12));
+    /// assert!(Value::U32(12).as_u8().is_none());
+    /// ```
+    pub fn as_u8(&self) -> Option<u8> {
+        if let Value::U8(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a `u16`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::U16(12).as_u16(), Some(12));
+    /// assert!(Value::U32(12).as_u16().is_none());
+    /// ```
+    pub fn as_u16(&self) -> Option<u16> {
+        if let Value::U16(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a `u32`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::U32(12).as_u32(), Some(12));
+    /// assert!(Value::U16(12).as_u32().is_none());
+    /// ```
+    pub fn as_u32(&self) -> Option<u32> {
+        if let Value::U32(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a `u64`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::U64(12).as_u64(), Some(12));
+    /// assert!(Value::U32(12).as_u64().is_none());
+    /// ```
+    pub fn as_u64(&self) -> Option<u64> {
+        if let Value::U64(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is an `f32`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::F32(12.0).as_f32(), Some(12.0));
+    /// assert!(Value::U32(12).as_f32().is_none());
+    /// ```
+    pub fn as_f32(&self) -> Option<f32> {
+        if let Value::F32(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is an `f64`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::F64(12.0).as_f64(), Some(12.0));
+    /// assert!(Value::U32(12).as_f64().is_none());
+    /// ```
+    pub fn as_f64(&self) -> Option<f64> {
+        if let Value::F64(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns a `&str` if `Value` is a `String`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::String("foo".into()).as_str(), Some("foo"));
+    /// assert!(Value::U32(12).as_str().is_none());
+    /// ```
+    pub fn as_str(&self) -> Option<&str> {
+        if let Value::String(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a `Time` struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::{Time, Value};
+    /// assert_eq!(
+    ///     Value::Time(Time::from_nanos(120)).as_time(),
+    ///     Some(Time::from_nanos(120)),
+    /// );
+    /// assert!(Value::U32(12).as_time().is_none());
+    /// ```
+    pub fn as_time(&self) -> Option<Time> {
+        if let Value::Time(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a `Duration` struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::{Duration, Value};
+    /// assert_eq!(
+    ///     Value::Duration(Duration::from_nanos(120)).as_duration(),
+    ///     Some(Duration::from_nanos(120)),
+    /// );
+    /// assert!(Value::U32(12).as_duration().is_none());
+    /// ```
+    pub fn as_duration(&self) -> Option<Duration> {
+        if let Value::Duration(value) = self {
+            Some(*value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns a reference to the content if `Value` is an array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(
+    ///     Value::Array(vec![1u32.into(), 2u32.into(), 3u32.into()]).as_slice(),
+    ///     Some(&[Value::U32(1), Value::U32(2), Value::U32(3)][..]),
+    /// );
+    /// assert!(Value::U32(12).as_slice().is_none());
+    /// ```
+    pub fn as_slice(&self) -> Option<&[Value]> {
+        if let Value::Array(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns a reference to the content if `Value` is a message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// # use std::collections::HashMap;
+    /// let mut data = HashMap::<String, Value>::new();
+    /// data.insert("foo".into(), true.into());
+    /// data.insert("bar".into(), false.into());
+    /// assert_eq!(Value::Message(data.clone()).as_map(), Some(&data));
+    /// assert!(Value::U32(12).as_map().is_none());
+    /// ```
+    pub fn as_map(&self) -> Option<&MessageValue> {
+        if let Value::Message(value) = self {
+            Some(value)
+        } else {
+            None
         }
     }
 }
