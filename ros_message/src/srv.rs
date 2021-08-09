@@ -5,6 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Formatter;
 
+/// A ROS service parsed from a `srv` file.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Srv {
     path: MessagePath,
@@ -20,6 +21,41 @@ impl fmt::Display for Srv {
 }
 
 impl Srv {
+    /// Create a service from a passed in path and source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there is an error parsing the service source.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Srv;
+    /// # use std::convert::TryInto;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let service = Srv::new(
+    ///     "foo/Bar".try_into()?,
+    ///     r#"# a comment that is ignored
+    ///     Header header
+    ///     uint32 a
+    ///     byte[16] b
+    ///     geometry_msgs/Point[] point
+    ///     uint32 FOO=5
+    ///     string SOME_TEXT=this is # some text, don't be fooled by the hash
+    /// ---
+    ///     uint32 a
+    ///     geometry_msgs/Point[] point
+    ///     uint32 FOO=6
+    ///     "#,
+    /// )?;
+    ///
+    /// assert_eq!(service.path(), &"foo/Bar".try_into()?);
+    /// assert_eq!(service.request().fields().len(), 6);
+    /// assert_eq!(service.response().fields().len(), 3);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(path: MessagePath, source: impl Into<String>) -> Result<Srv> {
         let source = source.into();
         let (req, res) = Self::build_req_res(&path, &source)?;
@@ -31,23 +67,23 @@ impl Srv {
         })
     }
 
-    pub fn into_inner(self) -> (MessagePath, String, Msg, Msg) {
-        (self.path, self.source, self.req, self.res)
-    }
-
+    /// Returns the path of the service.
     pub fn path(&self) -> &MessagePath {
         &self.path
     }
 
+    /// Returns the original source.
     pub fn source(&self) -> &str {
         &self.source
     }
 
-    pub fn req(&self) -> &Msg {
+    /// Returns the request message.
+    pub fn request(&self) -> &Msg {
         &self.req
     }
 
-    pub fn res(&self) -> &Msg {
+    /// Returns the response message.
+    pub fn response(&self) -> &Msg {
         &self.res
     }
 
@@ -77,14 +113,8 @@ impl Srv {
         };
 
         Ok((
-            Msg::new(
-                MessagePath::new(path.package(), format!("{}Req", path.name()))?,
-                req,
-            )?,
-            Msg::new(
-                MessagePath::new(path.package(), format!("{}Res", path.name()))?,
-                res,
-            )?,
+            Msg::new(path.peer(format!("{}Req", path.name())), req)?,
+            Msg::new(path.peer(format!("{}Res", path.name())), res)?,
         ))
     }
 }

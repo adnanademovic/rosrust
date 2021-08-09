@@ -6,26 +6,45 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::iter::FromIterator;
 
+/// Represents an arbitrary ROS message.
 pub type MessageValue = HashMap<String, Value>;
 
 /// Represents an arbitrary ROS message or value in it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Value {
+    /// Represents `bool`.
     Bool(bool),
+    /// Represents `int8` or `byte`.
     I8(i8),
+    /// Represents `int16`.
     I16(i16),
+    /// Represents `int32`.
     I32(i32),
+    /// Represents `int64`.
     I64(i64),
+    /// Represents `uint8` or `char`.
     U8(u8),
+    /// Represents `uint16`.
     U16(u16),
+    /// Represents `uint32`.
     U32(u32),
+    /// Represents `uint64`.
     U64(u64),
+    /// Represents `float32`.
     F32(f32),
+    /// Represents `float64`.
     F64(f64),
+    /// Represents `string`.
     String(String),
+    /// Represents `time`.
     Time(Time),
+    /// Represents `duration`.
     Duration(Duration),
+    /// Represents `some_type[]` or `some_type[length]`.
+    ///
+    /// For example: `float32[64]`, `geometry_msgs/Point[]`.
     Array(Vec<Value>),
+    /// Represents an embedded message.
     Message(MessageValue),
 }
 

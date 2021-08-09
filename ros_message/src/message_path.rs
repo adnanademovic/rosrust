@@ -6,6 +6,7 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 
+/// Path to a ROS message with naming conventions tested.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessagePath {
     package: String,
@@ -26,6 +27,26 @@ impl MessagePath {
     /// Create full message path, with naming rules checked
     ///
     /// Naming rules are based on [REP 144](https://www.ros.org/reps/rep-0144.html).
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if naming conventions are not met.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::MessagePath;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let message_path = MessagePath::new("foo", "Bar")?;
+    ///
+    /// assert_eq!(message_path.package(), "foo");
+    /// assert_eq!(message_path.name(), "Bar");
+    ///
+    /// assert!(MessagePath::new("0foo", "Bar").is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(package: impl Into<String>, name: impl Into<String>) -> Result<Self> {
         let package = package.into();
         let name = name.into();
@@ -38,8 +59,32 @@ impl MessagePath {
         Ok(Self { package, name })
     }
 
+    /// Create a new message path inside the same package.
+    ///
+    /// Prevents the need for constant error checking of package names.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::MessagePath;
+    /// #
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let message_path = MessagePath::new("foo", "Bar")?.peer("Baz");
+    ///
+    /// assert_eq!(message_path.package(), "foo");
+    /// assert_eq!(message_path.name(), "Baz");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn peer(&self, name: impl Into<String>) -> Self {
+        Self {
+            package: self.package.clone(),
+            name: name.into(),
+        }
+    }
+
     fn from_combined(input: &str) -> Result<Self> {
-        let parts = input.splitn(2, '/').collect::<Vec<&str>>();
+        let parts = input.splitn(3, '/').collect::<Vec<&str>>();
         match parts[..] {
             [package, name] => Self::new(package, name),
             _ => Err(Error::InvalidMessagePath {
@@ -49,16 +94,14 @@ impl MessagePath {
         }
     }
 
+    /// Package that the message is located in.
     pub fn package(&self) -> &str {
         &self.package
     }
 
+    /// Name of the message inside the package.
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    pub fn into_inner(self) -> (String, String) {
-        (self.package, self.name)
     }
 }
 

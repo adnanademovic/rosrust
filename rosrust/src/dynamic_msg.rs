@@ -153,13 +153,12 @@ impl DynamicMsg {
             (DataType::String, Value::String(v)) => v.encode(w),
             (DataType::Time, Value::Time(time)) => time.encode(w),
             (DataType::Duration, Value::Duration(duration)) => duration.encode(w),
-            (DataType::LocalStruct(name), Value::Message(v)) => {
-                let path = MessagePath::new(self.msg.path().package(), name)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+            (DataType::LocalMessage(name), Value::Message(v)) => {
+                let path = self.msg.path().peer(name);
                 let dependency = self.get_dependency(&path)?;
                 self.encode_message(dependency, v, w)
             }
-            (DataType::RemoteStruct(path), Value::Message(v)) => {
+            (DataType::GlobalMessage(path), Value::Message(v)) => {
                 let dependency = self.get_dependency(path)?;
                 self.encode_message(dependency, v, w)
             }
@@ -249,13 +248,12 @@ impl DynamicMsg {
             DataType::String => String::decode(r)?.into(),
             DataType::Time => Time::decode(r)?.into(),
             DataType::Duration => Duration::decode(r)?.into(),
-            DataType::LocalStruct(name) => {
-                let path = MessagePath::new(self.msg.path().package(), name)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+            DataType::LocalMessage(name) => {
+                let path = self.msg.path().peer(name);
                 let dependency = self.get_dependency(&path)?;
                 self.decode_message(dependency, r)?.into()
             }
-            DataType::RemoteStruct(path) => {
+            DataType::GlobalMessage(path) => {
                 let dependency = self.get_dependency(path)?;
                 self.decode_message(dependency, r)?.into()
             }

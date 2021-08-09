@@ -1,4 +1,4 @@
-use crate::{FieldCase, FieldInfo, MessagePath, Msg, Result, Value};
+use crate::{FieldCase, FieldInfo, MessagePath, Msg, Value};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
@@ -98,8 +98,8 @@ fn md5_string_is_correct() {
     );
 }
 
-fn get_dependency_set(message: &Msg) -> Result<HashSet<MessagePath>> {
-    Ok(message.dependencies()?.into_iter().collect())
+fn get_dependency_set(message: &Msg) -> HashSet<MessagePath> {
+    message.dependencies().into_iter().collect()
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn constructor_parses_real_message() {
             FieldInfo::new("float64", "covariance", FieldCase::Array(36)).unwrap(),
         ]
     );
-    let dependencies = get_dependency_set(&data).expect("Failed to get dependency set");
+    let dependencies = get_dependency_set(&data);
     assert_eq!(dependencies.len(), 1);
     assert!(dependencies.contains(
         &MessagePath::new("geometry_msgs", "Twist").expect("Unexpected bad message path")
@@ -138,7 +138,7 @@ fn constructor_parses_real_message() {
             FieldInfo::new("Pose", "pose", FieldCase::Unit).unwrap(),
         ]
     );
-    let dependencies = get_dependency_set(&data).expect("Failed to get dependency set");
+    let dependencies = get_dependency_set(&data);
     assert_eq!(dependencies.len(), 2);
     assert!(dependencies.contains(
         &MessagePath::new("geometry_msgs", "Pose").expect("Unexpected bad message path")
@@ -180,7 +180,7 @@ fn constructor_parses_real_message() {
             .unwrap(),
         ]
     );
-    let dependencies = get_dependency_set(&data).expect("Failed to get dependency set");
+    let dependencies = get_dependency_set(&data);
     assert_eq!(dependencies.len(), 3);
     assert!(dependencies.contains(
         &MessagePath::new("geometry_msgs", "Vector3").expect("Unexpected bad message path")
@@ -216,22 +216,12 @@ fn dependencies_lists_all_fields_the_message_depends_upon() {
     )
     .unwrap();
     assert_eq!(
-        msg.dependencies().unwrap(),
+        msg.dependencies(),
         vec![
             "std_msgs/Header".try_into().unwrap(),
             "geometry_msgs/Pose".try_into().unwrap(),
-        ]
+        ],
     );
-}
-
-#[test]
-fn full_name_returns_the_full_message_name() {
-    let msg = Msg::new(
-        "geometry_msgs/PoseStamped".try_into().unwrap(),
-        include_str!("../../../msg_examples/geometry_msgs/msg/PoseStamped.msg"),
-    )
-    .unwrap();
-    assert_eq!(msg.full_name(), "geometry_msgs/PoseStamped");
 }
 
 #[test]

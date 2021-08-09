@@ -28,14 +28,8 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
         }
     }
     for message in message_map.services.keys() {
-        let key_req = MessagePath::new(message.package(), format!("{}Req", message.name()))
-            .chain_err(|| {
-                "Failed to create service request message! This is unexpected and probably a reportable bug."
-            })?;
-        let key_res = MessagePath::new(message.package(), format!("{}Res", message.name()))
-            .chain_err(|| {
-                "Failed to create service response message! This is unexpected and probably a reportable bug."
-            })?;
+        let key_req = message.peer(format!("{}Req", message.name()));
+        let key_res = message.peer(format!("{}Res", message.name()));
         let req = match representations.get(&key_req) {
             Some(v) => v,
             None => bail!("Message map does not contain all needed elements"),
@@ -69,7 +63,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
     let mut handled_messages = HashSet::<MessagePath>::new();
     let mut result = message.0.source().to_owned();
     let mut pending = message
-        .dependencies()?
+        .dependencies()
         .into_iter()
         .collect::<LinkedList<_>>();
     while let Some(value) = pending.pop_front() {
@@ -84,7 +78,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
             Some(msg) => msg,
             None => bail!("Message map does not contain all needed elements"),
         };
-        for dependency in message.dependencies()? {
+        for dependency in message.dependencies() {
             pending.push_back(dependency);
         }
         result += message.0.source();
@@ -133,17 +127,17 @@ pub fn get_message_map(
             message_path,
         )? {
             MessageCase::Message(message) => {
-                for dependency in &message.dependencies()? {
-                    pending.push(dependency.clone());
+                for dependency in message.dependencies() {
+                    pending.push(dependency);
                 }
                 messages.insert(message.0.path().clone(), message);
             }
             MessageCase::Service(service, req, res) => {
-                for dependency in &req.dependencies()? {
-                    pending.push(dependency.clone());
+                for dependency in req.dependencies() {
+                    pending.push(dependency);
                 }
-                for dependency in &res.dependencies()? {
-                    pending.push(dependency.clone());
+                for dependency in res.dependencies() {
+                    pending.push(dependency);
                 }
                 messages.insert(req.0.path().clone(), req);
                 messages.insert(res.0.path().clone(), res);
@@ -243,7 +237,7 @@ fn get_message_or_service(
             f.read_to_string(&mut contents)
                 .chain_err(|| "Failed to read file to string!")?;
 
-            let (path, source, req, res) = ros_message::Srv::new(path.clone(), &contents)
+            let service = ros_message::Srv::new(path.clone(), &contents)
                 .or_else(|err| {
                     if ignore_bad_messages {
                         ros_message::Srv::new(path.clone(), "\n\n---\n\n")
@@ -251,13 +245,15 @@ fn get_message_or_service(
                         Err(err)
                     }
                 })
-                .chain_err(|| "Failed to build service messages")?
-                .into_inner();
+                .chain_err(|| "Failed to build service messages")?;
 
             return Ok(MessageCase::Service(
-                Srv { path, source },
-                Msg(req),
-                Msg(res),
+                Srv {
+                    path: service.path().clone(),
+                    source: service.source().into(),
+                },
+                Msg(service.request().clone()),
+                Msg(service.response().clone()),
             ));
         }
     }

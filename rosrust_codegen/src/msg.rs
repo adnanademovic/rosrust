@@ -123,11 +123,11 @@ impl Msg {
     }
 
     pub fn full_name(&self) -> String {
-        self.0.full_name()
+        format!("{}", self.0.path())
     }
 
-    pub fn dependencies(&self) -> Result<Vec<MessagePath>> {
-        self.0.dependencies().chain_err(|| "invalid dependencies")
+    pub fn dependencies(&self) -> Vec<MessagePath> {
+        self.0.dependencies()
     }
 
     pub fn get_md5_representation(
@@ -241,8 +241,8 @@ fn field_info_field_token_stream_encode<T: ToTokens>(
             DataType::String
             | DataType::Time
             | DataType::Duration
-            | DataType::LocalStruct(_)
-            | DataType::RemoteStruct(_) => {
+            | DataType::LocalMessage(_)
+            | DataType::GlobalMessage(_) => {
                 quote! { #crate_prefix rosmsg::encode_variable_slice(&self.#name, w.by_ref())?; }
             }
             _ => {
@@ -267,8 +267,8 @@ fn field_info_field_token_stream_decode<T: ToTokens>(
             DataType::String
             | DataType::Time
             | DataType::Duration
-            | DataType::LocalStruct(_)
-            | DataType::RemoteStruct(_) => {
+            | DataType::LocalMessage(_)
+            | DataType::GlobalMessage(_) => {
                 quote! { #name: #crate_prefix rosmsg::decode_variable_vec(r.by_ref())?, }
             }
             _ => {
@@ -306,8 +306,8 @@ fn field_info_const_token_stream<T: ToTokens>(
         DataType::String => quote! { #name: &'static str = #value },
         DataType::Time
         | DataType::Duration
-        | DataType::LocalStruct(..)
-        | DataType::RemoteStruct(..) => return quote! {},
+        | DataType::LocalMessage(..)
+        | DataType::GlobalMessage(..) => return quote! {},
         DataType::I8(_) => {
             let numeric_value = Literal::i8_suffixed(value.parse().unwrap());
             quote! { #name: #datatype = #numeric_value as #datatype }
@@ -371,11 +371,11 @@ fn datatype_token_stream<T: ToTokens>(data_type: &DataType, crate_prefix: &T) ->
         DataType::String => quote! { ::std::string::String },
         DataType::Time => quote! { #crate_prefix Time },
         DataType::Duration => quote! { #crate_prefix Duration },
-        DataType::LocalStruct(ref name) => {
+        DataType::LocalMessage(ref name) => {
             let name = Ident::new(name, Span::call_site());
             quote! { #name }
         }
-        DataType::RemoteStruct(ref message) => {
+        DataType::GlobalMessage(ref message) => {
             let name = Ident::new(message.name(), Span::call_site());
             let pkg = Ident::new(message.package(), Span::call_site());
             quote! { super::#pkg::#name }

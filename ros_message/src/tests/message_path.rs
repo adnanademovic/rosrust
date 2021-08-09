@@ -35,3 +35,10 @@ fn package_names_must_not_contain_multiple_underscores_in_a_row() {
     MessagePath::new("foo__123_", "MessageName").expect_err("Unexpected correct package name");
     MessagePath::new("foo___123_", "MessageName").expect_err("Unexpected correct package name");
 }
+
+#[test]
+fn format_returns_the_full_message_name() {
+    let path: MessagePath =
+        MessagePath::new("foo_123", "MessageName").expect("Unexpected incorrect package name");
+    assert_eq!(format!("{}", path), "foo_123/MessageName");
+}
