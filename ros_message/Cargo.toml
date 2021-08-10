@@ -8,6 +8,7 @@ repository = "https://github.com/adnanademovic/rosrust"
 version = "0.1.0"
 
 [dependencies]
+array-init = "2.0.0"
 hex = "0.4.3"
 itertools = "0.10.1"
 lazy_static = "1.4.0"

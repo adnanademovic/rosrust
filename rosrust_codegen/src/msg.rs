@@ -40,6 +40,18 @@ impl Msg {
             .iter()
             .map(|v| field_info_field_default_token_stream(v, crate_prefix))
             .collect::<Vec<_>>();
+        let fields_into_values = self
+            .0
+            .fields()
+            .iter()
+            .map(|v| field_info_field_into_value_token_stream(v, crate_prefix))
+            .collect::<Vec<_>>();
+        let fields_from_values = self
+            .0
+            .fields()
+            .iter()
+            .map(|v| field_info_field_from_value_token_stream(v, crate_prefix))
+            .collect::<Vec<_>>();
         let fields_for_eq_and_debug = self
             .0
             .fields()
@@ -69,6 +81,41 @@ impl Msg {
 
             impl #name {
                 #(#const_fields)*
+            }
+
+            impl std::convert::From<#name> for #crate_prefix MsgValue {
+                fn from(src: #name) -> Self {
+                    #crate_prefix MsgValue::Message(src.into())
+                }
+            }
+
+            impl std::convert::From<#name> for #crate_prefix MsgMessage {
+                fn from(src: #name) -> Self {
+                    let mut output = Self::new();
+                    #(#fields_into_values)*
+                    output
+                }
+            }
+
+            impl std::convert::TryFrom<#crate_prefix MsgValue> for #name {
+                type Error = ();
+
+                fn try_from(src: #crate_prefix MsgValue) -> Result<Self, ()> {
+                    use std::convert::TryInto;
+                    let message: #crate_prefix MsgMessage = src.try_into()?;
+                    message.try_into()
+                }
+            }
+
+            impl std::convert::TryFrom<#crate_prefix MsgMessage> for #name {
+                type Error = ();
+
+                fn try_from(mut src: #crate_prefix MsgMessage) -> Result<Self, ()> {
+                    use std::convert::TryInto;
+                    Ok(Self {
+                        #(#fields_from_values)*
+                    })
+                }
             }
 
             impl std::cmp::PartialEq<Self> for #name {
@@ -225,6 +272,34 @@ fn field_info_field_default_token_stream<T: ToTokens>(
         FieldCase::Array(l) => {
             let instances = (0..*l).map(|_| quote! {Default::default()});
             quote! { #name: [#(#instances),*], }
+        }
+        FieldCase::Const(_) => quote! {},
+    }
+}
+
+fn field_info_field_into_value_token_stream<T: ToTokens>(
+    field_info: &FieldInfo,
+    _crate_prefix: &T,
+) -> impl ToTokens {
+    let name = field_info_create_identifier(field_info, Span::call_site());
+    let name_str = field_info.name();
+    match field_info.case() {
+        FieldCase::Unit | FieldCase::Vector | FieldCase::Array(_) => {
+            quote! { output.insert(#name_str.into(), src.#name.into()); }
+        }
+        FieldCase::Const(_) => quote! {},
+    }
+}
+
+fn field_info_field_from_value_token_stream<T: ToTokens>(
+    field_info: &FieldInfo,
+    _crate_prefix: &T,
+) -> impl ToTokens {
+    let name = field_info_create_identifier(field_info, Span::call_site());
+    let name_str = field_info.name();
+    match field_info.case() {
+        FieldCase::Unit | FieldCase::Vector | FieldCase::Array(_) => {
+            quote! { #name: src.remove(#name_str).ok_or(())?.try_into()?, }
         }
         FieldCase::Const(_) => quote! {},
     }

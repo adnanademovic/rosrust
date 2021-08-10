@@ -2,7 +2,7 @@ use crate::{Duration, Time};
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::iter::FromIterator;
@@ -520,9 +520,15 @@ impl From<Duration> for Value {
     }
 }
 
-impl From<Vec<Value>> for Value {
-    fn from(v: Vec<Value>) -> Self {
-        Self::Array(v)
+impl<T: Into<Value>> From<Vec<T>> for Value {
+    fn from(v: Vec<T>) -> Self {
+        Self::Array(v.into_iter().map(Into::into).collect())
+    }
+}
+
+impl<T: Into<Value>, const L: usize> From<[T; L]> for Value {
+    fn from(v: [T; L]) -> Self {
+        Self::Array(std::array::IntoIter::new(v).map(Into::into).collect())
     }
 }
 
@@ -644,11 +650,28 @@ impl TryFrom<Value> for Duration {
     }
 }
 
-impl TryFrom<Value> for Vec<Value> {
+impl<T: TryFrom<Value>> TryFrom<Value> for Vec<T> {
     type Error = ();
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.try_into_vec().ok_or(())
+        let value = value.try_into_vec().ok_or(())?;
+        value
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Self, _>>()
+            .map_err(|_| ())
+    }
+}
+
+impl<T: TryFrom<Value>, const L: usize> TryFrom<Value> for [T; L] {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let value = value.try_into_vec().ok_or(())?;
+        if value.len() != L {
+            return Err(());
+        }
+        array_init::from_iter(value.into_iter().filter_map(|v| v.try_into().ok())).ok_or(())
     }
 }
 
