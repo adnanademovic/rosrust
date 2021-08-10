@@ -2,6 +2,7 @@ use crate::{Duration, Time};
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::iter::FromIterator;
@@ -289,6 +290,23 @@ impl Value {
         }
     }
 
+    /// Returns the content if `Value` is a `String`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(Value::String("foo".into()).try_into_string(), Some("foo".into()));
+    /// assert!(Value::U32(12).try_into_string().is_none());
+    /// ```
+    pub fn try_into_string(self) -> Option<String> {
+        if let Value::String(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
     /// Returns the content if `Value` is a `Time` struct.
     ///
     /// # Examples
@@ -349,6 +367,26 @@ impl Value {
         }
     }
 
+    /// Returns the content if `Value` is an array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// assert_eq!(
+    ///     Value::Array(vec![1u32.into(), 2u32.into(), 3u32.into()]).try_into_vec(),
+    ///     Some(vec![Value::U32(1), Value::U32(2), Value::U32(3)]),
+    /// );
+    /// assert!(Value::U32(12).try_into_vec().is_none());
+    /// ```
+    pub fn try_into_vec(self) -> Option<Vec<Value>> {
+        if let Value::Array(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
     /// Returns a reference to the content if `Value` is a message.
     ///
     /// # Examples
@@ -363,6 +401,27 @@ impl Value {
     /// assert!(Value::U32(12).as_map().is_none());
     /// ```
     pub fn as_map(&self) -> Option<&MessageValue> {
+        if let Value::Message(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the content if `Value` is a message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ros_message::Value;
+    /// # use std::collections::HashMap;
+    /// let mut data = HashMap::<String, Value>::new();
+    /// data.insert("foo".into(), true.into());
+    /// data.insert("bar".into(), false.into());
+    /// assert_eq!(Value::Message(data.clone()).try_into_map(), Some(data));
+    /// assert!(Value::U32(12).try_into_map().is_none());
+    /// ```
+    pub fn try_into_map(self) -> Option<MessageValue> {
         if let Value::Message(value) = self {
             Some(value)
         } else {
@@ -470,6 +529,134 @@ impl From<Vec<Value>> for Value {
 impl From<HashMap<String, Value>> for Value {
     fn from(v: HashMap<String, Value>) -> Self {
         Self::Message(v)
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_bool().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for i8 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_i8().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for i16 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_i16().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for i32 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_i32().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for i64 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_i64().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for u8 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_u8().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for u16 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_u16().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for u32 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_u32().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for u64 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_u64().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for f32 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_f32().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for f64 {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_f64().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for String {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.try_into_string().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for Time {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_time().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for Duration {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.as_duration().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for Vec<Value> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.try_into_vec().ok_or(())
+    }
+}
+
+impl TryFrom<Value> for HashMap<String, Value> {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        value.try_into_map().ok_or(())
     }
 }
 
