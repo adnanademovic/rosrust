@@ -102,8 +102,8 @@ fn match_line_works_on_legal_data() {
             .unwrap()
     );
     assert_eq!(
-        FieldInfo::new("geom_msgs/Twist", "myname", FieldCase::Const("-444".into())).unwrap(),
-        match_line("  geom_msgs/Twist  myname =   -444 # data  ")
+        FieldInfo::new("int16", "myname", FieldCase::Const("-444".into())).unwrap(),
+        match_line("  int16  myname =   -444 # data  ")
             .unwrap()
             .unwrap()
     );

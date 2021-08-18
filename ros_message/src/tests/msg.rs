@@ -248,5 +248,5 @@ fn constants_returns_a_map_of_all_constants_in_message_root() {
         "c_string".into(),
         Value::String("Things 'in' here should \"be able\" # to go crazy with \\ escapes".into()),
     );
-    assert_eq!(msg.constants().unwrap(), constants);
+    assert_eq!(msg.constants(), constants);
 }

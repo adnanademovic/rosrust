@@ -1,8 +1,9 @@
-use crate::{DataType, MessagePath, Result};
+use crate::{DataType, Error, MessagePath, Result, Value};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Formatter;
+use std::hash::{Hash, Hasher};
 
 /// Represents all possible variants of a message field
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -29,12 +30,30 @@ pub enum FieldCase {
     Const(String),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Uncompared<T> {
+    inner: T,
+}
+
+impl<T> Hash for Uncompared<T> {
+    fn hash<H: Hasher>(&self, _state: &mut H) {}
+}
+
+impl<T> PartialEq for Uncompared<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl<T> Eq for Uncompared<T> {}
+
 /// Full description of one field in a `msg` or `srv` file.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FieldInfo {
     datatype: DataType,
     name: String,
     case: FieldCase,
+    const_value: Uncompared<Option<Value>>,
 }
 
 impl fmt::Display for FieldInfo {
@@ -53,7 +72,7 @@ impl FieldInfo {
     ///
     /// # Errors
     ///
-    /// An error will be returned if the data type cannot be parsed.
+    /// An error will be returned if the data type cannot be parsed, or const data is invalid.
     ///
     /// # Examples
     ///
@@ -76,10 +95,41 @@ impl FieldInfo {
     /// assert!(FieldInfo::new("bad/field/type", "foo", FieldCase::Vector).is_err());
     /// ```
     pub fn new(datatype: &str, name: impl Into<String>, case: FieldCase) -> Result<FieldInfo> {
+        let parsed_datatype = DataType::parse(datatype)?;
+        let name = name.into();
+        let const_value = match &case {
+            FieldCase::Const(raw_value) => Some(
+                match parsed_datatype {
+                    DataType::Bool => Some(Value::Bool(raw_value != "0")),
+                    DataType::I8(_) => raw_value.parse().ok().map(Value::I8),
+                    DataType::I16 => raw_value.parse().ok().map(Value::I16),
+                    DataType::I32 => raw_value.parse().ok().map(Value::I32),
+                    DataType::I64 => raw_value.parse().ok().map(Value::I64),
+                    DataType::U8(_) => raw_value.parse().ok().map(Value::U8),
+                    DataType::U16 => raw_value.parse().ok().map(Value::U16),
+                    DataType::U32 => raw_value.parse().ok().map(Value::U32),
+                    DataType::U64 => raw_value.parse().ok().map(Value::U64),
+                    DataType::F32 => raw_value.parse().ok().map(Value::F32),
+                    DataType::F64 => raw_value.parse().ok().map(Value::F64),
+                    DataType::String => Some(Value::String(raw_value.clone())),
+                    DataType::Time
+                    | DataType::Duration
+                    | DataType::LocalMessage(_)
+                    | DataType::GlobalMessage(_) => None,
+                }
+                .ok_or_else(|| Error::BadConstant {
+                    name: name.clone(),
+                    datatype: datatype.into(),
+                    value: raw_value.into(),
+                })?,
+            ),
+            FieldCase::Unit | FieldCase::Vector | FieldCase::Array(_) => None,
+        };
         Ok(FieldInfo {
-            datatype: DataType::parse(datatype)?,
-            name: name.into(),
+            datatype: parsed_datatype,
+            name,
             case,
+            const_value: Uncompared { inner: const_value },
         })
     }
 
@@ -96,6 +146,11 @@ impl FieldInfo {
     /// Returns the case of the field.
     pub fn case(&self) -> &FieldCase {
         &self.case
+    }
+
+    /// Returns the stored value if a constant field.
+    pub fn const_value(&self) -> Option<&Value> {
+        self.const_value.inner.as_ref()
     }
 
     /// Returns true if the field contains a constant value.
@@ -214,7 +269,7 @@ impl FieldInfo {
     /// assert!(FieldInfo::new("std_msgs/Header", "header", FieldCase::Unit)?.is_header());
     /// assert!(!FieldInfo::new("Header", "header", FieldCase::Vector)?.is_header());
     /// assert!(!FieldInfo::new("Header", "header", FieldCase::Array(5))?.is_header());
-    /// assert!(!FieldInfo::new("Header", "header", FieldCase::Const("12".into()))?.is_header());
+    /// assert!(FieldInfo::new("Header", "header", FieldCase::Const("12".into())).is_err());
     /// assert!(!FieldInfo::new("Header", "some_field", FieldCase::Unit)?.is_header());
     /// # Ok(())
     /// # }

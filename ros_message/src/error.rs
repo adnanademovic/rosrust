@@ -36,10 +36,12 @@ pub enum Error {
         name: String,
     },
     /// Passed in constant value is not parsable as its data type.
-    #[error("bad constant value `{value}` in field {name}")]
+    #[error("bad constant value `{value}` of type {datatype} in field {name}")]
     BadConstant {
         /// Name of the constant.
         name: String,
+        /// Type of the invalid value.
+        datatype: String,
         /// The invalid value provided.
         value: String,
     },
