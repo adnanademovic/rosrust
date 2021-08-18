@@ -34,3 +34,51 @@ fn md5_string_is_correct() {
         "ABCD",
     );
 }
+
+#[test]
+fn serialize_as_string() {
+    assert_eq!(serde_json::to_string(&DataType::I64).unwrap(), "\"int64\"");
+    assert_eq!(
+        serde_json::to_string(&DataType::F32).unwrap(),
+        "\"float32\"",
+    );
+    assert_eq!(
+        serde_json::to_string(&DataType::String).unwrap(),
+        "\"string\"",
+    );
+    assert_eq!(
+        serde_json::to_string(&DataType::LocalMessage("xx".into())).unwrap(),
+        "\"xx\"",
+    );
+    assert_eq!(
+        serde_json::to_string(&DataType::GlobalMessage(
+            MessagePath::new("p1", "xx").expect("Unexpected bad message path")
+        ))
+        .unwrap(),
+        "\"p1/xx\"",
+    );
+}
+
+#[test]
+fn deserialize_from_string() {
+    assert_eq!(
+        serde_json::from_str::<DataType>("\"int64\"").unwrap(),
+        DataType::I64,
+    );
+    assert_eq!(
+        serde_json::from_str::<DataType>("\"float32\"").unwrap(),
+        DataType::F32,
+    );
+    assert_eq!(
+        serde_json::from_str::<DataType>("\"string\"").unwrap(),
+        DataType::String,
+    );
+    assert_eq!(
+        serde_json::from_str::<DataType>("\"xx\"").unwrap(),
+        DataType::LocalMessage("xx".into()),
+    );
+    assert_eq!(
+        serde_json::from_str::<DataType>("\"p1/xx\"").unwrap(),
+        DataType::GlobalMessage(MessagePath::new("p1", "xx").expect("Unexpected bad message path")),
+    );
+}

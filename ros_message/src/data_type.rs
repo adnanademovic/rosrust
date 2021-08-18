@@ -1,11 +1,14 @@
 use crate::{Error, MessagePath, Result};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Formatter;
 
 /// Enumerates all data types possible in a ROS message.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(into = "String")]
+#[serde(try_from = "&str")]
 pub enum DataType {
     /// Represents `bool`.
     Bool,
@@ -71,6 +74,20 @@ pub enum U8Variant {
     Uint8,
     /// Represents `char`.
     Char,
+}
+
+impl From<DataType> for String {
+    fn from(src: DataType) -> String {
+        format!("{}", src)
+    }
+}
+
+impl TryFrom<&str> for DataType {
+    type Error = Error;
+
+    fn try_from(src: &str) -> Result<Self> {
+        Self::parse(src)
+    }
 }
 
 impl fmt::Display for DataType {

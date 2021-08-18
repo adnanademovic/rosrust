@@ -1,6 +1,7 @@
 use crate::{DataType, Error, MessagePath, Result, Value};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::Formatter;
 use std::hash::{Hash, Hasher};
@@ -30,7 +31,7 @@ pub enum FieldCase {
     Const(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 struct Uncompared<T> {
     inner: T,
 }
@@ -49,6 +50,8 @@ impl<T> Eq for Uncompared<T> {}
 
 /// Full description of one field in a `msg` or `srv` file.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(into = "FieldInfoSerde")]
+#[serde(try_from = "FieldInfoSerde")]
 pub struct FieldInfo {
     datatype: DataType,
     name: String,
@@ -95,11 +98,13 @@ impl FieldInfo {
     /// assert!(FieldInfo::new("bad/field/type", "foo", FieldCase::Vector).is_err());
     /// ```
     pub fn new(datatype: &str, name: impl Into<String>, case: FieldCase) -> Result<FieldInfo> {
-        let parsed_datatype = DataType::parse(datatype)?;
-        let name = name.into();
+        Self::evaluate(datatype.try_into()?, name.into(), case)
+    }
+
+    fn evaluate(datatype: DataType, name: String, case: FieldCase) -> Result<FieldInfo> {
         let const_value = match &case {
             FieldCase::Const(raw_value) => Some(
-                match parsed_datatype {
+                match &datatype {
                     DataType::Bool => Some(Value::Bool(raw_value != "0")),
                     DataType::I8(_) => raw_value.parse().ok().map(Value::I8),
                     DataType::I16 => raw_value.parse().ok().map(Value::I16),
@@ -119,14 +124,14 @@ impl FieldInfo {
                 }
                 .ok_or_else(|| Error::BadConstant {
                     name: name.clone(),
-                    datatype: datatype.into(),
+                    datatype: format!("{}", datatype),
                     value: raw_value.into(),
                 })?,
             ),
             FieldCase::Unit | FieldCase::Vector | FieldCase::Array(_) => None,
         };
         Ok(FieldInfo {
-            datatype: parsed_datatype,
+            datatype,
             name,
             case,
             const_value: Uncompared { inner: const_value },
@@ -281,6 +286,31 @@ impl FieldInfo {
         match &self.datatype {
             DataType::GlobalMessage(msg) => msg.package() == "std_msgs" && msg.name() == "Header",
             _ => false,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct FieldInfoSerde {
+    datatype: DataType,
+    name: String,
+    case: FieldCase,
+}
+
+impl TryFrom<FieldInfoSerde> for FieldInfo {
+    type Error = Error;
+
+    fn try_from(src: FieldInfoSerde) -> Result<Self> {
+        Self::evaluate(src.datatype, src.name, src.case)
+    }
+}
+
+impl From<FieldInfo> for FieldInfoSerde {
+    fn from(src: FieldInfo) -> Self {
+        Self {
+            datatype: src.datatype,
+            name: src.name,
+            case: src.case,
         }
     }
 }

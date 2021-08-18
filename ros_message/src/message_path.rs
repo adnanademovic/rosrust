@@ -8,6 +8,8 @@ use std::hash::Hash;
 
 /// Path to a ROS message with naming conventions tested.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(into = "String")]
+#[serde(try_from = "&str")]
 pub struct MessagePath {
     package: String,
     name: String,
@@ -116,5 +118,11 @@ impl<'a> TryFrom<&'a str> for MessagePath {
 
     fn try_from(value: &'a str) -> Result<Self> {
         Self::from_combined(value)
+    }
+}
+
+impl From<MessagePath> for String {
+    fn from(src: MessagePath) -> Self {
+        format!("{}", src)
     }
 }
