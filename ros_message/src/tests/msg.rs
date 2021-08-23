@@ -250,3 +250,87 @@ fn constants_returns_a_map_of_all_constants_in_message_root() {
     );
     assert_eq!(msg.constants(), constants);
 }
+
+#[test]
+fn serialize_into_name_and_truncated_source_only() {
+    assert_eq!(
+        serde_json::to_value(
+            &Msg::new(
+                "geometry_msgs/Quaternion"
+                    .try_into()
+                    .expect("Unexpectedly bad message body"),
+                "# This represents an orientation in free space in quaternion form.\n\nfloat64 x\nfloat64 y\nfloat64 z\nfloat64 w\n",
+            )
+                .unwrap(),
+        )
+            .unwrap(),
+        serde_json::from_str::<serde_json::Value>(
+            r##"
+            {
+                "path": "geometry_msgs/Quaternion",
+                "source": "# This represents an orientation in free space in quaternion form.\n\nfloat64 x\nfloat64 y\nfloat64 z\nfloat64 w"
+            }
+            "##,
+        )
+            .unwrap(),
+    );
+}
+
+#[test]
+fn deserialize_from_name_and_source() {
+    assert_eq!(
+        serde_json::from_str::<Msg>(
+            r##"
+            {
+                "path": "geometry_msgs/Quaternion",
+                "source": "# This represents an orientation in free space in quaternion form.\n\nfloat64 x\nfloat64 y\nfloat64 z\nfloat64 w\n\n\n\n"
+            }
+            "##,
+        )
+            .unwrap(),
+        Msg::new(
+            "geometry_msgs/Quaternion"
+                .try_into()
+                .expect("Unexpectedly bad message body"),
+            "# This represents an orientation in free space in quaternion form.\n\nfloat64 x\nfloat64 y\nfloat64 z\nfloat64 w\n",
+        )
+            .unwrap(),
+    );
+}
+
+#[test]
+fn deserialize_rejects_bad_name_or_source() {
+    assert!(
+        serde_json::from_str::<Msg>(
+            r##"
+            {
+                "path": "geometry_msgs/Quaternion",
+                "source": "# This represents an orientation in free space in quaternion form.\n\nfloat64 x\nfloat64 y\nfloat64 z\nfloat64 w\n\n\n\n"
+            }
+            "##,
+        )
+            .is_ok(),
+    );
+    assert!(
+        serde_json::from_str::<Msg>(
+            r##"
+            {
+                "path": "Geometry_msgs/Quaternion",
+                "source": "# This represents an orientation in free space in quaternion form.\n\nfloat64 x\nfloat64 y\nfloat64 z\nfloat64 w\n\n\n\n"
+            }
+            "##,
+        )
+            .is_err(),
+    );
+    assert!(
+        serde_json::from_str::<Msg>(
+            r##"
+            {
+                "path": "geometry_msgs/Quaternion",
+                "source": "# This represents an orientation in free space in quaternion form.\n\nfloat64 _x\nfloat64 y\nfloat64 z\nfloat64 w\n\n\n\n"
+            }
+            "##,
+        )
+            .is_err(),
+    );
+}
