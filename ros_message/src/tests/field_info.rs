@@ -1,4 +1,4 @@
-use crate::{FieldCase, FieldInfo, MessagePath};
+use crate::{FieldCase, FieldInfo, MessagePath, Value};
 use std::collections::HashMap;
 
 #[test]
@@ -114,4 +114,162 @@ fn display() {
         ),
         "p2/xx abc".to_owned()
     );
+}
+
+#[test]
+fn serialize_unit_field_case_as_string() {
+    assert_eq!(
+        serde_json::to_string(&FieldCase::Unit).unwrap(),
+        r#""Unit""#,
+    );
+}
+
+#[test]
+fn serialize_vector_field_case_as_string() {
+    assert_eq!(
+        serde_json::to_string(&FieldCase::Vector).unwrap(),
+        r#""Vector""#,
+    );
+}
+
+#[test]
+fn serialize_array_field_case_as_structure_with_length_integer() {
+    assert_eq!(
+        serde_json::to_string(&FieldCase::Array(12)).unwrap(),
+        r#"{"Array":12}"#,
+    );
+}
+
+#[test]
+fn serialize_const_field_case_as_structure_with_value_string() {
+    assert_eq!(
+        serde_json::to_string(&FieldCase::Const("abc".into())).unwrap(),
+        r#"{"Const":"abc"}"#,
+    );
+}
+
+#[test]
+fn deserialize_unit_field_case_from_string() {
+    assert_eq!(
+        serde_json::from_str::<FieldCase>(r#""Unit""#).unwrap(),
+        FieldCase::Unit,
+    );
+}
+
+#[test]
+fn deserialize_vector_field_case_from_string() {
+    assert_eq!(
+        serde_json::from_str::<FieldCase>(r#""Vector""#).unwrap(),
+        FieldCase::Vector,
+    );
+}
+
+#[test]
+fn deserialize_array_field_case_from_structure_with_length_integer() {
+    assert_eq!(
+        serde_json::from_str::<FieldCase>(r#"{"Array":12}"#).unwrap(),
+        FieldCase::Array(12),
+    );
+}
+
+#[test]
+fn deserialize_const_field_case_from_structure_with_value_string() {
+    assert_eq!(
+        serde_json::from_str::<FieldCase>(r#"{"Const":"abc"}"#).unwrap(),
+        FieldCase::Const("abc".into()),
+    );
+}
+
+#[test]
+fn serialize_field_info_as_correct_structure() {
+    assert_eq!(
+        serde_json::to_value(FieldInfo::new("p2/xx", "abc", FieldCase::Array(12)).unwrap())
+            .unwrap(),
+        serde_json::from_str::<serde_json::Value>(
+            r#"
+            {
+                "datatype": "p2/xx",
+                "name": "abc",
+                "case": { "Array": 12 }
+            }
+            "#,
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        serde_json::to_value(
+            FieldInfo::new("int16", "abc", FieldCase::Const("33".into())).unwrap()
+        )
+        .unwrap(),
+        serde_json::from_str::<serde_json::Value>(
+            r#"
+            {
+                "datatype": "int16",
+                "name": "abc",
+                "case": { "Const": "33" }
+            }
+            "#,
+        )
+        .unwrap(),
+    );
+}
+
+#[test]
+fn deserialize_field_info_from_correct_structure() {
+    assert_eq!(
+        serde_json::from_str::<FieldInfo>(
+            r#"
+            {
+                "datatype": "p2/xx",
+                "name": "abc",
+                "case": { "Array": 12 }
+            }
+            "#,
+        )
+        .unwrap(),
+        FieldInfo::new("p2/xx", "abc", FieldCase::Array(12)).unwrap(),
+    );
+    assert_eq!(
+        serde_json::from_str::<FieldInfo>(
+            r#"
+            {
+                "datatype": "int16",
+                "name": "abc",
+                "case": { "Const": "33" }
+            }
+            "#,
+        )
+        .unwrap(),
+        FieldInfo::new("int16", "abc", FieldCase::Const("33".into())).unwrap(),
+    );
+}
+
+#[test]
+fn deserialize_field_info_ensures_correct_const_value() {
+    assert_eq!(
+        serde_json::from_str::<FieldInfo>(
+            r#"
+            {
+                "datatype": "int16",
+                "name": "abc",
+                "case": { "Const": "33" }
+            }
+            "#,
+        )
+        .unwrap()
+        .const_value()
+        .unwrap()
+        .clone(),
+        Value::I16(33),
+    );
+    assert!(serde_json::from_str::<FieldInfo>(
+        r#"
+            {
+                "datatype": "int16",
+                "name": "abc",
+                "case": { "Const": "asdf" }
+            }
+            "#,
+    )
+    .is_err());
 }
