@@ -42,3 +42,25 @@ fn format_returns_the_full_message_name() {
         MessagePath::new("foo_123", "MessageName").expect("Unexpected incorrect package name");
     assert_eq!(format!("{}", path), "foo_123/MessageName");
 }
+
+#[test]
+fn serialize_as_string() {
+    assert_eq!(
+        serde_json::to_string(&MessagePath::new("foo_123", "MessageName").unwrap()).unwrap(),
+        "\"foo_123/MessageName\"",
+    );
+}
+
+#[test]
+fn deserialize_from_string() {
+    assert_eq!(
+        serde_json::from_str::<MessagePath>("\"foo_123/MessageName\"").unwrap(),
+        MessagePath::new("foo_123", "MessageName").unwrap(),
+    );
+}
+
+#[test]
+fn deserialize_checks_if_package_name_is_valid() {
+    assert!(serde_json::from_str::<MessagePath>("\"foo_123/MessageName\"").is_ok());
+    assert!(serde_json::from_str::<MessagePath>("\"Foo_123/MessageName\"").is_err());
+}
