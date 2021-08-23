@@ -52,11 +52,10 @@ fn main() {
         .join(",");
 
     let file_content = format!(
-        "
-        use rosrust;
-        rosrust::rosmsg_include!({},IGNORE_BAD);
-        pub static MESSAGES: &'static [(&str, &str)]=&[{}];
-        ",
+        r#"
+rosrust::rosmsg_include!({},IGNORE_BAD);
+pub static MESSAGES: &[(&str, &str)]=&[{}];
+        "#,
         package_names, package_tuples
     );
 

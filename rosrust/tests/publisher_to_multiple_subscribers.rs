@@ -1,5 +1,4 @@
 use crossbeam::channel::unbounded;
-use rosrust;
 use std::process::Command;
 
 mod util;
@@ -41,8 +40,9 @@ fn publisher_to_multiple_subscribers() {
 
     let publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
 
-    let mut message = msg::std_msgs::String::default();
-    message.data = "hello world".to_owned();
+    let message = msg::std_msgs::String {
+        data: "hello world".into(),
+    };
 
     println!("Checking roscpp subscriber");
     util::test_publisher(&publisher, &message, &rx, r"^I heard: \[hello world\]$", 50);

@@ -39,8 +39,8 @@ impl<T: Action> GoalManager<T> {
         }
     }
 
-    pub fn init_goal<'a>(
-        &'a mut self,
+    pub fn init_goal(
+        &mut self,
         goal: GoalBody<T>,
         on_transition: Option<OnTransition<T>>,
         on_feedback: Option<OnFeedback<T>>,

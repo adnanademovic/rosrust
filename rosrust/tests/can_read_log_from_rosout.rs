@@ -1,5 +1,4 @@
 use crossbeam::channel::unbounded;
-use rosrust;
 use std::collections::BTreeSet;
 
 mod util;

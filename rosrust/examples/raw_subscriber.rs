@@ -1,5 +1,3 @@
-use env_logger;
-use rosrust;
 use std::collections::HashMap;
 
 mod msg {

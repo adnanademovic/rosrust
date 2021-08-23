@@ -24,7 +24,7 @@ impl<T: rosrust::Message> StatusTracker<T> {
     }
 
     pub fn new_goal(goal: Goal<T>) -> Self {
-        let mut goal_id = if goal.id.id == "" {
+        let mut goal_id = if goal.id.id.is_empty() {
             generate_id()
         } else {
             goal.id.clone()

@@ -86,15 +86,12 @@ impl<T: Action> ActionServer<T> {
         let status_frequency = get_status_frequency().unwrap_or(5.0);
 
         let status_list_timeout = rosrust::param(&format!("{}/status_list_timeout", namespace))
-            .ok_or_else(|| "Bad actionlib namespace")?
+            .ok_or("Bad actionlib namespace")?
             .get()
             .unwrap_or(5.0);
         let status_list_timeout = (status_list_timeout * 1_000_000_000.0) as i64;
 
-        let status_list = Arc::new(Mutex::new(StatusList::new(
-            status_list_timeout,
-            status_pub.clone(),
-        )));
+        let status_list = Arc::new(Mutex::new(StatusList::new(status_list_timeout, status_pub)));
 
         let goal_coordinator = Arc::new(goal_coordinator::GoalCoordinator::new(
             result_pub.clone(),
@@ -250,7 +247,7 @@ impl<T: Action> ServerSimpleGoalHandle<T> {
     }
 
     pub fn goal(&self) -> &GoalBody<T> {
-        &self.goal_handle.goal()
+        self.goal_handle.goal()
     }
 
     pub fn canceled(&self) -> bool {

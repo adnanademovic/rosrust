@@ -302,4 +302,4 @@ impl HistoryEntry {
     }
 }
 
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
+static FAILED_TO_LOCK: &str = "Failed to acquire lock";

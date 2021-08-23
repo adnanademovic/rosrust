@@ -171,21 +171,21 @@ pub struct SystemStateTuple(
     Vec<TopicDataTuple>,
 );
 
-impl Into<SystemState> for SystemStateTuple {
-    fn into(self) -> SystemState {
+impl From<SystemStateTuple> for SystemState {
+    fn from(src: SystemStateTuple) -> SystemState {
         SystemState {
-            publishers: self.0.into_iter().map(Into::into).collect(),
-            subscribers: self.1.into_iter().map(Into::into).collect(),
-            services: self.2.into_iter().map(Into::into).collect(),
+            publishers: src.0.into_iter().map(Into::into).collect(),
+            subscribers: src.1.into_iter().map(Into::into).collect(),
+            services: src.2.into_iter().map(Into::into).collect(),
         }
     }
 }
 
-impl Into<TopicData> for TopicDataTuple {
-    fn into(self) -> TopicData {
+impl From<TopicDataTuple> for TopicData {
+    fn from(src: TopicDataTuple) -> TopicData {
         TopicData {
-            name: self.0,
-            connections: self.1,
+            name: src.0,
+            connections: src.1,
         }
     }
 }
@@ -193,11 +193,11 @@ impl Into<TopicData> for TopicDataTuple {
 #[derive(Debug, serde_derive::Deserialize)]
 pub struct TopicTuple(String, String);
 
-impl Into<Topic> for TopicTuple {
-    fn into(self) -> Topic {
+impl From<TopicTuple> for Topic {
+    fn from(src: TopicTuple) -> Topic {
         Topic {
-            name: self.0,
-            datatype: self.1,
+            name: src.0,
+            datatype: src.1,
         }
     }
 }

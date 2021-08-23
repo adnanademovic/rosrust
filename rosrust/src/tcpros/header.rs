@@ -1,6 +1,5 @@
 use crate::rosmsg::RosMsg;
 use error_chain::bail;
-use std;
 use std::collections::HashMap;
 use std::io::Error;
 
@@ -38,11 +37,10 @@ pub fn match_field(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std;
     use std::collections::HashMap;
 
-    static FAILED_TO_ENCODE: &'static str = "Failed to encode";
-    static FAILED_TO_DECODE: &'static str = "Failed to decode";
+    static FAILED_TO_ENCODE: &str = "Failed to encode";
+    static FAILED_TO_DECODE: &str = "Failed to decode";
 
     #[test]
     fn writes_empty_map() {

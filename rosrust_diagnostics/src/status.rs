@@ -111,14 +111,14 @@ impl Status {
     }
 }
 
-impl Into<DiagnosticStatus> for Status {
-    fn into(self) -> DiagnosticStatus {
+impl From<Status> for DiagnosticStatus {
+    fn from(src: Status) -> DiagnosticStatus {
         DiagnosticStatus {
-            level: self.level as i8,
-            name: self.name,
-            message: self.message,
-            hardware_id: self.hardware_id,
-            values: self.values,
+            level: src.level as i8,
+            name: src.name,
+            message: src.message,
+            hardware_id: src.hardware_id,
+            values: src.values,
         }
     }
 }

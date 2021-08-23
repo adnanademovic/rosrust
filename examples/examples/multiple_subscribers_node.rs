@@ -1,5 +1,3 @@
-use env_logger;
-use rosrust;
 use rosrust::{sleep, Duration, RawMessage};
 
 fn main() {

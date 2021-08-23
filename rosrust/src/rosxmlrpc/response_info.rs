@@ -60,23 +60,23 @@ impl ResponseInfo {
     }
 }
 
-impl Into<xml_rpc::Response> for ResponseInfo {
-    fn into(self) -> xml_rpc::Response {
-        let code = Value::Int(self.code);
-        let message = Value::String(self.message);
-        Ok(vec![Value::Array(vec![code, message, self.data])])
+impl From<ResponseInfo> for xml_rpc::Response {
+    fn from(src: ResponseInfo) -> xml_rpc::Response {
+        let code = Value::Int(src.code);
+        let message = Value::String(src.message);
+        Ok(vec![Value::Array(vec![code, message, src.data])])
     }
 }
 
-impl Into<Response<Value>> for ResponseInfo {
-    fn into(self) -> Response<Value> {
-        match self.code {
-            SUCCESS_CODE => Ok(self.data),
-            ERROR_CODE => Err(ResponseError::Client(self.message)),
-            FAILURE_CODE => Err(ResponseError::Server(self.message)),
+impl From<ResponseInfo> for Response<Value> {
+    fn from(src: ResponseInfo) -> Response<Value> {
+        match src.code {
+            SUCCESS_CODE => Ok(src.data),
+            ERROR_CODE => Err(ResponseError::Client(src.message)),
+            FAILURE_CODE => Err(ResponseError::Server(src.message)),
             _ => Err(ResponseError::Server(format!(
                 "Bad response code \"{}\" returned from server",
-                self.code
+                src.code
             ))),
         }
     }

@@ -38,10 +38,10 @@ error_chain::error_chain! {
 #[inline]
 fn is_closed_connection(err: &::std::io::Error) -> bool {
     use std::io::ErrorKind as IoErrorKind;
-    match err.kind() {
-        IoErrorKind::BrokenPipe | IoErrorKind::ConnectionReset => true,
-        _ => false,
-    }
+    matches!(
+        err.kind(),
+        IoErrorKind::BrokenPipe | IoErrorKind::ConnectionReset,
+    )
 }
 
 impl Error {

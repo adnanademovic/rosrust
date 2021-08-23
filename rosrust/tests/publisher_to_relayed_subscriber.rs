@@ -1,5 +1,4 @@
 use crossbeam::channel::unbounded;
-use rosrust;
 use std::process::Command;
 
 mod util;
@@ -31,8 +30,9 @@ fn publisher_to_relayed_subscriber() {
 
     let publisher = rosrust::publish::<msg::std_msgs::String>("chatter_pub", 100).unwrap();
 
-    let mut message = msg::std_msgs::String::default();
-    message.data = "hello world".to_owned();
+    let message = msg::std_msgs::String {
+        data: "hello world".into(),
+    };
 
     util::test_publisher(&publisher, &message, &rx, r"^hello world", 50);
 

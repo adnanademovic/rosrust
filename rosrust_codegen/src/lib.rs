@@ -2,10 +2,10 @@
 
 extern crate proc_macro;
 
+mod alerts;
 mod error;
 mod genmsg;
 mod helpers;
-mod message_path;
 mod msg;
 mod output_layout;
 mod rosmsg_include;
@@ -27,7 +27,7 @@ pub fn rosmsg_include(input: TokenStream) -> TokenStream {
     }
     let is_internal = next_item == "INTERNAL";
     let ignore_bad = next_item == "IGNORE_BAD";
-    if !is_internal && !ignore_bad && next_item != "" {
+    if !is_internal && !ignore_bad && !next_item.is_empty() {
         messages.push(next_item);
     }
     let message_refs = messages.iter().map(String::as_str).collect::<Vec<&str>>();

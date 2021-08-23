@@ -6,7 +6,6 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use error_chain::bail;
 use log::error;
 use socket2::Socket;
-use std;
 use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};

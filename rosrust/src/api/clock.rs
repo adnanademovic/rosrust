@@ -1,6 +1,6 @@
-use crate::time::{Duration, Time};
 use crate::util::FAILED_TO_LOCK;
 use crossbeam::sync::{Parker, Unparker};
+use ros_message::{Duration, Time};
 use std::cell::Cell;
 use std::cmp;
 use std::collections::BinaryHeap;
@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
-static BEFORE_EPOCH: &'static str = "Requested time is before UNIX epoch.";
+static BEFORE_EPOCH: &str = "Requested time is before UNIX epoch.";
 
 pub struct Delay {
     clock: Arc<dyn Clock>,

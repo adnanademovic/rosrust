@@ -1,6 +1,3 @@
-use env_logger;
-use rosrust;
-
 fn main() {
     env_logger::init();
 

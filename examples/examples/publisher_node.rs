@@ -1,6 +1,3 @@
-use env_logger;
-use rosrust;
-
 fn main() {
     env_logger::init();
 
@@ -20,8 +17,9 @@ fn main() {
     // Breaks when a shutdown signal is sent
     while rosrust::is_ok() {
         // Create string message
-        let mut msg = rosrust_msg::std_msgs::String::default();
-        msg.data = format!("hello world from rosrust {}", count);
+        let msg = rosrust_msg::std_msgs::String {
+            data: format!("hello world from rosrust {}", count),
+        };
 
         // Log event
         rosrust::ros_info!("Publishing: {}", msg.data);

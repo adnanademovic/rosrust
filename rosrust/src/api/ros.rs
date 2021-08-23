@@ -11,10 +11,10 @@ use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
-use crate::time::{Duration, Time};
 use crate::RawMessageDescription;
 use error_chain::bail;
 use log::error;
+use ros_message::{Duration, Time};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -54,9 +54,7 @@ impl Ros {
                 .into_iter()
                 .next()
                 .ok_or_else(|| ErrorKind::BadYamlData(dest.clone()))?;
-            let param = ros
-                .param(&src)
-                .ok_or_else(|| ErrorKind::CannotResolveName(src))?;
+            let param = ros.param(&src).ok_or(ErrorKind::CannotResolveName(src))?;
             param.set_raw(yaml_to_xmlrpc(data)?)?;
         }
 

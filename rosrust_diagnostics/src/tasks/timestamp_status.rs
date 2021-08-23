@@ -1,3 +1,5 @@
+#![allow(clippy::float_cmp)]
+
 use crate::{Level, Status, Task};
 use rosrust::Time;
 use std::sync::Mutex;
@@ -211,7 +213,7 @@ impl Range {
     }
 }
 
-static FAILED_TO_LOCK: &'static str = "Failed to acquire lock";
+static FAILED_TO_LOCK: &str = "Failed to acquire lock";
 
 #[cfg(test)]
 mod tests {
@@ -227,8 +229,8 @@ mod tests {
         assert_eq!(ts.acceptable.min, low);
         assert_eq!(ts.acceptable.max, high);
         assert_eq!(ts.name, name);
-        assert_eq!(tracker.zero_seen, false);
-        assert_eq!(tracker.delta_valid, false);
+        assert!(!tracker.zero_seen);
+        assert!(!tracker.delta_valid);
         assert_eq!(tracker.counts.early, 0);
         assert_eq!(tracker.counts.late, 0);
         assert_eq!(tracker.counts.zero, 0);
@@ -262,8 +264,8 @@ mod tests {
         assert_eq!(ts.acceptable.min, low);
         assert_eq!(ts.acceptable.max, high);
         assert_eq!(ts.name, name);
-        assert_eq!(tracker.zero_seen, false);
-        assert_eq!(tracker.delta_valid, false);
+        assert!(!tracker.zero_seen);
+        assert!(!tracker.delta_valid);
         assert_eq!(tracker.counts.early, 0);
         assert_eq!(tracker.counts.late, 0);
         assert_eq!(tracker.counts.zero, 0);
@@ -360,9 +362,10 @@ mod tests {
 
     #[test]
     fn tracker_defaults_to_zeros_and_false() {
+        #[allow(clippy::field_reassign_with_default)]
         let tracker = Tracker::default();
-        assert_eq!(tracker.zero_seen, false);
-        assert_eq!(tracker.delta_valid, false);
+        assert!(!tracker.zero_seen);
+        assert!(!tracker.delta_valid);
         assert_eq!(tracker.counts.early, 0);
         assert_eq!(tracker.counts.late, 0);
         assert_eq!(tracker.counts.zero, 0);
@@ -372,6 +375,7 @@ mod tests {
 
     #[test]
     fn tracker_clearing_reading_only_maintains_counts() {
+        #![allow(clippy::field_reassign_with_default)]
         let mut tracker = Tracker::default();
         tracker.zero_seen = true;
         tracker.delta_valid = true;
@@ -383,8 +387,8 @@ mod tests {
 
         tracker.clear_last_reading();
 
-        assert_eq!(tracker.zero_seen, false);
-        assert_eq!(tracker.delta_valid, false);
+        assert!(!tracker.zero_seen);
+        assert!(!tracker.delta_valid);
         assert_eq!(tracker.counts.early, 5);
         assert_eq!(tracker.counts.late, 6);
         assert_eq!(tracker.counts.zero, 7);

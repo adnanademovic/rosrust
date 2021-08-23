@@ -56,7 +56,7 @@ mod tests {
     use super::path::Path;
     use super::*;
 
-    static FAILED_TO_RESOLVE: &'static str = "Failed to resolve";
+    static FAILED_TO_RESOLVE: &str = "Failed to resolve";
 
     #[test]
     fn constructs_from_legal_path() {

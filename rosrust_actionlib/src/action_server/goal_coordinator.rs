@@ -118,7 +118,7 @@ impl<T: Action> GoalCoordinator<T> {
                     .values()
                     .filter(|tracker| {
                         let tracker = tracker.lock().expect(MUTEX_LOCK_FAIL);
-                        goal_filter.matches(&tracker.goal_id())
+                        goal_filter.matches(tracker.goal_id())
                     })
                     .cloned()
                     .collect::<Vec<_>>()
@@ -184,7 +184,7 @@ struct GoalFilter {
 
 impl From<GoalID> for GoalFilter {
     fn from(goal_id: GoalID) -> Self {
-        let id = if goal_id.id == "" {
+        let id = if goal_id.id.is_empty() {
             None
         } else {
             Some(goal_id.id)

@@ -26,7 +26,7 @@ fn main() {
             if !message.ends_with("Action") {
                 continue;
             }
-            let action = match message.rsplitn(2, "Action").skip(1).next() {
+            let action = match message.rsplitn(2, "Action").nth(1) {
                 Some(v) => v,
                 None => continue,
             };

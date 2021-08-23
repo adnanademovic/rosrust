@@ -1,7 +1,6 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use crossbeam::channel::unbounded;
 use lazy_static::lazy_static;
-use rosrust;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time;
@@ -90,8 +89,8 @@ fn subscribe_publish_relayed(criterion: &mut Criterion) {
         );
     });
 
-    let inner_publisher = publisher.clone();
-    let receiver = rx.clone();
+    let inner_publisher = publisher;
+    let receiver = rx;
     // Limit to 8 due to the relay node's buffer limit being 10
     criterion.bench_function("send and receive 8 messages relayed", move |b| {
         let idx = AtomicUsize::new(0);
@@ -169,8 +168,8 @@ fn subscribe_publish_directly(criterion: &mut Criterion) {
         );
     });
 
-    let inner_publisher = publisher.clone();
-    let receiver = rx.clone();
+    let inner_publisher = publisher;
+    let receiver = rx;
     criterion.bench_function("send and receive 100 messages directly", move |b| {
         let idx = AtomicUsize::new(0);
 
@@ -193,6 +192,8 @@ fn subscribe_publish_directly(criterion: &mut Criterion) {
 }
 
 fn call_service(criterion: &mut Criterion) {
+    #![allow(clippy::needless_collect)]
+
     setup();
 
     let namespace = format!("/namespaceat{}", line!());
@@ -257,7 +258,7 @@ fn call_service(criterion: &mut Criterion) {
             assert_eq!(60, sum);
         });
     });
-    let client = client_original.clone();
+    let client = client_original;
     criterion.bench_function("call roscpp service 50 times in parallel", move |b| {
         b.iter(|| {
             let requests = (0..50)
@@ -271,7 +272,7 @@ fn call_service(criterion: &mut Criterion) {
 
     let client_original =
         rosrust::client::<msg::rospy_tutorials::AddTwoInts>(&service_name_py).unwrap();
-    let client = client_original.clone();
+    let client = client_original;
     criterion.bench_function("call rospy service once", move |b| {
         b.iter(|| {
             let sum = client
@@ -296,7 +297,7 @@ fn call_service(criterion: &mut Criterion) {
             assert_eq!(60, sum);
         });
     });
-    let client = client_original.clone();
+    let client = client_original;
     criterion.bench_function("call rosrust service 50 times in parallel", move |b| {
         b.iter(|| {
             let requests = (0..50)
@@ -321,7 +322,7 @@ fn call_service(criterion: &mut Criterion) {
             assert_eq!(60, sum);
         });
     });
-    let client = client_original.clone();
+    let client = client_original;
     criterion.bench_function(
         "call inline rosrust service 50 times in parallel",
         move |b| {

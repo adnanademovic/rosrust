@@ -1,8 +1,8 @@
-use crate::error::Result;
+use crate::error::{Result, ResultExt};
 use crate::helpers;
 use crate::helpers::MessageMap;
-use crate::message_path::MessagePath;
 use crate::output_layout;
+use ros_message::MessagePath;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
@@ -12,7 +12,6 @@ pub fn depend_on_messages(
     messages: &[&str],
 ) -> Result<output_layout::Layout> {
     let message_map = message_names_to_message_map(ignore_bad_messages, folders, messages)?;
-    validate_message_paths(&message_map)?;
     message_map_to_layout(&message_map)
 }
 
@@ -25,34 +24,25 @@ fn message_names_to_message_map(
         .iter()
         .copied()
         .map(TryInto::try_into)
-        .collect::<Result<Vec<MessagePath>>>()?;
+        .collect::<ros_message::Result<Vec<MessagePath>>>()
+        .chain_err(|| "Failed to parse all message paths")?;
     helpers::get_message_map(ignore_bad_messages, folders, &message_pairs)
-}
-
-fn validate_message_paths(message_map: &MessageMap) -> Result<()> {
-    for message in message_map.messages.keys() {
-        message.validate()?;
-    }
-    for message in message_map.services.keys() {
-        message.validate()?;
-    }
-    Ok(())
 }
 
 fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layout> {
     let mut output = output_layout::Layout {
         packages: Vec::new(),
     };
-    let hashes = helpers::calculate_md5(&message_map)?;
+    let hashes = helpers::calculate_md5(message_map)?;
     let packages = message_map
         .messages
         .keys()
-        .map(|message| message.package.clone())
+        .map(|message| message.package().into())
         .chain(
             message_map
                 .services
                 .keys()
-                .map(|message| message.package.clone()),
+                .map(|message| message.package().into()),
         )
         .collect::<HashSet<String>>();
     for package in packages {
@@ -64,11 +54,11 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
         let names = message_map
             .messages
             .iter()
-            .filter(|&(message, _value)| &message.package == &package)
-            .map(|(message, value)| (message.name.clone(), value.source.clone()))
+            .filter(|&(message, _value)| message.package() == package)
+            .map(|(message, value)| (message.name().into(), value.0.source().into()))
             .collect::<HashMap<String, String>>();
         for (name, source) in names {
-            let key = MessagePath::new(&package, name);
+            let key = MessagePath::new(&package, name).chain_err(|| "Invalid message path")?;
             let message = message_map
                 .messages
                 .get(&key)
@@ -80,7 +70,7 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
                 .clone();
             let msg_definition =
                 helpers::generate_message_definition(&message_map.messages, &message)?;
-            let msg_type = message.get_type();
+            let msg_type = message.full_name();
             package_data.messages.push(output_layout::Message {
                 message,
                 msg_definition,
@@ -92,12 +82,12 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
         let names = message_map
             .services
             .iter()
-            .filter(|&(message, _value)| &message.package == &package)
-            .map(|(message, value)| (message.name.clone(), value.source.clone()))
+            .filter(|&(message, _value)| message.package() == package)
+            .map(|(message, value)| (message.name().into(), value.source.clone()))
             .collect::<HashMap<String, String>>();
         for (name, source) in names {
             let md5sum = hashes
-                .get(&MessagePath::new(&package, &name))
+                .get(&MessagePath::new(&package, &name).chain_err(|| "Invalid message path")?)
                 .expect("Internal implementation contains mismatch in map keys")
                 .clone();
             let msg_type = format!("{}/{}", package, name);

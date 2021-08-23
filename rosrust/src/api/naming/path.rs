@@ -1,6 +1,5 @@
 use super::error::{Error, ErrorKind};
 use error_chain::bail;
-use std;
 use std::fmt;
 use std::ops::{Add, AddAssign};
 
@@ -131,11 +130,11 @@ fn process_name(name: &str) -> Result<String, Error> {
 }
 
 fn is_legal_first_char(v: u8) -> bool {
-    v >= b'A' && v <= b'Z'
-        || v >= b'a' && v <= b'z'
+    (b'A'..=b'Z').contains(&v)
+        || (b'a'..=b'z').contains(&v)
         || v == b'/'
         || v == b'~'
-        || v >= b'0' && v <= b'9'
+        || (b'0'..=b'9').contains(&v)
 }
 
 fn is_legal_char(v: u8) -> bool {
@@ -146,7 +145,7 @@ fn is_legal_char(v: u8) -> bool {
 mod tests {
     use super::*;
 
-    static FAILED_TO_HANDLE: &'static str = "Failed to handle";
+    static FAILED_TO_HANDLE: &str = "Failed to handle";
 
     #[test]
     fn names_are_legal() {
@@ -257,14 +256,14 @@ mod tests {
 
     #[test]
     fn addition_works() {
-        let foo = "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE);
-        let bar = "/B4r/x".parse::<Buffer>().expect(FAILED_TO_HANDLE);
-        let baz = "/bA_z".parse::<Buffer>().expect(FAILED_TO_HANDLE);
-        assert_eq!("/foo/B4r/x", format!("{}", foo.slice() + bar.slice()));
+        let part1 = "/foo".parse::<Buffer>().expect(FAILED_TO_HANDLE);
+        let part2 = "/B4r/x".parse::<Buffer>().expect(FAILED_TO_HANDLE);
+        let part3 = "/bA_z".parse::<Buffer>().expect(FAILED_TO_HANDLE);
+        assert_eq!("/foo/B4r/x", format!("{}", part1.slice() + part2.slice()));
         assert_eq!(
             "/B4r/x/foo/foo",
-            format!("{}", bar.slice() + foo.slice() + foo.slice())
+            format!("{}", part2.slice() + part1.slice() + part1.slice())
         );
-        assert_eq!("/foo/B4r/x/bA_z", format!("{}", foo + bar + baz));
+        assert_eq!("/foo/B4r/x/bA_z", format!("{}", part1 + part2 + part3));
     }
 }

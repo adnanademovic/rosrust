@@ -11,12 +11,15 @@ version = "0.9.5"
 [dependencies]
 error-chain = "0.12.4"
 lazy_static = "1.4.0"
-regex = "1.5.4"
 quote = "1.0.9"
 syn = "1.0.74"
 proc-macro2 = "1.0.28"
 md-5 = "0.9.1"
 hex = "0.4.3"
+
+[dependencies.ros_message]
+path = "../ros_message"
+version = "0.1.0"
 
 [lib]
 proc-macro = true
