@@ -98,6 +98,52 @@ fn get_message_bytes() -> Vec<u8> {
 }
 
 #[test]
+fn message_structure_matches_compiled_message() {
+    let dynamic_msg = get_message_structure();
+    let static_msg = msg::geometry_msgs::PoseArray {
+        header: msg::std_msgs::Header {
+            frame_id: "abc".into(),
+            seq: 22,
+            stamp: Time { sec: 123, nsec: 0 },
+        },
+        poses: vec![
+            msg::geometry_msgs::Pose {
+                position: msg::geometry_msgs::Point {
+                    x: 1.0,
+                    y: 2.0,
+                    z: 3.0,
+                },
+                orientation: msg::geometry_msgs::Quaternion {
+                    x: 4.0,
+                    y: 5.0,
+                    z: 6.0,
+                    w: 7.0,
+                },
+            },
+            msg::geometry_msgs::Pose {
+                position: msg::geometry_msgs::Point {
+                    x: 8.0,
+                    y: 9.0,
+                    z: 10.0,
+                },
+                orientation: msg::geometry_msgs::Quaternion {
+                    x: 11.0,
+                    y: 12.0,
+                    z: 13.0,
+                    w: 14.0,
+                },
+            },
+        ],
+    };
+    assert_eq!(
+        std::convert::TryInto::<msg::geometry_msgs::PoseArray>::try_into(dynamic_msg.clone())
+            .unwrap(),
+        static_msg
+    );
+    assert_eq!(Into::<MessageValue>::into(static_msg), dynamic_msg);
+}
+
+#[test]
 fn encodes_structures() {
     let dynamic_msg = make_message();
     let mut cursor = std::io::Cursor::new(vec![]);
