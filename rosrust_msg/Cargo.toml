@@ -13,4 +13,4 @@ build = "build.rs"
 
 [dependencies.rosrust]
 path = "../rosrust"
-version = "0.9.7"
+version = "0.9.8"
