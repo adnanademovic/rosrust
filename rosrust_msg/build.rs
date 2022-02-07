@@ -51,6 +51,12 @@ fn main() {
         .collect::<Vec<String>>()
         .join(",");
 
+    // Panic on an empty message list: there is no use for this, and it avoids
+    // a cryptic error in the proc macro invocation later on
+    if package_names.is_empty() {
+        panic!("empty package_names: are any of CMAKE_PREFIX_PATH and ROSRUST_MSG_PATH defined? is /opt/ros/<VERSION>/env sourced?");
+    }
+
     let file_content = format!(
         r#"
 rosrust::rosmsg_include!({},IGNORE_BAD);
