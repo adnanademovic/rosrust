@@ -4,7 +4,6 @@ use quote::quote;
 use std::env;
 use std::path::Path;
 
-
 pub fn depend_on_messages(
     messages: &[&str],
     internal: bool,
