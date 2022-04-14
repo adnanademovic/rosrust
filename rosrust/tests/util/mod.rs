@@ -70,6 +70,7 @@ pub enum Feature {
     Log,
     Parameters,
     Benchmarks,
+    ClientReconnection,
 }
 
 impl Feature {
@@ -82,6 +83,7 @@ impl Feature {
             Feature::Log => 500,
             Feature::Parameters => 600,
             Feature::Benchmarks => 700,
+            Feature::ClientReconnection => 800,
         }
     }
 }
