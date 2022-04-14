@@ -3,6 +3,7 @@ use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
 use crate::api::Master;
 use crate::rosmsg::RosMsg;
+use crate::util::FAILED_TO_LOCK;
 use byteorder::{LittleEndian, ReadBytesExt};
 use error_chain::bail;
 use log::error;
@@ -11,7 +12,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub struct ClientResponse<T> {
@@ -40,17 +41,39 @@ struct ClientInfo {
     service: String,
 }
 
+struct UriCache {
+    master: std::sync::Arc<Master>,
+    data: Mutex<Option<String>>,
+    service: String,
+}
+
+impl UriCache {
+    fn get(&self) -> Result<String> {
+        if let Some(uri) = Option::<String>::clone(&self.data.lock().expect(FAILED_TO_LOCK)) {
+            return Ok(uri.clone());
+        }
+        let new_uri = self
+            .master
+            .lookup_service(&self.service)
+            .chain_err(|| ErrorKind::ServiceConnectionFail(self.service.clone()))?;
+        *self.data.lock().expect(FAILED_TO_LOCK) = Some(new_uri.clone());
+        Ok(new_uri)
+    }
+
+    fn clear(&self) {
+        *self.data.lock().expect(FAILED_TO_LOCK) = None;
+    }
+}
+
 #[derive(Clone)]
 pub struct Client<T: ServicePair> {
-    master: std::sync::Arc<Master>,
     info: std::sync::Arc<ClientInfo>,
+    uri_cache: std::sync::Arc<UriCache>,
     phantom: std::marker::PhantomData<T>,
 }
 
-fn connect_to_tcp_attempt(master: &Master, service: &str) -> Result<TcpStream> {
-    let uri = master
-        .lookup_service(&service)
-        .chain_err(|| ErrorKind::ServiceConnectionFail(service.into()))?;
+fn connect_to_tcp_attempt(uri_cache: &UriCache) -> Result<TcpStream> {
+    let uri = uri_cache.get()?;
     let trimmed_uri = uri.trim_start_matches("rosrpc://");
     let stream = TcpStream::connect(trimmed_uri)?;
     let socket: Socket = stream.into();
@@ -60,8 +83,7 @@ fn connect_to_tcp_attempt(master: &Master, service: &str) -> Result<TcpStream> {
 }
 
 fn connect_to_tcp_with_multiple_attempts(
-    master: &Master,
-    name: &str,
+    uri_cache: &UriCache,
     attempts: usize,
 ) -> Result<TcpStream> {
     let mut err = io::Error::new(
@@ -71,13 +93,14 @@ fn connect_to_tcp_with_multiple_attempts(
     .into();
     let mut repeat_delay_ms = 1;
     for _ in 0..attempts {
-        let stream_result = connect_to_tcp_attempt(master, name);
+        let stream_result = connect_to_tcp_attempt(&uri_cache);
         match stream_result {
             Ok(stream) => {
                 return Ok(stream);
             }
             Err(error) => err = error,
         }
+        uri_cache.clear();
         std::thread::sleep(std::time::Duration::from_millis(repeat_delay_ms));
         repeat_delay_ms *= 2;
     }
@@ -87,9 +110,13 @@ fn connect_to_tcp_with_multiple_attempts(
 impl<T: ServicePair> Client<T> {
     pub fn new(master: Arc<Master>, caller_id: &str, service: &str) -> Client<T> {
         Client {
-            master,
             info: std::sync::Arc::new(ClientInfo {
                 caller_id: String::from(caller_id),
+                service: String::from(service),
+            }),
+            uri_cache: std::sync::Arc::new(UriCache {
+                master,
+                data: Mutex::new(None),
                 service: String::from(service),
             }),
             phantom: std::marker::PhantomData,
@@ -99,7 +126,7 @@ impl<T: ServicePair> Client<T> {
     pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
         Self::request_body(
             args,
-            Arc::clone(&self.master),
+            &self.uri_cache,
             &self.info.caller_id,
             &self.info.service,
         )
@@ -107,21 +134,21 @@ impl<T: ServicePair> Client<T> {
 
     pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
         let info = Arc::clone(&self.info);
-        let master = Arc::clone(&self.master);
+        let uri_cache = Arc::clone(&self.uri_cache);
         ClientResponse {
             handle: thread::spawn(move || {
-                Self::request_body(&args, master, &info.caller_id, &info.service)
+                Self::request_body(&args, &uri_cache, &info.caller_id, &info.service)
             }),
         }
     }
 
     fn request_body(
         args: &T::Request,
-        master: Arc<Master>,
+        uri_cache: &UriCache,
         caller_id: &str,
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
-        let mut stream = connect_to_tcp_with_multiple_attempts(master.as_ref(), service, 15)
+        let mut stream = connect_to_tcp_with_multiple_attempts(uri_cache, 15)
             .chain_err(|| ErrorKind::ServiceConnectionFail(service.into()))?;
 
         // Service request starts by exchanging connection headers
