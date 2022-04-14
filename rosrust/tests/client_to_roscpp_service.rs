@@ -1,5 +1,4 @@
 use std::process::Command;
-use std::time;
 
 mod util;
 
@@ -26,7 +25,6 @@ fn client_to_roscpp_service() {
     );
 
     rosrust::init("add_two_ints_client");
-    rosrust::wait_for_service("add_two_ints", Some(time::Duration::from_secs(10))).unwrap();
     let client = rosrust::client::<msg::roscpp_tutorials::TwoInts>("add_two_ints").unwrap();
 
     test_request(&client, 0, 10);

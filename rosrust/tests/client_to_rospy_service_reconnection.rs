@@ -1,6 +1,6 @@
 use ros_message::Duration;
+use std::mem;
 use std::process::Command;
-use std::{mem, time};
 
 mod util;
 
@@ -26,9 +26,8 @@ fn client_to_rospy_service_reconnection() {
             .arg("rospy_tutorials")
             .arg("add_two_ints_server"),
     );
-    rosrust::wait_for_service("add_two_ints", Some(time::Duration::from_secs(10))).unwrap();
-    let client = rosrust::client::<msg::rospy_tutorials::AddTwoInts>("add_two_ints").unwrap();
 
+    let client = rosrust::client::<msg::rospy_tutorials::AddTwoInts>("add_two_ints").unwrap();
     test_request(&client, 0, 10);
     test_request(&client, 10, 0);
     test_request(&client, 100, -200);
