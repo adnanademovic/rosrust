@@ -1,6 +1,7 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
+use crate::api::Master;
 use crate::rosmsg::RosMsg;
 use byteorder::{LittleEndian, ReadBytesExt};
 use error_chain::bail;
@@ -36,29 +37,41 @@ impl<T: Send + 'static> ClientResponse<T> {
 
 struct ClientInfo {
     caller_id: String,
-    uri: String,
     service: String,
 }
 
 #[derive(Clone)]
 pub struct Client<T: ServicePair> {
+    master: std::sync::Arc<Master>,
     info: std::sync::Arc<ClientInfo>,
     phantom: std::marker::PhantomData<T>,
 }
 
-fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> io::Result<TcpStream> {
+fn connect_to_tcp_attempt(master: &Master, service: &str) -> Result<TcpStream> {
+    let uri = master
+        .lookup_service(&service)
+        .chain_err(|| ErrorKind::ServiceConnectionFail(service.into()))?;
+    let trimmed_uri = uri.trim_start_matches("rosrpc://");
+    let stream = TcpStream::connect(trimmed_uri)?;
+    let socket: Socket = stream.into();
+    socket.set_linger(None)?;
+    let stream: TcpStream = socket.into();
+    Ok(stream)
+}
+
+fn connect_to_tcp_with_multiple_attempts(
+    master: &Master,
+    name: &str,
+    attempts: usize,
+) -> Result<TcpStream> {
     let mut err = io::Error::new(
         io::ErrorKind::Other,
         "Tried to connect via TCP with 0 connection attempts",
-    );
+    )
+    .into();
     let mut repeat_delay_ms = 1;
     for _ in 0..attempts {
-        let stream_result = TcpStream::connect(uri).and_then(|stream| {
-            let socket: Socket = stream.into();
-            socket.set_linger(None)?;
-            let stream: TcpStream = socket.into();
-            Ok(stream)
-        });
+        let stream_result = connect_to_tcp_attempt(master, name);
         match stream_result {
             Ok(stream) => {
                 return Ok(stream);
@@ -72,11 +85,11 @@ fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> io::Resu
 }
 
 impl<T: ServicePair> Client<T> {
-    pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
+    pub fn new(master: Arc<Master>, caller_id: &str, service: &str) -> Client<T> {
         Client {
+            master,
             info: std::sync::Arc::new(ClientInfo {
                 caller_id: String::from(caller_id),
-                uri: String::from(uri),
                 service: String::from(service),
             }),
             phantom: std::marker::PhantomData,
@@ -86,7 +99,7 @@ impl<T: ServicePair> Client<T> {
     pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
         Self::request_body(
             args,
-            &self.info.uri,
+            Arc::clone(&self.master),
             &self.info.caller_id,
             &self.info.service,
         )
@@ -94,22 +107,22 @@ impl<T: ServicePair> Client<T> {
 
     pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
         let info = Arc::clone(&self.info);
+        let master = Arc::clone(&self.master);
         ClientResponse {
             handle: thread::spawn(move || {
-                Self::request_body(&args, &info.uri, &info.caller_id, &info.service)
+                Self::request_body(&args, master, &info.caller_id, &info.service)
             }),
         }
     }
 
     fn request_body(
         args: &T::Request,
-        uri: &str,
+        master: Arc<Master>,
         caller_id: &str,
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
-        let trimmed_uri = uri.trim_start_matches("rosrpc://");
-        let mut stream = connect_to_tcp_with_multiple_attempts(trimmed_uri, 15)
-            .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
+        let mut stream = connect_to_tcp_with_multiple_attempts(master.as_ref(), service, 15)
+            .chain_err(|| ErrorKind::ServiceConnectionFail(service.into()))?;
 
         // Service request starts by exchanging connection headers
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;

@@ -206,8 +206,7 @@ impl Ros {
 
     pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>> {
         let name = self.resolver.translate(service)?;
-        let uri = self.master.lookup_service(&name)?;
-        Ok(Client::new(&self.name, &uri, &name))
+        Ok(Client::new(Arc::clone(&self.master), &self.name, &name))
     }
 
     pub fn wait_for_service(

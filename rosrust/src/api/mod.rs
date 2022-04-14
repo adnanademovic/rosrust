@@ -1,5 +1,5 @@
 pub use self::clock::{Clock, Delay, Rate};
-pub use self::master::{SystemState, Topic};
+pub use self::master::{Master, SystemState, Topic};
 pub use self::ros::{Parameter, Ros};
 use std::sync::atomic::{AtomicBool, Ordering};
 
