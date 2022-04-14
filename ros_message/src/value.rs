@@ -528,7 +528,7 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl<T: Into<Value>, const L: usize> From<[T; L]> for Value {
     fn from(v: [T; L]) -> Self {
-        Self::Array(std::array::IntoIter::new(v).map(Into::into).collect())
+        Self::Array(IntoIterator::into_iter(v).map(Into::into).collect())
     }
 }
 
