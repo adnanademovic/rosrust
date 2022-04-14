@@ -6,11 +6,11 @@ license = "MIT"
 name = "rosrust_msg"
 readme = "../README.md"
 repository = "https://github.com/adnanademovic/rosrust"
-version = "0.1.4"
+version = "0.1.5"
 build = "build.rs"
 
 [dependencies]
 
 [dependencies.rosrust]
 path = "../rosrust"
-version = "0.9.8"
+version = "0.9.9"
