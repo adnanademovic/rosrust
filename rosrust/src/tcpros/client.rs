@@ -11,7 +11,7 @@ use socket2::Socket;
 use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -72,11 +72,36 @@ pub struct Client<T: ServicePair> {
     phantom: std::marker::PhantomData<T>,
 }
 
-fn connect_to_tcp_attempt(uri_cache: &UriCache) -> Result<TcpStream> {
+fn connect_to_tcp_attempt(
+    uri_cache: &UriCache,
+    timeout: Option<std::time::Duration>,
+) -> Result<TcpStream> {
     let uri = uri_cache.get()?;
     let trimmed_uri = uri.trim_start_matches("rosrpc://");
-    let stream = TcpStream::connect(trimmed_uri)?;
+    let stream = match timeout {
+        Some(timeout) => {
+            let invalid_addr_error = || {
+                ErrorKind::Io(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Invalid socket address",
+                ))
+            };
+            let socket_addr = trimmed_uri
+                .to_socket_addrs()
+                .chain_err(invalid_addr_error)?
+                .into_iter()
+                .next()
+                .ok_or_else(invalid_addr_error)?;
+            TcpStream::connect_timeout(&socket_addr, timeout)?
+        }
+        None => TcpStream::connect(trimmed_uri)?,
+    };
     let socket: Socket = stream.into();
+    if let Some(timeout) = timeout {
+        // In case defaults are not None, only apply if a timeout is passed
+        socket.set_read_timeout(Some(timeout))?;
+        socket.set_write_timeout(Some(timeout))?;
+    }
     socket.set_linger(None)?;
     let stream: TcpStream = socket.into();
     Ok(stream)
@@ -93,7 +118,7 @@ fn connect_to_tcp_with_multiple_attempts(
     .into();
     let mut repeat_delay_ms = 1;
     for _ in 0..attempts {
-        let stream_result = connect_to_tcp_attempt(&uri_cache);
+        let stream_result = connect_to_tcp_attempt(&uri_cache, None);
         match stream_result {
             Ok(stream) => {
                 return Ok(stream);
@@ -121,6 +146,20 @@ impl<T: ServicePair> Client<T> {
             }),
             phantom: std::marker::PhantomData,
         }
+    }
+
+    fn probe_inner(&self, timeout: std::time::Duration) -> Result<()> {
+        let mut stream = connect_to_tcp_attempt(&self.uri_cache, Some(timeout))?;
+        exchange_probe_headers(&mut stream, &self.info.caller_id, &self.info.service)?;
+        Ok(())
+    }
+
+    pub fn probe(&self, timeout: std::time::Duration) -> Result<()> {
+        let probe_result = self.probe_inner(timeout);
+        if probe_result.is_err() {
+            self.uri_cache.clear();
+        }
+        probe_result
     }
 
     pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
@@ -218,9 +257,21 @@ where
     Ok(())
 }
 
-fn read_response<T, U>(mut stream: &mut U) -> Result<()>
+fn write_probe_request<U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
 where
-    T: ServicePair,
+    U: std::io::Write,
+{
+    let mut fields = HashMap::<String, String>::new();
+    fields.insert(String::from("probe"), String::from("1"));
+    fields.insert(String::from("callerid"), String::from(caller_id));
+    fields.insert(String::from("service"), String::from(service));
+    fields.insert(String::from("md5sum"), String::from("*"));
+    encode(&mut stream, &fields)?;
+    Ok(())
+}
+
+fn read_response<U>(mut stream: &mut U) -> Result<()>
+where
     U: std::io::Read,
 {
     let fields = decode(&mut stream)?;
@@ -236,5 +287,13 @@ where
     U: std::io::Write + std::io::Read,
 {
     write_request::<T, U>(stream, caller_id, service)?;
-    read_response::<T, U>(stream)
+    read_response::<U>(stream)
+}
+
+fn exchange_probe_headers<U>(stream: &mut U, caller_id: &str, service: &str) -> Result<()>
+where
+    U: std::io::Write + std::io::Read,
+{
+    write_probe_request::<U>(stream, caller_id, service)?;
+    read_response::<U>(stream)
 }
