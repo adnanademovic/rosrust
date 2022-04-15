@@ -71,6 +71,7 @@ pub enum Feature {
     Parameters,
     Benchmarks,
     ClientReconnection,
+    WaitForService,
 }
 
 impl Feature {
@@ -84,6 +85,7 @@ impl Feature {
             Feature::Parameters => 600,
             Feature::Benchmarks => 700,
             Feature::ClientReconnection => 800,
+            Feature::WaitForService => 900,
         }
     }
 }
