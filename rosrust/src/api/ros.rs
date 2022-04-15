@@ -1,6 +1,6 @@
 use super::super::rosxmlrpc::Response;
 use super::clock::{Clock, Rate, RealClock, SimulatedClock};
-use super::error::{ErrorKind, Result, ResultExt};
+use super::error::{Error, ErrorKind, Result, ResultExt};
 use super::master::{self, Master, Topic};
 use super::naming::{self, Resolver};
 use super::raii::{Publisher, Service, Subscriber};
@@ -11,7 +11,7 @@ use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
-use crate::RawMessageDescription;
+use crate::{RawMessage, RawMessageDescription};
 use error_chain::bail;
 use log::error;
 use ros_message::{Duration, Time};
@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread::sleep;
+use std::time::Instant;
 use xml_rpc;
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -206,8 +207,7 @@ impl Ros {
 
     pub fn client<T: ServicePair>(&self, service: &str) -> Result<Client<T>> {
         let name = self.resolver.translate(service)?;
-        let uri = self.master.lookup_service(&name)?;
-        Ok(Client::new(&self.name, &uri, &name))
+        Ok(Client::new(Arc::clone(&self.master), &self.name, &name))
     }
 
     pub fn wait_for_service(
@@ -215,28 +215,22 @@ impl Ros {
         service: &str,
         timeout: Option<std::time::Duration>,
     ) -> Result<()> {
-        use crate::rosxmlrpc::ResponseError;
+        let timeout = timeout.map(|v| std::time::Instant::now() + v);
+        let client = self.client::<RawMessage>(service)?;
 
-        let name = self.resolver.translate(service)?;
-        let now = std::time::Instant::now();
         loop {
-            let e = match self.master.lookup_service(&name) {
-                Ok(_) => return Ok(()),
-                Err(e) => e,
-            };
-            match e {
-                ResponseError::Client(ref m) if m == "no provider" => {
-                    if let Some(ref timeout) = timeout {
-                        if now.elapsed() > *timeout {
-                            return Err(ErrorKind::TimeoutError.into());
-                        }
-                    }
-                    sleep(std::time::Duration::from_millis(100));
-                    continue;
-                }
-                _ => {}
+            let iteration_limit = std::time::Duration::from_secs(10);
+            let leftover_timeout = match timeout {
+                Some(t) => t
+                    .checked_duration_since(Instant::now())
+                    .ok_or_else(|| Error::from(ErrorKind::TimeoutError))?,
+                None => iteration_limit,
             }
-            return Err(e.into());
+            .min(iteration_limit);
+            if client.probe(leftover_timeout).is_ok() {
+                return Ok(());
+            }
+            sleep(std::time::Duration::from_millis(100));
         }
     }
 

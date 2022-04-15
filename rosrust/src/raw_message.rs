@@ -1,4 +1,4 @@
-use crate::{Message, RosMsg};
+use crate::{Message, RosMsg, ServicePair};
 use std::io;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -45,4 +45,9 @@ impl RosMsg for RawMessage {
         r.read_to_end(&mut data)?;
         Ok(Self(data))
     }
+}
+
+impl ServicePair for RawMessage {
+    type Request = RawMessage;
+    type Response = RawMessage;
 }

@@ -1,7 +1,9 @@
 use super::error::{ErrorKind, Result, ResultExt};
 use super::header::{decode, encode};
 use super::{ServicePair, ServiceResult};
+use crate::api::Master;
 use crate::rosmsg::RosMsg;
+use crate::util::FAILED_TO_LOCK;
 use byteorder::{LittleEndian, ReadBytesExt};
 use error_chain::bail;
 use log::error;
@@ -9,8 +11,8 @@ use socket2::Socket;
 use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};
-use std::net::TcpStream;
-use std::sync::Arc;
+use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub struct ClientResponse<T> {
@@ -36,35 +38,94 @@ impl<T: Send + 'static> ClientResponse<T> {
 
 struct ClientInfo {
     caller_id: String,
-    uri: String,
     service: String,
+}
+
+struct UriCache {
+    master: std::sync::Arc<Master>,
+    data: Mutex<Option<String>>,
+    service: String,
+}
+
+impl UriCache {
+    fn get(&self) -> Result<String> {
+        if let Some(uri) = Option::<String>::clone(&self.data.lock().expect(FAILED_TO_LOCK)) {
+            return Ok(uri.clone());
+        }
+        let new_uri = self
+            .master
+            .lookup_service(&self.service)
+            .chain_err(|| ErrorKind::ServiceConnectionFail(self.service.clone()))?;
+        *self.data.lock().expect(FAILED_TO_LOCK) = Some(new_uri.clone());
+        Ok(new_uri)
+    }
+
+    fn clear(&self) {
+        *self.data.lock().expect(FAILED_TO_LOCK) = None;
+    }
 }
 
 #[derive(Clone)]
 pub struct Client<T: ServicePair> {
     info: std::sync::Arc<ClientInfo>,
+    uri_cache: std::sync::Arc<UriCache>,
     phantom: std::marker::PhantomData<T>,
 }
 
-fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> io::Result<TcpStream> {
+fn connect_to_tcp_attempt(
+    uri_cache: &UriCache,
+    timeout: Option<std::time::Duration>,
+) -> Result<TcpStream> {
+    let uri = uri_cache.get()?;
+    let trimmed_uri = uri.trim_start_matches("rosrpc://");
+    let stream = match timeout {
+        Some(timeout) => {
+            let invalid_addr_error = || {
+                ErrorKind::Io(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Invalid socket address",
+                ))
+            };
+            let socket_addr = trimmed_uri
+                .to_socket_addrs()
+                .chain_err(invalid_addr_error)?
+                .into_iter()
+                .next()
+                .ok_or_else(invalid_addr_error)?;
+            TcpStream::connect_timeout(&socket_addr, timeout)?
+        }
+        None => TcpStream::connect(trimmed_uri)?,
+    };
+    let socket: Socket = stream.into();
+    if let Some(timeout) = timeout {
+        // In case defaults are not None, only apply if a timeout is passed
+        socket.set_read_timeout(Some(timeout))?;
+        socket.set_write_timeout(Some(timeout))?;
+    }
+    socket.set_linger(None)?;
+    let stream: TcpStream = socket.into();
+    Ok(stream)
+}
+
+fn connect_to_tcp_with_multiple_attempts(
+    uri_cache: &UriCache,
+    attempts: usize,
+) -> Result<TcpStream> {
     let mut err = io::Error::new(
         io::ErrorKind::Other,
         "Tried to connect via TCP with 0 connection attempts",
-    );
+    )
+    .into();
     let mut repeat_delay_ms = 1;
     for _ in 0..attempts {
-        let stream_result = TcpStream::connect(uri).and_then(|stream| {
-            let socket: Socket = stream.into();
-            socket.set_linger(None)?;
-            let stream: TcpStream = socket.into();
-            Ok(stream)
-        });
+        let stream_result = connect_to_tcp_attempt(&uri_cache, None);
         match stream_result {
             Ok(stream) => {
                 return Ok(stream);
             }
             Err(error) => err = error,
         }
+        uri_cache.clear();
         std::thread::sleep(std::time::Duration::from_millis(repeat_delay_ms));
         repeat_delay_ms *= 2;
     }
@@ -72,21 +133,39 @@ fn connect_to_tcp_with_multiple_attempts(uri: &str, attempts: usize) -> io::Resu
 }
 
 impl<T: ServicePair> Client<T> {
-    pub fn new(caller_id: &str, uri: &str, service: &str) -> Client<T> {
+    pub fn new(master: Arc<Master>, caller_id: &str, service: &str) -> Client<T> {
         Client {
             info: std::sync::Arc::new(ClientInfo {
                 caller_id: String::from(caller_id),
-                uri: String::from(uri),
+                service: String::from(service),
+            }),
+            uri_cache: std::sync::Arc::new(UriCache {
+                master,
+                data: Mutex::new(None),
                 service: String::from(service),
             }),
             phantom: std::marker::PhantomData,
         }
     }
 
+    fn probe_inner(&self, timeout: std::time::Duration) -> Result<()> {
+        let mut stream = connect_to_tcp_attempt(&self.uri_cache, Some(timeout))?;
+        exchange_probe_headers(&mut stream, &self.info.caller_id, &self.info.service)?;
+        Ok(())
+    }
+
+    pub fn probe(&self, timeout: std::time::Duration) -> Result<()> {
+        let probe_result = self.probe_inner(timeout);
+        if probe_result.is_err() {
+            self.uri_cache.clear();
+        }
+        probe_result
+    }
+
     pub fn req(&self, args: &T::Request) -> Result<ServiceResult<T::Response>> {
         Self::request_body(
             args,
-            &self.info.uri,
+            &self.uri_cache,
             &self.info.caller_id,
             &self.info.service,
         )
@@ -94,22 +173,22 @@ impl<T: ServicePair> Client<T> {
 
     pub fn req_async(&self, args: T::Request) -> ClientResponse<T::Response> {
         let info = Arc::clone(&self.info);
+        let uri_cache = Arc::clone(&self.uri_cache);
         ClientResponse {
             handle: thread::spawn(move || {
-                Self::request_body(&args, &info.uri, &info.caller_id, &info.service)
+                Self::request_body(&args, &uri_cache, &info.caller_id, &info.service)
             }),
         }
     }
 
     fn request_body(
         args: &T::Request,
-        uri: &str,
+        uri_cache: &UriCache,
         caller_id: &str,
         service: &str,
     ) -> Result<ServiceResult<T::Response>> {
-        let trimmed_uri = uri.trim_start_matches("rosrpc://");
-        let mut stream = connect_to_tcp_with_multiple_attempts(trimmed_uri, 15)
-            .chain_err(|| ErrorKind::ServiceConnectionFail(service.into(), uri.into()))?;
+        let mut stream = connect_to_tcp_with_multiple_attempts(uri_cache, 15)
+            .chain_err(|| ErrorKind::ServiceConnectionFail(service.into()))?;
 
         // Service request starts by exchanging connection headers
         exchange_headers::<T, _>(&mut stream, caller_id, service)?;
@@ -178,9 +257,21 @@ where
     Ok(())
 }
 
-fn read_response<T, U>(mut stream: &mut U) -> Result<()>
+fn write_probe_request<U>(mut stream: &mut U, caller_id: &str, service: &str) -> Result<()>
 where
-    T: ServicePair,
+    U: std::io::Write,
+{
+    let mut fields = HashMap::<String, String>::new();
+    fields.insert(String::from("probe"), String::from("1"));
+    fields.insert(String::from("callerid"), String::from(caller_id));
+    fields.insert(String::from("service"), String::from(service));
+    fields.insert(String::from("md5sum"), String::from("*"));
+    encode(&mut stream, &fields)?;
+    Ok(())
+}
+
+fn read_response<U>(mut stream: &mut U) -> Result<()>
+where
     U: std::io::Read,
 {
     let fields = decode(&mut stream)?;
@@ -196,5 +287,13 @@ where
     U: std::io::Write + std::io::Read,
 {
     write_request::<T, U>(stream, caller_id, service)?;
-    read_response::<T, U>(stream)
+    read_response::<U>(stream)
+}
+
+fn exchange_probe_headers<U>(stream: &mut U, caller_id: &str, service: &str) -> Result<()>
+where
+    U: std::io::Write + std::io::Read,
+{
+    write_probe_request::<U>(stream, caller_id, service)?;
+    read_response::<U>(stream)
 }

@@ -3,9 +3,9 @@ error_chain::error_chain! {
         Io(::std::io::Error);
     }
     errors {
-        ServiceConnectionFail(service: String, uri: String) {
+        ServiceConnectionFail(service: String) {
             description("Failed to connect to service")
-            display("Failed to connect with client to service {} at uri {}", service, uri)
+            display("Failed to connect with client to service {}", service)
         }
         TopicConnectionFail(topic:String) {
             description("Failed to connect to topic")
