@@ -37,7 +37,7 @@ fn duration_works_with_negative() {
 }
 
 #[test]
-fn convert_works() {
+fn duration_from_std_works() {
     let std_duration = time::Duration::new(123, 456);
     let msg_duration = Duration::from(std_duration);
     assert_eq!(msg_duration.sec, 123);
@@ -47,6 +47,19 @@ fn convert_works() {
     let msg_duration2: Duration = std_duration2.into();
     assert_eq!(msg_duration2.sec, 9876);
     assert_eq!(msg_duration2.nsec, 54321);
+}
+
+#[test]
+fn duration_to_std_works() {
+    let msg_duration = Duration { sec: 123, nsec: 456 };
+    let std_duration = time::Duration::from(msg_duration);
+    assert_eq!(std_duration.as_secs(), 123);
+    assert_eq!(std_duration.subsec_nanos(), 456);
+
+    let msg_duration2 = Duration { sec: 9876, nsec: 54321 };
+    let std_duration2: time::Duration = msg_duration2.into();
+    assert_eq!(std_duration2.as_secs(), 9876);
+    assert_eq!(std_duration2.subsec_nanos(), 54321);
 }
 
 #[test]

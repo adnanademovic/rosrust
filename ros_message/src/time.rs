@@ -1,7 +1,8 @@
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use std::fmt;
+use std::convert::TryInto;
 use std::fmt::Formatter;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops;
 use std::time;
@@ -306,8 +307,24 @@ impl ops::Neg for Duration {
 impl From<time::Duration> for Duration {
     fn from(std_duration: time::Duration) -> Self {
         Duration {
-            sec: std_duration.as_secs() as i32,
+            sec: std_duration.as_secs().try_into().unwrap(),
             nsec: std_duration.subsec_nanos() as i32,
         }
+    }
+}
+
+impl From<Duration> for time::Duration {
+    fn from(other: Duration) -> Self {
+        let mut extra_sec = other.nsec / 1_000_000_000;
+        let mut nsec = other.nsec % 1_000_000_000;
+        if nsec < 0 {
+            extra_sec -= 1;
+            nsec += 1_000_000_000;
+        }
+
+        Self::new(
+            (other.sec + extra_sec).try_into().unwrap(),
+            nsec as u32,
+        )
     }
 }
