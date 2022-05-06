@@ -134,6 +134,25 @@ impl cmp::Ord for Time {
     }
 }
 
+impl From<time::SystemTime> for Time {
+    fn from(other: time::SystemTime) -> Self {
+        let epoch = time::SystemTime::UNIX_EPOCH;
+        let elapsed = other.duration_since(epoch).unwrap();
+        Self {
+            sec: elapsed.as_secs().try_into().unwrap(),
+            nsec: elapsed.subsec_nanos(),
+        }
+    }
+}
+
+impl From<Time> for time::SystemTime {
+    fn from(other: Time) -> Self {
+        let elapsed = time::Duration::new(other.sec.into(), other.nsec);
+        time::SystemTime::UNIX_EPOCH + elapsed
+
+    }
+}
+
 /// ROS representation of duration, with nanosecond precision
 #[derive(Copy, Clone, Default, Serialize, Deserialize, Debug, Eq)]
 pub struct Duration {

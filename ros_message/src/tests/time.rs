@@ -63,6 +63,32 @@ fn duration_to_std_works() {
 }
 
 #[test]
+fn time_from_std_works() {
+    let std_time = time::SystemTime::UNIX_EPOCH + time::Duration::new(123, 456);
+    let msg_time = Time::from(std_time);
+    assert_eq!(msg_time.sec, 123);
+    assert_eq!(msg_time.nsec, 456);
+
+    let std_time2 = time::SystemTime::UNIX_EPOCH + time::Duration::new(9876, 54321);
+    let msg_time2: Time = std_time2.into();
+    assert_eq!(msg_time2.sec, 9876);
+    assert_eq!(msg_time2.nsec, 54321);
+}
+
+#[test]
+fn time_to_std_works() {
+    let msg_time = Time { sec: 123, nsec: 456 };
+    let std_time = time::SystemTime::from(msg_time);
+    assert_eq!((std_time.duration_since(time::SystemTime::UNIX_EPOCH)).unwrap().as_secs(), 123);
+    assert_eq!((std_time.duration_since(time::SystemTime::UNIX_EPOCH)).unwrap().subsec_nanos(), 456);
+
+    let msg_time2 = Time { sec: 9876, nsec: 54321 };
+    let std_time2: time::SystemTime = msg_time2.into();
+    assert_eq!((std_time2.duration_since(time::SystemTime::UNIX_EPOCH)).unwrap().as_secs(), 9876);
+    assert_eq!((std_time2.duration_since(time::SystemTime::UNIX_EPOCH)).unwrap().subsec_nanos(), 54321);
+}
+
+#[test]
 fn display_zero() {
     let time = Time::from_nanos(0);
     assert_eq!(format!("{}", time), "0");
