@@ -223,4 +223,19 @@ pub fn log(level: i8, msg: String, file: &str, line: u32) {
     ros!().log(level, msg, file, line)
 }
 
+#[inline]
+pub fn log_once(level: i8, msg: String, file: &str, line: u32) {
+    ros!().log_once(level, msg, file, line)
+}
+
+#[inline]
+pub fn log_throttle(period: f64, level: i8, msg: String, file: &str, line: u32) {
+    ros!().log_throttle(period, level, msg, file, line)
+}
+
+#[inline]
+pub fn log_throttle_identical(period: f64, level: i8, msg: String, file: &str, line: u32) {
+    ros!().log_throttle_identical(period, level, msg, file, line)
+}
+
 static UNINITIALIZED: &str = "ROS uninitialized. Please run ros::init(name) first!";
