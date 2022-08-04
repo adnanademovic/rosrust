@@ -13,6 +13,7 @@ use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::{RawMessage, RawMessageDescription};
 use error_chain::bail;
+use lazy_static::lazy_static;
 use log::error;
 use ros_message::{Duration, Time};
 use serde::{Deserialize, Serialize};
@@ -347,15 +348,30 @@ impl Ros {
     }
 
     fn log_to_terminal(&self, level: i8, msg: &str, file: &str, line: u32) {
+        lazy_static! {
+            static ref FORMAT_LINE: String = std::env::var("ROSCONSOLE_FORMAT")
+                .unwrap_or("[${severity}] [${time}]: ${message}".to_string());
+        }
+
         use colored::{Color, Colorize};
 
-        let format_string =
-            |prefix, color| format!("[{} @ {}:{}]: {}", prefix, file, line, msg).color(color);
+        let format_string = |prefix, color| {
+            // 'walltime', 'logger' and 'function' missing
+            FORMAT_LINE
+                .replace("${severity}", prefix)
+                .replace("${time}", &self.now().to_string())
+                .replace("${message}", msg)
+                .replace("${thread}", &format!("{:x}", thread_id::get()))
+                .replace("${file}", file)
+                .replace("${line}", &line.to_string())
+                .replace("${node}", &self.name)
+                .color(color)
+        };
 
         match level {
             Log::DEBUG => println!("{}", format_string("DEBUG", Color::White)),
-            Log::INFO => println!("{}", format_string("INFO", Color::White)),
-            Log::WARN => eprintln!("{}", format_string("WARN", Color::Yellow)),
+            Log::INFO => println!("{}", format_string(" INFO", Color::White)),
+            Log::WARN => eprintln!("{}", format_string(" WARN", Color::Yellow)),
             Log::ERROR => eprintln!("{}", format_string("ERROR", Color::Red)),
             Log::FATAL => eprintln!("{}", format_string("FATAL", Color::Red)),
             _ => {}
