@@ -357,15 +357,22 @@ impl Ros {
 
         let format_string = |prefix, color| {
             // 'walltime', 'logger' and 'function' missing
-            FORMAT_LINE
+
+            // Direct replace for common and cheap to replace items
+            let mut log_line = FORMAT_LINE
                 .replace("${severity}", prefix)
                 .replace("${time}", &self.now().to_string())
                 .replace("${message}", msg)
-                .replace("${thread}", &format!("{:x}", thread_id::get()))
-                .replace("${file}", file)
-                .replace("${line}", &line.to_string())
                 .replace("${node}", &self.name)
-                .color(color)
+                .replace("${file}", file);
+            if let Some(_index) = log_line.find("${thread}") {
+                log_line = log_line.replace("${thread}", &format!("{:x}", thread_id::get()));
+            }
+            if let Some(_index) = log_line.find("${line}") {
+                log_line = log_line.replace("${line}", &line.to_string());
+            }
+
+            log_line.color(color)
         };
 
         match level {
