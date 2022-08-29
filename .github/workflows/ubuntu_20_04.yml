@@ -3,6 +3,7 @@ name: Ubuntu 20.04 Noetic rosrust
 # on: [push]
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
