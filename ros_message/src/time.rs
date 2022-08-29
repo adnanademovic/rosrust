@@ -137,9 +137,13 @@ impl cmp::Ord for Time {
 impl From<time::SystemTime> for Time {
     fn from(other: time::SystemTime) -> Self {
         let epoch = time::SystemTime::UNIX_EPOCH;
-        let elapsed = other.duration_since(epoch).unwrap();
+        let elapsed = other.duration_since(epoch)
+            .expect("Dates before 1970 are not supported by the ROS time format");
+        let sec = elapsed.as_secs()
+            .try_into()
+            .expect("Dates after 2100 are not supported by the ROS time format");
         Self {
-            sec: elapsed.as_secs().try_into().unwrap(),
+            sec,
             nsec: elapsed.subsec_nanos(),
         }
     }
@@ -149,7 +153,6 @@ impl From<Time> for time::SystemTime {
     fn from(other: Time) -> Self {
         let elapsed = time::Duration::new(other.sec.into(), other.nsec);
         time::SystemTime::UNIX_EPOCH + elapsed
-
     }
 }
 
@@ -325,8 +328,11 @@ impl ops::Neg for Duration {
 
 impl From<time::Duration> for Duration {
     fn from(std_duration: time::Duration) -> Self {
+        let sec = std_duration.as_secs()
+            .try_into()
+            .expect("Durations longer than 68 years are not supported by the ROS time format");
         Duration {
-            sec: std_duration.as_secs().try_into().unwrap(),
+            sec,
             nsec: std_duration.subsec_nanos() as i32,
         }
     }
