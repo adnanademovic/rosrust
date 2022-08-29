@@ -38,28 +38,6 @@ impl Time {
         Self::default()
     }
 
-    /// Get the current time.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ros_message::Time;
-    /// # #[derive(Default)]
-    /// # struct Header {
-    /// #   stamp: Time,
-    /// # }
-    /// # #[derive(Default)]
-    /// # struct Message {
-    /// #   header: Header,
-    /// # }
-    /// # let mut message = Message::default();
-    /// message.header.stamp = Time::now();
-    /// ```
-    #[inline]
-    pub fn now() -> Self {
-        time::SystemTime::now().into()
-    }
-
     /// Creates a time of the given number of nanoseconds.
     ///
     /// # Examples
