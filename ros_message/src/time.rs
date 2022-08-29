@@ -98,15 +98,12 @@ impl Time {
 }
 
 fn display_nanos(nanos: &str, f: &mut Formatter<'_>) -> fmt::Result {
+    // Special display function to handle edge cases like
+    // Duration { sec: -1, nsec: 1 } and Duration { sec: -1, nsec: -1 }
     let split_point = nanos.len() - 9;
     let characters = nanos.chars();
     let (left, right) = characters.as_str().split_at(split_point);
-    let right = right.trim_end_matches('0');
-    if right.is_empty() {
-        write!(f, "{}", left)
-    } else {
-        write!(f, "{}.{}", left, right)
-    }
+    write!(f, "{}.{}", left, right)
 }
 
 impl fmt::Display for Time {
