@@ -11,6 +11,7 @@ pub use dynamic_msg::DynamicMsg;
 pub use ros_message::{Duration, MessageValue as MsgMessage, Time, Value as MsgValue};
 #[doc(hidden)]
 pub use rosrust_codegen::*;
+pub mod wall_time;
 
 pub mod api;
 mod dynamic_msg;
