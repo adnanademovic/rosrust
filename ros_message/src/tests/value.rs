@@ -55,7 +55,7 @@ fn display() {
 header: 
   frame_id: "abc"
   seq: 22
-  stamp: 123.1
+  stamp: 123.100000000
 poses: 
   - 
     orientation: 
