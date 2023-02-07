@@ -117,15 +117,15 @@ impl DynamicMsg {
                 FieldCase::Const(_) => continue,
                 FieldCase::Unit => {
                     let field_value = get_field(value, field.name())?;
-                    self.encode_field(field, field_value, w)?;
+                    self.encode_field(msg.path(), field, field_value, w)?;
                 }
                 FieldCase::Vector => {
                     let field_value = get_field(value, field.name())?;
-                    self.encode_field_array(field, field_value, None, w)?;
+                    self.encode_field_array(msg.path(), field, field_value, None, w)?;
                 }
                 FieldCase::Array(l) => {
                     let field_value = get_field(value, field.name())?;
-                    self.encode_field_array(field, field_value, Some(*l), w)?;
+                    self.encode_field_array(msg.path(), field, field_value, Some(*l), w)?;
                 }
             }
         }
@@ -134,6 +134,7 @@ impl DynamicMsg {
 
     fn encode_field(
         &self,
+        parent: &MessagePath,
         field: &FieldInfo,
         value: &Value,
         w: &mut impl std::io::Write,
@@ -154,7 +155,7 @@ impl DynamicMsg {
             (DataType::Time, Value::Time(time)) => time.encode(w),
             (DataType::Duration, Value::Duration(duration)) => duration.encode(w),
             (DataType::LocalMessage(name), Value::Message(v)) => {
-                let path = self.msg.path().peer(name);
+                let path = parent.peer(name);
                 let dependency = self.get_dependency(&path)?;
                 self.encode_message(dependency, v, w)
             }
@@ -171,6 +172,7 @@ impl DynamicMsg {
 
     fn encode_field_array(
         &self,
+        parent: &MessagePath,
         field: &FieldInfo,
         value: &Value,
         array_length: Option<usize>,
@@ -213,7 +215,7 @@ impl DynamicMsg {
             }
         }
         for value in value {
-            self.encode_field(field, value, w.by_ref())?;
+            self.encode_field(parent, field, value, w.by_ref())?;
         }
         Ok(())
     }
@@ -223,16 +225,21 @@ impl DynamicMsg {
         for field in msg.fields() {
             let value = match field.case() {
                 FieldCase::Const(_) => continue,
-                FieldCase::Unit => self.decode_field(field, r)?,
-                FieldCase::Vector => self.decode_field_array(field, None, r)?,
-                FieldCase::Array(l) => self.decode_field_array(field, Some(*l), r)?,
+                FieldCase::Unit => self.decode_field(msg.path(), field, r)?,
+                FieldCase::Vector => self.decode_field_array(msg.path(), field, None, r)?,
+                FieldCase::Array(l) => self.decode_field_array(msg.path(), field, Some(*l), r)?,
             };
             output.insert(field.name().into(), value);
         }
         Ok(output)
     }
 
-    fn decode_field(&self, field: &FieldInfo, r: &mut impl io::Read) -> io::Result<Value> {
+    fn decode_field(
+        &self,
+        parent: &MessagePath,
+        field: &FieldInfo,
+        r: &mut impl io::Read,
+    ) -> io::Result<Value> {
         Ok(match field.datatype() {
             DataType::Bool => bool::decode(r)?.into(),
             DataType::I8(_) => i8::decode(r)?.into(),
@@ -249,7 +256,7 @@ impl DynamicMsg {
             DataType::Time => Time::decode(r)?.into(),
             DataType::Duration => Duration::decode(r)?.into(),
             DataType::LocalMessage(name) => {
-                let path = self.msg.path().peer(name);
+                let path = parent.peer(name);
                 let dependency = self.get_dependency(&path)?;
                 self.decode_message(dependency, r)?.into()
             }
@@ -262,6 +269,7 @@ impl DynamicMsg {
 
     fn decode_field_array(
         &self,
+        parent: &MessagePath,
         field: &FieldInfo,
         array_length: Option<usize>,
         r: &mut impl io::Read,
@@ -272,7 +280,7 @@ impl DynamicMsg {
         };
         // TODO: optimize by checking data type only once
         (0..array_length)
-            .map(|_| self.decode_field(field, r))
+            .map(|_| self.decode_field(parent, field, r))
             .collect()
     }
 }
