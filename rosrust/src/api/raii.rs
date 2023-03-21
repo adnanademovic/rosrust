@@ -4,9 +4,8 @@ use super::master::Master;
 use super::slave::Slave;
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Message, PublisherStream, ServicePair, ServiceResult};
-use crate::RawMessageDescription;
+use crate::{RawMessageDescription, SubscriptionHandler};
 use log::error;
-use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
@@ -101,20 +100,18 @@ pub struct Subscriber {
 }
 
 impl Subscriber {
-    pub(crate) fn new<T, F, G>(
+    pub(crate) fn new<T, H>(
         master: Arc<Master>,
         slave: Arc<Slave>,
         name: &str,
         queue_size: usize,
-        on_message: F,
-        on_connect: G,
+        handler: H,
     ) -> Result<Self>
     where
         T: Message,
-        F: Fn(T, &str) + Send + 'static,
-        G: Fn(HashMap<String, String>) + Send + 'static,
+        H: SubscriptionHandler<T>,
     {
-        let id = slave.add_subscription::<T, F, G>(name, queue_size, on_message, on_connect)?;
+        let id = slave.add_subscription::<T, H>(name, queue_size, handler)?;
 
         let info = Arc::new(InteractorRaii::new(SubscriberInfo {
             master,

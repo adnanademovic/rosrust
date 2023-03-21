@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 
 pub use crate::api::raii::{Publisher, Service, Subscriber};
+pub use crate::api::handlers::{SubscriptionHandler};
 pub use crate::api::{error, Clock, Parameter};
 pub use crate::raw_message::{RawMessage, RawMessageDescription};
 #[doc(hidden)]

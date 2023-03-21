@@ -1,7 +1,7 @@
 use crate::api::error::{self, ErrorKind, Result};
 use crate::tcpros::{SubscriberRosConnection, Topic};
 use crate::util::FAILED_TO_LOCK;
-use crate::Message;
+use crate::{Message, SubscriptionHandler};
 use error_chain::bail;
 use log::error;
 use std::collections::{BTreeSet, HashMap};
@@ -51,18 +51,10 @@ impl SubscriptionsTracker {
             .collect()
     }
 
-    pub fn add<T, F, G>(
-        &self,
-        name: &str,
-        topic: &str,
-        queue_size: usize,
-        on_message: F,
-        on_connect: G,
-    ) -> Result<usize>
+    pub fn add<T, H>(&self, name: &str, topic: &str, queue_size: usize, handler: H) -> Result<usize>
     where
         T: Message,
-        F: Fn(T, &str) + Send + 'static,
-        G: Fn(HashMap<String, String>) + Send + 'static,
+        H: SubscriptionHandler<T>,
     {
         let msg_definition = T::msg_definition();
         let msg_type = T::msg_type();
@@ -92,7 +84,7 @@ impl SubscriptionsTracker {
             )
             .into())
         } else {
-            Ok(connection.add_subscriber(queue_size, on_message, on_connect))
+            Ok(connection.add_subscriber(queue_size, handler))
         }
     }
 
