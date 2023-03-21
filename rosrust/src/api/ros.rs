@@ -7,11 +7,12 @@ use super::raii::{Publisher, Service, Subscriber};
 use super::resolve;
 use super::slave::Slave;
 use crate::api::clock::Delay;
+use crate::api::handlers::CallbackSubscriptionHandler;
 use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
-use crate::{RawMessage, RawMessageDescription};
+use crate::{RawMessage, RawMessageDescription, SubscriptionHandler};
 use error_chain::bail;
 use log::error;
 use ros_message::{Duration, Time};
@@ -293,13 +294,35 @@ impl Ros {
             queue_size = usize::max_value();
         }
         let name = self.resolver.translate(topic)?;
-        Subscriber::new::<T, F, G>(
+        Subscriber::new::<T, _>(
             Arc::clone(&self.master),
             Arc::clone(&self.slave),
             &name,
             queue_size,
-            on_message,
-            on_connect,
+            CallbackSubscriptionHandler::new(on_message, on_connect),
+        )
+    }
+
+    pub fn subscribe_with<T, H>(
+        &self,
+        topic: &str,
+        mut queue_size: usize,
+        handler: H,
+    ) -> Result<Subscriber>
+    where
+        T: Message,
+        H: SubscriptionHandler<T>,
+    {
+        if queue_size == 0 {
+            queue_size = usize::max_value();
+        }
+        let name = self.resolver.translate(topic)?;
+        Subscriber::new::<T, H>(
+            Arc::clone(&self.master),
+            Arc::clone(&self.slave),
+            &name,
+            queue_size,
+            handler,
         )
     }
 
