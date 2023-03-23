@@ -80,7 +80,7 @@ impl<'a> CompositeTaskRunner<'a> {
     #[allow(missing_docs)]
     pub fn run(&mut self, task: &dyn Task) {
         self.target.set_summary(self.level, self.message.clone());
-        task.run(&mut self.target);
+        task.run(self.target);
         self.combination.merge_summary_with(self.target);
     }
 

@@ -202,6 +202,7 @@ impl Range {
         Self::range(value, value)
     }
 
+    #[allow(clippy::self_named_constructors)]
     #[inline]
     fn range(min: f64, max: f64) -> Self {
         Self { min, max }

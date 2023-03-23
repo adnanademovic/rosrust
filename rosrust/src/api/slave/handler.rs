@@ -17,7 +17,7 @@ pub struct SlaveHandler {
 }
 
 fn unwrap_array_case(params: Params) -> Params {
-    if let Some(&Value::Array(ref items)) = params.get(0) {
+    if let Some(Value::Array(items)) = params.get(0) {
         return items.clone();
     }
     params
@@ -67,7 +67,9 @@ impl SlaveHandler {
             }
         });
 
-        server.register_value("getPid", "PID", |_args| Ok(Value::Int(std::process::id() as i32)));
+        server.register_value("getPid", "PID", |_args| {
+            Ok(Value::Int(std::process::id() as i32))
+        });
 
         let subscriptions = SubscriptionsTracker::default();
         let subs = subscriptions.clone();
@@ -173,7 +175,7 @@ impl SlaveHandler {
             let mut has_tcpros = false;
             for protocol in protocols {
                 if let Value::Array(protocol) = protocol {
-                    if let Some(&Value::String(ref name)) = protocol.get(0) {
+                    if let Some(Value::String(name)) = protocol.get(0) {
                         has_tcpros |= name == "TCPROS";
                     }
                 }

@@ -26,8 +26,8 @@ fn main() {
             if !message.ends_with("Action") {
                 continue;
             }
-            let action = match message.rsplitn(2, "Action").nth(1) {
-                Some(v) => v,
+            let action = match message.rsplit_once("Action") {
+                Some((v, _)) => v,
                 None => continue,
             };
 
@@ -49,5 +49,5 @@ fn main() {
 
     let file_name = format!("{}/{}", out_dir, "actions.rs");
 
-    fs::write(&file_name, &action_lines).unwrap();
+    fs::write(file_name, action_lines).unwrap();
 }
