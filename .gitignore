@@ -9,3 +9,5 @@ Cargo.lock
 # Will have benchmark results
 # We are ignoring this until we figure out what to do with it
 /rosrust/target/
+
+/.vscode/
