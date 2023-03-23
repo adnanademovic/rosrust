@@ -246,7 +246,7 @@ impl FieldInfo {
     ) -> Result<String> {
         let datatype = self.datatype.md5_str(package, hashes)?;
         Ok(match (self.datatype.is_builtin(), &self.case) {
-            (_, &FieldCase::Const(ref v)) => format!("{} {}={}", datatype, self.name, v),
+            (_, FieldCase::Const(v)) => format!("{} {}={}", datatype, self.name, v),
             (false, _) | (_, &FieldCase::Unit) => format!("{} {}", datatype, self.name),
             (true, &FieldCase::Vector) => format!("{}[] {}", datatype, self.name),
             (true, &FieldCase::Array(l)) => format!("{}[{}] {}", datatype, l, self.name),

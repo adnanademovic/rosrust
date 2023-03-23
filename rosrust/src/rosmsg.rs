@@ -225,8 +225,8 @@ pub fn decode_variable_primitive_vec<R: io::Read, T: RosMsg>(mut r: R) -> io::Re
     let buf_ptr = buf.as_mut_ptr();
 
     // Fill the Vec to full capacity with the stream data.
-    let mut read_buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr as *mut u8, num_bytes) };
-    r.read_exact(&mut read_buf)?;
+    let read_buf = unsafe { std::slice::from_raw_parts_mut(buf_ptr as *mut u8, num_bytes) };
+    r.read_exact(read_buf)?;
 
     // Do not drop the memory
     std::mem::forget(buf);

@@ -19,11 +19,11 @@ impl SubscriptionsTracker {
         T: Iterator<Item = String>,
     {
         let mut last_error_message = None;
-        if let Some(mut subscription) = self.mapping.lock().expect(FAILED_TO_LOCK).get_mut(topic) {
+        if let Some(subscription) = self.mapping.lock().expect(FAILED_TO_LOCK).get_mut(topic) {
             let publisher_set: BTreeSet<String> = publishers.collect();
             subscription.limit_publishers_to(&publisher_set);
             for publisher in publisher_set {
-                if let Err(err) = connect_to_publisher(&mut subscription, name, &publisher, topic) {
+                if let Err(err) = connect_to_publisher(subscription, name, &publisher, topic) {
                     let info = err
                         .iter()
                         .map(|v| format!("{}", v))
@@ -160,7 +160,7 @@ fn request_topic(
                 .parse()
                 .chain_err(|| error::rosxmlrpc::ErrorKind::BadUri(publisher_uri.into()))?,
             "requestTopic",
-            &(caller_id, topic, [["TCPROS"]]),
+            (caller_id, topic, [["TCPROS"]]),
         )
         .chain_err(|| error::rosxmlrpc::ErrorKind::TopicConnectionError(topic.to_owned()))?
         .map_err(|_| "error")?;

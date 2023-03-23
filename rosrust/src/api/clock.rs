@@ -66,7 +66,7 @@ impl Clock for RealClock {
             .expect(BEFORE_EPOCH);
         Time {
             sec: time.as_secs() as u32,
-            nsec: time.subsec_nanos() as u32,
+            nsec: time.subsec_nanos(),
         }
     }
 

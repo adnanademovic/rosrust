@@ -31,7 +31,7 @@ impl Resolver {
     }
 
     fn resolve(&self, name: &str) -> Result<path::Buffer, Error> {
-        let first_char = *name.as_bytes().get(0).ok_or(ErrorKind::EmptyName)?;
+        let first_char = *name.as_bytes().first().ok_or(ErrorKind::EmptyName)?;
         if first_char == b'/' {
             return name.parse();
         }

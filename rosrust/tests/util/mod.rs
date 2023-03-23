@@ -27,9 +27,8 @@ fn await_roscore() {
 fn run_roscore(port: u32) -> ChildProcessTerminator {
     println!("Running roscore on port: {}", port);
     env::set_var("ROS_MASTER_URI", format!("http://localhost:{}", port));
-    let roscore = ChildProcessTerminator::spawn(
-        &mut Command::new("roscore").arg("-p").arg(format!("{}", port)),
-    );
+    let roscore =
+        ChildProcessTerminator::spawn(Command::new("roscore").arg("-p").arg(format!("{}", port)));
     await_roscore();
     roscore
 }

@@ -72,7 +72,7 @@ pub static MESSAGES: &[(&str, &str)]=&[{}];
         package_names, package_tuples
     );
 
-    fs::write(&file_name, &file_content).unwrap();
+    fs::write(file_name, file_content).unwrap();
 }
 
 fn rerun_if_file_changed(key: &str) {
