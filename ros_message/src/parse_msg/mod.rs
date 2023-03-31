@@ -168,7 +168,7 @@ fn match_const_numeric(data: &str) -> Option<(FieldLine, String)> {
 #[inline]
 fn strip_useless(data: &str) -> Result<&str> {
     Ok(data
-        .splitn(2, '#')
+        .split('#')
         .next()
         .ok_or_else(|| Error::BadMessageContent(data.into()))?
         .trim())

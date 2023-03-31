@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 
 pub use crate::api::raii::{Publisher, Service, Subscriber};
+pub use crate::api::handlers::{SubscriptionHandler};
 pub use crate::api::{error, Clock, Parameter};
 pub use crate::raw_message::{RawMessage, RawMessageDescription};
 #[doc(hidden)]
@@ -11,6 +12,7 @@ pub use dynamic_msg::DynamicMsg;
 pub use ros_message::{Duration, MessageValue as MsgMessage, Time, Value as MsgValue};
 #[doc(hidden)]
 pub use rosrust_codegen::*;
+pub mod wall_time;
 
 pub mod api;
 mod dynamic_msg;

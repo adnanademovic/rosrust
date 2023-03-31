@@ -3,6 +3,7 @@ use super::header::{decode, encode, match_field};
 use super::{Message, Topic};
 use crate::rosmsg::RosMsg;
 use crate::util::lossy_channel::{lossy_channel, LossyReceiver, LossySender};
+use crate::SubscriptionHandler;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use crossbeam::channel::{bounded, select, Receiver, Sender, TrySendError};
 use log::error;
@@ -77,16 +78,10 @@ impl SubscriberRosConnection {
     // This creates a new thread to call on_message. Next API change should
     // allow subscribing with either callback or inline handler of the queue.
     // The queue is lossy, so it wouldn't be blocking.
-    pub fn add_subscriber<T, F, G>(
-        &mut self,
-        queue_size: usize,
-        on_message: F,
-        on_connect: G,
-    ) -> usize
+    pub fn add_subscriber<T, H>(&mut self, queue_size: usize, handler: H) -> usize
     where
         T: Message,
-        F: Fn(T, &str) + Send + 'static,
-        G: Fn(HashMap<String, String>) + Send + 'static,
+        H: SubscriptionHandler<T>,
     {
         let data_stream_id = self.next_data_stream_id;
         self.connected_ids.insert(data_stream_id);
@@ -105,9 +100,7 @@ impl SubscriberRosConnection {
             // TODO: we might want to panic here
             error!("Subscriber failed to connect to data stream");
         }
-        thread::spawn(move || {
-            handle_data::<T, F, G>(data_rx, connection_rx, on_message, on_connect)
-        });
+        thread::spawn(move || handle_data::<T, H>(data_rx, connection_rx, handler));
         data_stream_id
     }
 
@@ -176,15 +169,13 @@ impl SubscriberRosConnection {
     }
 }
 
-fn handle_data<T, F, G>(
+fn handle_data<T, H>(
     data: LossyReceiver<MessageInfo>,
     connections: Receiver<HashMap<String, String>>,
-    on_message: F,
-    on_connect: G,
+    mut handler: H,
 ) where
     T: Message,
-    F: Fn(T, &str),
-    G: Fn(HashMap<String, String>) + Send + 'static,
+    H: SubscriptionHandler<T>,
 {
     loop {
         select! {
@@ -192,13 +183,13 @@ fn handle_data<T, F, G>(
             recv(data.data_rx) -> msg => match msg {
                 Err(_) => break,
                 Ok(buffer) => match RosMsg::decode_slice(&buffer.data) {
-                    Ok(value) => on_message(value, &buffer.caller_id),
+                    Ok(value) => handler.message(value, &buffer.caller_id),
                     Err(err) => error!("Failed to decode message: {}", err),
                 },
             },
             recv(connections) -> msg => match msg {
                 Err(_) => break,
-                Ok(conn) => on_connect(conn),
+                Ok(conn) => handler.connection(conn),
             },
         }
     }

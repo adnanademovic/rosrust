@@ -19,6 +19,11 @@ pub fn depend_on_messages(
         .split(':')
         .filter_map(append_src_folder)
         .collect::<Vec<String>>();
+    let ros_package_paths = env::var("ROS_PACKAGE_PATH")
+        .unwrap_or_default()
+        .split(':')
+        .map(String::from)
+        .collect::<Vec<String>>();
     let extra_paths = env::var("ROSRUST_MSG_PATH")
         .unwrap_or_default()
         .split(':')
@@ -27,6 +32,7 @@ pub fn depend_on_messages(
     let paths = cmake_paths
         .iter()
         .chain(cmake_alt_paths.iter())
+        .chain(ros_package_paths.iter())
         .chain(extra_paths.iter())
         .map(String::as_str)
         .collect::<Vec<&str>>();

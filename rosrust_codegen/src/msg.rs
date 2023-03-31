@@ -56,7 +56,7 @@ impl Msg {
             .0
             .fields()
             .iter()
-            .filter_map(|v| field_info_field_name_eq_and_debug_token_stream(v))
+            .filter_map(field_info_field_name_eq_and_debug_token_stream)
             .collect::<Vec<_>>();
         let fields_partialeq = fields_for_eq_and_debug
             .iter()

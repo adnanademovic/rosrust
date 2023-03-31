@@ -1,7 +1,8 @@
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use std::fmt;
+use std::convert::TryInto;
 use std::fmt::Formatter;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops;
 use std::time;
@@ -98,15 +99,12 @@ impl Time {
 }
 
 fn display_nanos(nanos: &str, f: &mut Formatter<'_>) -> fmt::Result {
+    // Special display function to handle edge cases like
+    // Duration { sec: -1, nsec: 1 } and Duration { sec: -1, nsec: -1 }
     let split_point = nanos.len() - 9;
     let characters = nanos.chars();
     let (left, right) = characters.as_str().split_at(split_point);
-    let right = right.trim_end_matches('0');
-    if right.is_empty() {
-        write!(f, "{}", left)
-    } else {
-        write!(f, "{}.{}", left, right)
-    }
+    write!(f, "{}.{}", left, right)
 }
 
 impl fmt::Display for Time {
@@ -130,6 +128,28 @@ impl cmp::PartialOrd for Time {
 impl cmp::Ord for Time {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.nanos().cmp(&other.nanos())
+    }
+}
+
+impl From<time::SystemTime> for Time {
+    fn from(other: time::SystemTime) -> Self {
+        let epoch = time::SystemTime::UNIX_EPOCH;
+        let elapsed = other.duration_since(epoch)
+            .expect("Dates before 1970 are not supported by the ROS time format");
+        let sec = elapsed.as_secs()
+            .try_into()
+            .expect("Dates after 2100 are not supported by the ROS time format");
+        Self {
+            sec,
+            nsec: elapsed.subsec_nanos(),
+        }
+    }
+}
+
+impl From<Time> for time::SystemTime {
+    fn from(other: Time) -> Self {
+        let elapsed = time::Duration::new(other.sec.into(), other.nsec);
+        time::SystemTime::UNIX_EPOCH + elapsed
     }
 }
 
@@ -305,9 +325,28 @@ impl ops::Neg for Duration {
 
 impl From<time::Duration> for Duration {
     fn from(std_duration: time::Duration) -> Self {
+        let sec = std_duration.as_secs()
+            .try_into()
+            .expect("Durations longer than 68 years are not supported by the ROS time format");
         Duration {
-            sec: std_duration.as_secs() as i32,
+            sec,
             nsec: std_duration.subsec_nanos() as i32,
         }
+    }
+}
+
+impl From<Duration> for time::Duration {
+    fn from(other: Duration) -> Self {
+        let mut extra_sec = other.nsec / 1_000_000_000;
+        let mut nsec = other.nsec % 1_000_000_000;
+        if nsec < 0 {
+            extra_sec -= 1;
+            nsec += 1_000_000_000;
+        }
+
+        Self::new(
+            (other.sec + extra_sec).try_into().unwrap(),
+            nsec as u32,
+        )
     }
 }

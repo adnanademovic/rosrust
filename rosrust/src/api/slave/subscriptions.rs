@@ -1,7 +1,7 @@
 use crate::api::error::{self, ErrorKind, Result};
 use crate::tcpros::{SubscriberRosConnection, Topic};
 use crate::util::FAILED_TO_LOCK;
-use crate::Message;
+use crate::{Message, SubscriptionHandler};
 use error_chain::bail;
 use log::error;
 use std::collections::{BTreeSet, HashMap};
@@ -19,11 +19,11 @@ impl SubscriptionsTracker {
         T: Iterator<Item = String>,
     {
         let mut last_error_message = None;
-        if let Some(mut subscription) = self.mapping.lock().expect(FAILED_TO_LOCK).get_mut(topic) {
+        if let Some(subscription) = self.mapping.lock().expect(FAILED_TO_LOCK).get_mut(topic) {
             let publisher_set: BTreeSet<String> = publishers.collect();
             subscription.limit_publishers_to(&publisher_set);
             for publisher in publisher_set {
-                if let Err(err) = connect_to_publisher(&mut subscription, name, &publisher, topic) {
+                if let Err(err) = connect_to_publisher(subscription, name, &publisher, topic) {
                     let info = err
                         .iter()
                         .map(|v| format!("{}", v))
@@ -51,18 +51,10 @@ impl SubscriptionsTracker {
             .collect()
     }
 
-    pub fn add<T, F, G>(
-        &self,
-        name: &str,
-        topic: &str,
-        queue_size: usize,
-        on_message: F,
-        on_connect: G,
-    ) -> Result<usize>
+    pub fn add<T, H>(&self, name: &str, topic: &str, queue_size: usize, handler: H) -> Result<usize>
     where
         T: Message,
-        F: Fn(T, &str) + Send + 'static,
-        G: Fn(HashMap<String, String>) + Send + 'static,
+        H: SubscriptionHandler<T>,
     {
         let msg_definition = T::msg_definition();
         let msg_type = T::msg_type();
@@ -92,7 +84,7 @@ impl SubscriptionsTracker {
             )
             .into())
         } else {
-            Ok(connection.add_subscriber(queue_size, on_message, on_connect))
+            Ok(connection.add_subscriber(queue_size, handler))
         }
     }
 
@@ -168,7 +160,7 @@ fn request_topic(
                 .parse()
                 .chain_err(|| error::rosxmlrpc::ErrorKind::BadUri(publisher_uri.into()))?,
             "requestTopic",
-            &(caller_id, topic, [["TCPROS"]]),
+            (caller_id, topic, [["TCPROS"]]),
         )
         .chain_err(|| error::rosxmlrpc::ErrorKind::TopicConnectionError(topic.to_owned()))?
         .map_err(|_| "error")?;

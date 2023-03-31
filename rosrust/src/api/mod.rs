@@ -11,6 +11,7 @@ pub mod raii;
 pub mod resolve;
 mod ros;
 mod slave;
+pub mod handlers;
 
 pub struct ShutdownManager {
     should_shutdown: AtomicBool,

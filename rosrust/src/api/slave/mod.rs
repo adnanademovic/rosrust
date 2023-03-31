@@ -7,7 +7,7 @@ use super::error::{self, ErrorKind, Result};
 use crate::api::ShutdownManager;
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 use crate::util::{kill, FAILED_TO_LOCK};
-use crate::RawMessageDescription;
+use crate::{RawMessageDescription, SubscriptionHandler};
 use crossbeam::channel::TryRecvError;
 use error_chain::bail;
 use log::error;
@@ -148,20 +148,18 @@ impl Slave {
     }
 
     #[inline]
-    pub fn add_subscription<T, F, G>(
+    pub fn add_subscription<T, H>(
         &self,
         topic: &str,
         queue_size: usize,
-        on_message: F,
-        on_connect: G,
+        handler: H,
     ) -> Result<usize>
     where
         T: Message,
-        F: Fn(T, &str) + Send + 'static,
-        G: Fn(HashMap<String, String>) + Send + 'static,
+        H: SubscriptionHandler<T>,
     {
         self.subscriptions
-            .add(&self.name, topic, queue_size, on_message, on_connect)
+            .add(&self.name, topic, queue_size, handler)
     }
 
     #[inline]

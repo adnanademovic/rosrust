@@ -5,7 +5,7 @@ use crate::error::{ErrorKind, Result};
 use crate::rosxmlrpc::Response;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::util::FAILED_TO_LOCK;
-use crate::RawMessageDescription;
+use crate::{RawMessageDescription, SubscriptionHandler};
 use crossbeam::sync::ShardedLock;
 use ctrlc;
 use error_chain::bail;
@@ -196,6 +196,15 @@ where
     G: Fn(HashMap<String, String>) + Send + 'static,
 {
     ros!().subscribe_with_ids_and_headers::<T, F, G>(topic, queue_size, on_message, on_connect)
+}
+
+#[inline]
+pub fn subscribe_with<T, H>(topic: &str, queue_size: usize, handler: H) -> Result<Subscriber>
+where
+    T: Message,
+    H: SubscriptionHandler<T>,
+{
+    ros!().subscribe_with::<T, H>(topic, queue_size, handler)
 }
 
 #[inline]

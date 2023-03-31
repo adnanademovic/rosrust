@@ -50,7 +50,7 @@ struct UriCache {
 impl UriCache {
     fn get(&self) -> Result<String> {
         if let Some(uri) = Option::<String>::clone(&self.data.lock().expect(FAILED_TO_LOCK)) {
-            return Ok(uri.clone());
+            return Ok(uri);
         }
         let new_uri = self
             .master
@@ -118,7 +118,7 @@ fn connect_to_tcp_with_multiple_attempts(
     .into();
     let mut repeat_delay_ms = 1;
     for _ in 0..attempts {
-        let stream_result = connect_to_tcp_attempt(&uri_cache, None);
+        let stream_result = connect_to_tcp_attempt(uri_cache, None);
         match stream_result {
             Ok(stream) => {
                 return Ok(stream);

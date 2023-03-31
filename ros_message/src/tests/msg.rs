@@ -255,7 +255,7 @@ fn constants_returns_a_map_of_all_constants_in_message_root() {
 fn serialize_into_name_and_truncated_source_only() {
     assert_eq!(
         serde_json::to_value(
-            &Msg::new(
+            Msg::new(
                 "geometry_msgs/Quaternion"
                     .try_into()
                     .expect("Unexpectedly bad message body"),
