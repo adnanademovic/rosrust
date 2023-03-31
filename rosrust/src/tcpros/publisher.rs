@@ -55,11 +55,13 @@ fn read_request<U: std::io::Read>(
 fn write_response<U: std::io::Write>(
     mut stream: &mut U,
     caller_id: &str,
+    topic: &str,
     message_description: &RawMessageDescription,
 ) -> Result<()> {
     let mut fields = HashMap::<String, String>::new();
     fields.insert(String::from("md5sum"), message_description.md5sum.clone());
     fields.insert(String::from("type"), message_description.msg_type.clone());
+    fields.insert(String::from("topic"), String::from(topic));
     fields.insert(String::from("callerid"), caller_id.into());
     fields.insert(
         String::from("message_definition"),
@@ -79,7 +81,7 @@ where
     U: std::io::Write + std::io::Read,
 {
     let caller_id = read_request(&mut stream, topic, message_description)?;
-    write_response(&mut stream, pub_caller_id, message_description)?;
+    write_response(&mut stream, pub_caller_id, topic, message_description)?;
     Ok(caller_id)
 }
 
