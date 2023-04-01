@@ -12,6 +12,8 @@
 - `wall_time::now` for easier retrieval of actual time when running recordings
 - Convenience conversions between ROS time structures and standard time structures
 - `wait_for_subscribers` in publisher
+### Fixed
+- Clean up node on shutdown (by either using `spin()`, `shutdown()`, or `is_ok()` until it's false)
 
 ### Fixed
 - Fix deeply nested relative field paths in dynamic messages
