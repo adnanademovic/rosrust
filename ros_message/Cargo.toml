@@ -5,7 +5,7 @@ description = "Utilities for handling MSG and SRV files in ROS"
 license = "MIT"
 name = "ros_message"
 repository = "https://github.com/adnanademovic/rosrust"
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
 array-init = "2.0.0"

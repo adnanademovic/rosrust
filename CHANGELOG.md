@@ -1,10 +1,10 @@
 # Changelog
 
-## Rosrust Msg Unreleased
+## Rosrust Msg 0.1.7 (2023-04-01)
 ### Added
 - Find messages in `ROS_PACKAGE_PATH`
 
-## Rosrust Unreleased
+## Rosrust 0.9.11 (2023-04-01)
 ### Added
 - Log with `once`, `throttle` and `throttle_identical`
 - `SubscriptionHandler` interface to easily manage arbitrary subscriptions without fighting the borrow checker
