@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn can_read_log_from_rosout_for_rospy() {
-    let _roscore = util::run_roscore_for(util::Language::Python, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanReadLogFromRosoutForRospy);
     let _publisher = util::ChildProcessTerminator::spawn(
         Command::new("rosrun").arg("rospy_tutorials").arg("talker"),
     );

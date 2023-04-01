@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn can_throttle_identical_logs() {
-    let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanThrottleIdenticalLogs);
 
     rosrust::init("rosout_agg_listener");
 

@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn publisher_to_rospy_subscriber() {
-    let _roscore = util::run_roscore_for(util::Language::Python, util::Feature::Publisher);
+    let _roscore = util::run_roscore_for(util::TestVariant::PublisherToRospySubscriber);
     let _subscriber = util::ChildProcessTerminator::spawn(
         Command::new("rosrun")
             .arg("rospy_tutorials")

@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn publisher_to_multiple_subscribers() {
-    let _roscore = util::run_roscore_for(util::Language::Multi, util::Feature::Publisher);
+    let _roscore = util::run_roscore_for(util::TestVariant::PublisherToMultipleSubscribers);
     let _subscriber_cpp = util::ChildProcessTerminator::spawn(
         Command::new("rosrun")
             .arg("roscpp_tutorials")

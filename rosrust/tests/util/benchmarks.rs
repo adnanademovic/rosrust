@@ -16,7 +16,7 @@ mod msg {
 }
 
 fn global_init() -> util::ChildProcessTerminator {
-    let roscore = util::run_roscore_for(util::Language::None, util::Feature::Benchmarks);
+    let roscore = util::run_roscore_for(util::TestVariant::Benchmark);
     rosrust::init("benchmarker");
     roscore
 }

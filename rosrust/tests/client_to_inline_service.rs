@@ -17,7 +17,7 @@ fn test_request(client: &rosrust::Client<msg::roscpp_tutorials::TwoInts>, a: i64
 
 #[test]
 fn client_to_inline_service() {
-    let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Client);
+    let _roscore = util::run_roscore_for(util::TestVariant::ClientToInlineService);
     let _service = util::ChildProcessTerminator::spawn_example(
         Command::new("cargo")
             .arg("run")

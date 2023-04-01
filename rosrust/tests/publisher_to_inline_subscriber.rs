@@ -8,7 +8,7 @@ mod msg {
 
 #[test]
 fn publisher_to_inline_subscriber() {
-    let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Publisher);
+    let _roscore = util::run_roscore_for(util::TestVariant::PublisherToInlineSubscriber);
 
     rosrust::init("hello_world_talker_listener");
 

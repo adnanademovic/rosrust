@@ -3,7 +3,7 @@ mod util;
 
 #[test]
 fn timestamp_status_test() {
-    let _roscore = util::run_roscore_for(util::Feature::TimestampStatusTest);
+    let _roscore = util::run_roscore_for(util::TestVariant::TimestampStatusTest);
     rosrust::init("timestamp_status_test");
     let ts = TimestampStatus::builder().build();
     let mut status0 = Status::default();

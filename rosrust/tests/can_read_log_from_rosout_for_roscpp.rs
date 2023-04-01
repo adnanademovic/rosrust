@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn can_read_log_from_rosout_for_roscpp() {
-    let _roscore = util::run_roscore_for(util::Language::Cpp, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanReadLogFromRosoutForRoscpp);
     let _publisher = util::ChildProcessTerminator::spawn(
         Command::new("rosrun").arg("roscpp_tutorials").arg("talker"),
     );

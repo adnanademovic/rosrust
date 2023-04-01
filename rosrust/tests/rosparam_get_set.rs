@@ -26,7 +26,7 @@ struct Struct3 {
 }
 
 fn global_init() -> util::ChildProcessTerminator {
-    let roscore = util::run_roscore_for(util::Language::None, util::Feature::Parameters);
+    let roscore = util::run_roscore_for(util::TestVariant::RosparamGetSet);
     rosrust::init("rosparam_tester");
     roscore
 }

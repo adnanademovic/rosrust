@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn publisher_to_rosrust_subscriber() {
-    let _roscore = util::run_roscore_for(util::Language::Rust, util::Feature::Publisher);
+    let _roscore = util::run_roscore_for(util::TestVariant::PublisherToRosrustSubscriber);
     let _subscriber = util::ChildProcessTerminator::spawn_example(
         Command::new("cargo")
             .arg("run")

@@ -10,7 +10,7 @@ mod msg {
 
 #[test]
 fn can_read_log_from_rosout_for_multiple() {
-    let _roscore = util::run_roscore_for(util::Language::Multi, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanReadLogFromRosoutForMultiple);
     let _publisher_cpp = util::ChildProcessTerminator::spawn(
         Command::new("rosrun")
             .arg("roscpp_tutorials")

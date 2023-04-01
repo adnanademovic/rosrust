@@ -5,9 +5,11 @@ use std::str::from_utf8;
 use std::thread::sleep;
 use std::time::Duration;
 pub use subscriber_test::{test_publisher, test_subscriber, test_subscriber_detailed};
+pub use test_variant::TestVariant;
 
 mod child_process_terminator;
 mod subscriber_test;
+mod test_variant;
 
 fn rostopic_listing_succeeds() -> bool {
     return Command::new("rostopic")
@@ -33,64 +35,8 @@ fn run_roscore(port: u32) -> ChildProcessTerminator {
     roscore
 }
 
-pub fn run_roscore_for(language: Language, feature: Feature) -> ChildProcessTerminator {
-    run_roscore(generate_port(language, feature))
-}
-
-#[allow(dead_code)]
-pub enum Language {
-    None,
-    Cpp,
-    Python,
-    Rust,
-    Shell,
-    Multi,
-}
-
-impl Language {
-    fn get_offset(&self) -> u32 {
-        match self {
-            Language::None => 1,
-            Language::Cpp => 2,
-            Language::Python => 3,
-            Language::Rust => 4,
-            Language::Shell => 5,
-            Language::Multi => 6,
-        }
-    }
-}
-
-#[allow(dead_code)]
-pub enum Feature {
-    Client,
-    Service,
-    Publisher,
-    Subscriber,
-    Log,
-    Parameters,
-    Benchmarks,
-    ClientReconnection,
-    WaitForService,
-}
-
-impl Feature {
-    fn get_offset(&self) -> u32 {
-        match self {
-            Feature::Client => 100,
-            Feature::Service => 200,
-            Feature::Publisher => 300,
-            Feature::Subscriber => 400,
-            Feature::Log => 500,
-            Feature::Parameters => 600,
-            Feature::Benchmarks => 700,
-            Feature::ClientReconnection => 800,
-            Feature::WaitForService => 900,
-        }
-    }
-}
-
-fn generate_port(language: Language, feature: Feature) -> u32 {
-    11400 + language.get_offset() + feature.get_offset()
+pub fn run_roscore_for(test_variant: TestVariant) -> ChildProcessTerminator {
+    run_roscore(test_variant.port())
 }
 
 pub fn bytes_contain(sequence: &[u8], subsequence: &[u8]) -> bool {

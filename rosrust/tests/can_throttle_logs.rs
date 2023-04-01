@@ -8,7 +8,7 @@ mod msg {
 
 #[test]
 fn can_throttle_logs() {
-    let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanThrottleLogs);
 
     rosrust::init("rosout_agg_listener");
 

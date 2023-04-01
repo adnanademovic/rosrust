@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn subscriber_to_multiple_publishers() {
-    let _roscore = util::run_roscore_for(util::Language::Multi, util::Feature::Subscriber);
+    let _roscore = util::run_roscore_for(util::TestVariant::SubscriberToMultiplePublishers);
     let _publisher_rostopic = util::ChildProcessTerminator::spawn(
         Command::new("rostopic")
             .arg("pub")

@@ -5,7 +5,7 @@ mod util;
 
 #[test]
 fn frequency_status_test() {
-    let _roscore = util::run_roscore_for(util::Feature::FrequencyStatusTest);
+    let _roscore = util::run_roscore_for(util::TestVariant::FrequencyStatusTest);
     rosrust::init("frequency_status_test");
 
     let fs = FrequencyStatus::builder()

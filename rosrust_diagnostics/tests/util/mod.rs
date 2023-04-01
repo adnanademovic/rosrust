@@ -29,17 +29,17 @@ fn run_roscore(port: u32) -> ChildProcessTerminator {
     roscore
 }
 
-pub fn run_roscore_for(feature: Feature) -> ChildProcessTerminator {
+pub fn run_roscore_for(feature: TestVariant) -> ChildProcessTerminator {
     run_roscore(generate_port(feature))
 }
 
 #[allow(dead_code)]
 #[repr(u32)]
-pub enum Feature {
+pub enum TestVariant {
     TimestampStatusTest = 1,
     FrequencyStatusTest = 2,
 }
 
-fn generate_port(feature: Feature) -> u32 {
+fn generate_port(feature: TestVariant) -> u32 {
     14000 + feature as u32
 }

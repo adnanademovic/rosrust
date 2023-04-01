@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn can_read_log_from_rosout() {
-    let _roscore = util::run_roscore_for(util::Language::None, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanReadLogFromRosout);
 
     rosrust::init("rosout_agg_listener");
 

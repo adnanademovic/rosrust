@@ -20,7 +20,7 @@ fn test_request(a: i64, b: i64) {
 
 #[test]
 fn service_to_rosrust_client() {
-    let _roscore = util::run_roscore_for(util::Language::Rust, util::Feature::Service);
+    let _roscore = util::run_roscore_for(util::TestVariant::ServiceToRosrustClient);
 
     rosrust::init("add_two_ints_service");
     let _service = rosrust::service::<msg::roscpp_tutorials::TwoInts, _>("add_two_ints", |req| {

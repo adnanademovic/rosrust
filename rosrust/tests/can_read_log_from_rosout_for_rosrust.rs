@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn can_read_log_from_rosout_for_rosrust() {
-    let _roscore = util::run_roscore_for(util::Language::Rust, util::Feature::Log);
+    let _roscore = util::run_roscore_for(util::TestVariant::CanReadLogFromRosoutForRosrust);
     let _publisher = util::ChildProcessTerminator::spawn_example(
         Command::new("cargo")
             .arg("run")

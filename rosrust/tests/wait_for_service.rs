@@ -19,7 +19,7 @@ fn test_request(client: &rosrust::Client<msg::rospy_tutorials::AddTwoInts>, a: i
 
 #[test]
 fn wait_for_service() {
-    let _roscore = util::run_roscore_for(util::Language::Python, util::Feature::WaitForService);
+    let _roscore = util::run_roscore_for(util::TestVariant::WaitForService);
     rosrust::init("add_two_ints_client");
     assert!(
         rosrust::wait_for_service("add_two_ints", Some(std::time::Duration::from_secs(1))).is_err(),

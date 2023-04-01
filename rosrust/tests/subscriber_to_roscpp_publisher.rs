@@ -9,7 +9,7 @@ mod msg {
 
 #[test]
 fn subscriber_to_roscpp_publisher() {
-    let _roscore = util::run_roscore_for(util::Language::Cpp, util::Feature::Subscriber);
+    let _roscore = util::run_roscore_for(util::TestVariant::SubscriberToRoscppPublisher);
     let _publisher = util::ChildProcessTerminator::spawn(
         Command::new("rosrun").arg("roscpp_tutorials").arg("talker"),
     );
