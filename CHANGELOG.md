@@ -14,8 +14,6 @@
 - `wait_for_subscribers` in publisher
 ### Fixed
 - Clean up node on shutdown (by either using `spin()`, `shutdown()`, or `is_ok()` until it's false)
-
-### Fixed
 - Fix deeply nested relative field paths in dynamic messages
 
 ## Rosrust Msg 0.1.6 (2022-04-15)
