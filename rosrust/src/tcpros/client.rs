@@ -89,7 +89,6 @@ fn connect_to_tcp_attempt(
             let socket_addr = trimmed_uri
                 .to_socket_addrs()
                 .chain_err(invalid_addr_error)?
-                .into_iter()
                 .next()
                 .ok_or_else(invalid_addr_error)?;
             TcpStream::connect_timeout(&socket_addr, timeout)?

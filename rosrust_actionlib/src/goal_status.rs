@@ -3,8 +3,9 @@ use std::convert::{TryFrom, TryInto};
 
 // TODO: consider removing "Lost"
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum GoalState {
+    #[default]
     Pending = GoalStatusRaw::PENDING,
     Active = GoalStatusRaw::ACTIVE,
     Preempted = GoalStatusRaw::PREEMPTED,
@@ -15,12 +16,6 @@ pub enum GoalState {
     Recalling = GoalStatusRaw::RECALLING,
     Recalled = GoalStatusRaw::RECALLED,
     Lost = GoalStatusRaw::LOST,
-}
-
-impl Default for GoalState {
-    fn default() -> Self {
-        GoalState::Pending
-    }
 }
 
 impl TryFrom<u8> for GoalState {

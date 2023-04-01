@@ -130,11 +130,7 @@ fn process_name(name: &str) -> Result<String, Error> {
 }
 
 fn is_legal_first_char(v: u8) -> bool {
-    (b'A'..=b'Z').contains(&v)
-        || (b'a'..=b'z').contains(&v)
-        || v == b'/'
-        || v == b'~'
-        || (b'0'..=b'9').contains(&v)
+    v.is_ascii_uppercase() || v.is_ascii_lowercase() || v == b'/' || v == b'~' || v.is_ascii_digit()
 }
 
 fn is_legal_char(v: u8) -> bool {
