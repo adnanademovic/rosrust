@@ -1,5 +1,20 @@
 # Changelog
 
+## Rosrust Msg Unreleased
+### Added
+- Find messages in `ROS_PACKAGE_PATH`
+
+## Rosrust Unreleased
+### Added
+- Log with `once`, `throttle` and `throttle_identical`
+- `SubscriptionHandler` interface to easily manage arbitrary subscriptions without fighting the borrow checker
+- Find messages in `ROS_PACKAGE_PATH`
+- `wall_time::now` for easier retrieval of actual time when running recordings
+- Convenience conversions between ROS time structures and standard time structures
+
+### Fixed
+- Fix deeply nested relative field paths in dynamic messages
+
 ## Rosrust Msg 0.1.6 (2022-04-15)
 ### Changed
 - Updated dependencies
