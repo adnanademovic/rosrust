@@ -11,6 +11,7 @@
 - Find messages in `ROS_PACKAGE_PATH`
 - `wall_time::now` for easier retrieval of actual time when running recordings
 - Convenience conversions between ROS time structures and standard time structures
+- `wait_for_subscribers` in publisher
 
 ### Fixed
 - Fix deeply nested relative field paths in dynamic messages

@@ -15,6 +15,7 @@ fn main() {
 
     // Create publisher
     let chatter_pub = rosrust::publish("chatter", 200).unwrap();
+    chatter_pub.wait_for_subscribers(None).unwrap();
 
     let mut count = 0;
 

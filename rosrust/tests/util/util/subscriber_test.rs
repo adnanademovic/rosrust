@@ -16,7 +16,7 @@ pub fn test_subscriber_detailed(
     let regex = regex::Regex::new(regex_string).unwrap();
 
     let mut checks_to_perform = checks;
-    let mut previous_capture = 0.0;
+    let mut previous_capture = -1.0;
 
     while checks_to_perform > 0 {
         let data = rx.recv().unwrap();

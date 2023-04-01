@@ -21,6 +21,7 @@ fn main() {
         },
     )
     .unwrap();
+    chatter_pub.wait_for_subscribers(None).unwrap();
 
     let log_names = rosrust::param("~log_names").unwrap().get().unwrap_or(false);
 
