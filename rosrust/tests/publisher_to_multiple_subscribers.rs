@@ -39,6 +39,7 @@ fn publisher_to_multiple_subscribers() {
         .unwrap();
 
     let publisher = rosrust::publish::<msg::std_msgs::String>("chatter", 100).unwrap();
+    publisher.wait_for_subscribers(None).unwrap();
 
     let message = msg::std_msgs::String {
         data: "hello world".into(),
