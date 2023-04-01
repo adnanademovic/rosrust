@@ -12,13 +12,16 @@ use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
+use crate::util::FAILED_TO_LOCK;
 use crate::{RawMessage, RawMessageDescription, SubscriptionHandler};
 use error_chain::bail;
+use lazy_static::lazy_static;
 use log::error;
 use ros_message::{Duration, Time};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread::sleep;
 use std::time::Instant;
 use xml_rpc;
@@ -404,6 +407,74 @@ impl Ros {
         };
         if let Err(err) = logger.send(message) {
             error!("Logging error: {}", err);
+        }
+    }
+
+    pub fn log_once(&self, level: i8, msg: String, file: &str, line: u32) {
+        lazy_static! {
+            static ref UNIQUE_LOGS: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+        }
+        let key = format!("{}:{}", file, line);
+        let mut unique_logs = UNIQUE_LOGS.lock().expect(FAILED_TO_LOCK);
+        if !unique_logs.contains(&key) {
+            unique_logs.insert(key);
+            self.log(level, msg, file, line);
+        }
+    }
+
+    pub fn log_throttle(&self, period: f64, level: i8, msg: String, file: &str, line: u32) {
+        lazy_static! {
+            static ref PERIODIC_LOGS: Mutex<HashMap<String, Time>> = Mutex::new(HashMap::new());
+        }
+        let now = self.now();
+        let key = format!("{}:{}", file, line);
+        let get_next_log_time = |now, period| now + Duration::from_nanos((period * 1e9) as i64);
+        let mut period_logs = PERIODIC_LOGS.lock().expect(FAILED_TO_LOCK);
+        match period_logs.get_mut(&key) {
+            Some(next_log_time) => {
+                if now >= *next_log_time {
+                    *next_log_time = get_next_log_time(*next_log_time, period);
+                    self.log(level, msg, file, line);
+                }
+            }
+            None => {
+                period_logs.insert(key, get_next_log_time(now, period));
+                self.log(level, msg, file, line);
+            }
+        }
+    }
+
+    pub fn log_throttle_identical(
+        &self,
+        period: f64,
+        level: i8,
+        msg: String,
+        file: &str,
+        line: u32,
+    ) {
+        lazy_static! {
+            static ref IDENTICAL_LOGS: Mutex<HashMap<String, (Time, String)>> =
+                Mutex::new(HashMap::new());
+        }
+        let now = self.now();
+        let key = format!("{}:{}", file, line);
+        let get_next_log_time = |now, period| now + Duration::from_nanos((period * 1e9) as i64);
+        let mut identical_logs = IDENTICAL_LOGS.lock().expect(FAILED_TO_LOCK);
+        match identical_logs.get_mut(&key) {
+            Some((next_log_time, previous_msg)) => {
+                if &msg != previous_msg {
+                    *previous_msg = msg.clone();
+                    *next_log_time = get_next_log_time(now, period);
+                    self.log(level, msg, file, line);
+                } else if now >= *next_log_time {
+                    *next_log_time = get_next_log_time(*next_log_time, period);
+                    self.log(level, msg, file, line);
+                }
+            }
+            None => {
+                identical_logs.insert(key, (get_next_log_time(now, period), msg.clone()));
+                self.log(level, msg, file, line);
+            }
         }
     }
 }
