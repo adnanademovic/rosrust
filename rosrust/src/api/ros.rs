@@ -20,6 +20,7 @@ use log::error;
 use ros_message::{Duration, Time};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread::sleep;
@@ -36,7 +37,7 @@ pub struct Ros {
     name: String,
     clock: Arc<dyn Clock>,
     static_subs: Vec<Subscriber>,
-    logger: Option<Publisher<Log>>,
+    logger: Arc<Mutex<Option<Publisher<Log>>>>,
     shutdown_manager: Arc<ShutdownManager>,
 }
 
@@ -79,7 +80,7 @@ impl Ros {
             ros.clock = ros_clock;
         }
 
-        ros.logger = Some(ros.publish("/rosout", 100)?);
+        *ros.logger.lock().unwrap() = Some(ros.publish("/rosout", 100)?);
 
         Ok(ros)
     }
@@ -104,7 +105,11 @@ impl Ros {
         let name = format!("{}/{}", namespace, name);
         let resolver = Resolver::new(&name)?;
 
-        let shutdown_manager = Arc::new(ShutdownManager::default());
+        let logger = Arc::new(Mutex::new(None));
+        let shutdown_manager = Arc::new(ShutdownManager::new({
+            let logger = Arc::clone(&logger);
+            move || drop(logger.lock().unwrap().take())
+        }));
 
         let slave = Slave::new(
             master_uri,
@@ -125,7 +130,7 @@ impl Ros {
             name,
             clock: Arc::new(RealClock::default()),
             static_subs: Vec::new(),
-            logger: None,
+            logger,
             shutdown_manager,
         })
     }
@@ -390,10 +395,6 @@ impl Ros {
 
     pub fn log(&self, level: i8, msg: String, file: &str, line: u32) {
         self.log_to_terminal(level, &msg, file, line);
-        let logger = &match self.logger {
-            Some(ref v) => v,
-            None => return,
-        };
         let topics = self.slave.publications.get_topic_names();
         let message = Log {
             header: Header::default(),
@@ -405,8 +406,11 @@ impl Ros {
             function: String::default(),
             topics,
         };
-        if let Err(err) = logger.send(message) {
-            error!("Logging error: {}", err);
+        let maybe_logger = self.logger.lock().unwrap();
+        if let Some(logger) = maybe_logger.deref() {
+            if let Err(err) = logger.send(message) {
+                error!("Logging error: {}", err);
+            }
         }
     }
 
