@@ -63,6 +63,6 @@ fn bad_request_structure<T: ::std::fmt::Display>(err: T) -> ResponseError {
     ResponseError::Client(format!("Failed to serialize parameters: {}", err))
 }
 
-fn bad_response_structure<T: ::std::fmt::Display>(err: T) -> ResponseError {
+pub(crate) fn bad_response_structure<T: ::std::fmt::Display>(err: T) -> ResponseError {
     ResponseError::Server(format!("Response data has unexpected structure: {}", err))
 }

@@ -11,6 +11,7 @@ use crate::api::handlers::CallbackSubscriptionHandler;
 use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
+use crate::rosxmlrpc::client::bad_response_structure;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::util::FAILED_TO_LOCK;
 use crate::{RawMessage, RawMessageDescription, SubscriptionHandler};
@@ -31,6 +32,7 @@ use yaml_rust::{Yaml, YamlLoader};
 pub struct Ros {
     master: Arc<Master>,
     slave: Arc<Slave>,
+    param_cache: Arc<Mutex<HashMap<String, xml_rpc::Value>>>,
     hostname: String,
     bind_address: String,
     resolver: Resolver,
@@ -124,6 +126,7 @@ impl Ros {
         Ok(Ros {
             master: Arc::new(master),
             slave: Arc::new(slave),
+            param_cache: Arc::new(Mutex::new(HashMap::new())),
             hostname: String::from(hostname),
             bind_address: String::from(bind_host),
             resolver,
@@ -195,6 +198,7 @@ impl Ros {
 
     pub fn param(&self, name: &str) -> Option<Parameter> {
         self.resolver.translate(name).ok().map(|v| Parameter {
+            param_cache: Arc::clone(&self.param_cache),
             master: Arc::clone(&self.master),
             name: v,
         })
@@ -484,6 +488,7 @@ impl Ros {
 }
 
 pub struct Parameter {
+    param_cache: Arc<Mutex<HashMap<String, xml_rpc::Value>>>,
     master: Arc<Master>,
     name: String,
 }
@@ -494,11 +499,26 @@ impl Parameter {
     }
 
     pub fn get<'b, T: Deserialize<'b>>(&self) -> Response<T> {
-        self.master.get_param::<T>(&self.name)
+        let data = self.get_raw()?;
+        Deserialize::deserialize(data).map_err(bad_response_structure)
     }
 
     pub fn get_raw(&self) -> Response<xml_rpc::Value> {
-        self.master.get_param_any(&self.name)
+        if let Some(data) = self
+            .param_cache
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .get(&self.name)
+        {
+            return Ok(data.clone());
+        }
+        // TODO: maybe not have this error escape, and store an error response too
+        let data = self.master.get_param_any(&self.name)?;
+        self.param_cache
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .insert(self.name.clone(), data.clone());
+        Ok(data)
     }
 
     pub fn set<T: Serialize>(&self, value: &T) -> Response<()> {
