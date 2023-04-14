@@ -127,7 +127,7 @@ impl SlaveHandler {
                     ))
                 }
             };
-            let parameter_value = match args.next() {
+            let _parameter_value = match args.next() {
                 Some(parameter_value) => parameter_value,
                 _ => {
                     return Err(ResponseError::Client(
