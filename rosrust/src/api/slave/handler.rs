@@ -2,7 +2,7 @@ use super::publications::PublicationsTracker;
 use super::subscriptions::SubscriptionsTracker;
 use crate::rosxmlrpc::{self, Response, ResponseError, Server};
 use crate::tcpros::Service;
-use crate::util::kill;
+use crate::util::{kill, FAILED_TO_LOCK};
 use log::{error, info};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -28,6 +28,7 @@ impl SlaveHandler {
         master_uri: &str,
         hostname: &str,
         name: &str,
+        param_cache: Arc<Mutex<HashMap<String, Response<Value>>>>,
         shutdown_signal: kill::Sender,
     ) -> SlaveHandler {
         let mut server = Server::default();
@@ -105,8 +106,33 @@ impl SlaveHandler {
             ))
         });
 
-        server.register_value("paramUpdate", "Parameter updated", |_args| {
-            // We don't do anything with parameter updates
+        server.register_value("paramUpdate", "Parameter updated", move |args| {
+            let mut args = unwrap_array_case(args).into_iter();
+            let _caller_id = args
+                .next()
+                .ok_or_else(|| ResponseError::Client("Missing argument 'caller_id'".into()))?;
+            let parameter_key = match args.next() {
+                Some(Value::String(parameter_key)) => parameter_key,
+                _ => {
+                    return Err(ResponseError::Client(
+                        "Missing argument 'parameter_key'".into(),
+                    ))
+                }
+            };
+            let parameter_value = match args.next() {
+                Some(parameter_value) => parameter_value,
+                _ => {
+                    return Err(ResponseError::Client(
+                        "Missing argument 'parameter_key'".into(),
+                    ))
+                }
+            };
+            println!("{:?} {:?}", parameter_key, parameter_value);
+            let key = parameter_key.trim_end_matches('/');
+            param_cache
+                .lock()
+                .expect(FAILED_TO_LOCK)
+                .retain(|k, _| !k.starts_with(key) && !key.starts_with(k));
             Ok(Value::Int(0))
         });
 

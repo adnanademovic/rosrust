@@ -113,12 +113,14 @@ impl Ros {
             move || drop(logger.lock().unwrap().take())
         }));
 
+        let param_cache = Arc::new(Mutex::new(HashMap::new()));
         let slave = Slave::new(
             master_uri,
             hostname,
             bind_host,
             0,
             &name,
+            Arc::clone(&param_cache),
             Arc::clone(&shutdown_manager),
         )?;
         let master = Master::new(master_uri, &name, slave.uri())?;
@@ -126,7 +128,7 @@ impl Ros {
         Ok(Ros {
             master: Arc::new(master),
             slave: Arc::new(slave),
-            param_cache: Arc::new(Mutex::new(HashMap::new())),
+            param_cache,
             hostname: String::from(hostname),
             bind_address: String::from(bind_host),
             resolver,
