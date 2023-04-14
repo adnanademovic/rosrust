@@ -32,7 +32,7 @@ use yaml_rust::{Yaml, YamlLoader};
 pub struct Ros {
     master: Arc<Master>,
     slave: Arc<Slave>,
-    param_cache: Arc<Mutex<HashMap<String, xml_rpc::Value>>>,
+    param_cache: Arc<Mutex<HashMap<String, Response<xml_rpc::Value>>>>,
     hostname: String,
     bind_address: String,
     resolver: Resolver,
@@ -488,7 +488,7 @@ impl Ros {
 }
 
 pub struct Parameter {
-    param_cache: Arc<Mutex<HashMap<String, xml_rpc::Value>>>,
+    param_cache: Arc<Mutex<HashMap<String, Response<xml_rpc::Value>>>>,
     master: Arc<Master>,
     name: String,
 }
@@ -510,15 +510,15 @@ impl Parameter {
             .expect(FAILED_TO_LOCK)
             .get(&self.name)
         {
-            return Ok(data.clone());
+            return data.clone();
         }
-        // TODO: maybe not have this error escape, and store an error response too
-        let data = self.master.get_param_any(&self.name)?;
+        self.master.subscribe_param_any(&self.name)?;
+        let data = self.master.get_param_any(&self.name);
         self.param_cache
             .lock()
             .expect(FAILED_TO_LOCK)
             .insert(self.name.clone(), data.clone());
-        Ok(data)
+        data
     }
 
     pub fn set<T: Serialize>(&self, value: &T) -> Response<()> {
