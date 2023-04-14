@@ -9,7 +9,7 @@ pub mod server;
 
 pub type Response<T> = Result<T, ResponseError>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ResponseError {
     Client(String),
     Server(String),

@@ -1,5 +1,9 @@
 # Changelog
 
+## Rosrust Unreleased
+### Added
+- Automatic caching of parameters
+
 ## Rosrust Msg 0.1.7 (2023-04-01)
 ### Added
 - Find messages in `ROS_PACKAGE_PATH`

@@ -8,9 +8,11 @@ use super::resolve;
 use super::slave::Slave;
 use crate::api::clock::Delay;
 use crate::api::handlers::CallbackSubscriptionHandler;
+use crate::api::slave::ParamCache;
 use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
+use crate::rosxmlrpc::client::bad_response_structure;
 use crate::tcpros::{Client, Message, ServicePair, ServiceResult};
 use crate::util::FAILED_TO_LOCK;
 use crate::{RawMessage, RawMessageDescription, SubscriptionHandler};
@@ -31,6 +33,7 @@ use yaml_rust::{Yaml, YamlLoader};
 pub struct Ros {
     master: Arc<Master>,
     slave: Arc<Slave>,
+    param_cache: ParamCache,
     hostname: String,
     bind_address: String,
     resolver: Resolver,
@@ -111,12 +114,14 @@ impl Ros {
             move || drop(logger.lock().unwrap().take())
         }));
 
+        let param_cache = Arc::new(Mutex::new(Default::default()));
         let slave = Slave::new(
             master_uri,
             hostname,
             bind_host,
             0,
             &name,
+            Arc::clone(&param_cache),
             Arc::clone(&shutdown_manager),
         )?;
         let master = Master::new(master_uri, &name, slave.uri())?;
@@ -124,6 +129,7 @@ impl Ros {
         Ok(Ros {
             master: Arc::new(master),
             slave: Arc::new(slave),
+            param_cache,
             hostname: String::from(hostname),
             bind_address: String::from(bind_host),
             resolver,
@@ -195,6 +201,7 @@ impl Ros {
 
     pub fn param(&self, name: &str) -> Option<Parameter> {
         self.resolver.translate(name).ok().map(|v| Parameter {
+            param_cache: Arc::clone(&self.param_cache),
             master: Arc::clone(&self.master),
             name: v,
         })
@@ -484,6 +491,7 @@ impl Ros {
 }
 
 pub struct Parameter {
+    param_cache: ParamCache,
     master: Arc<Master>,
     name: String,
 }
@@ -494,11 +502,30 @@ impl Parameter {
     }
 
     pub fn get<'b, T: Deserialize<'b>>(&self) -> Response<T> {
-        self.master.get_param::<T>(&self.name)
+        let data = self.get_raw()?;
+        Deserialize::deserialize(data).map_err(bad_response_structure)
     }
 
     pub fn get_raw(&self) -> Response<xml_rpc::Value> {
-        self.master.get_param_any(&self.name)
+        let subscribed;
+        {
+            let cache = self.param_cache.lock().expect(FAILED_TO_LOCK);
+            if let Some(data) = cache.data.get(&self.name) {
+                return data.clone();
+            }
+            subscribed = cache.subscribed;
+        }
+        if !subscribed {
+            self.master.subscribe_param_any("/")?;
+            self.param_cache.lock().expect(FAILED_TO_LOCK).subscribed = true;
+        }
+        let data = self.master.get_param_any(&self.name);
+        self.param_cache
+            .lock()
+            .expect(FAILED_TO_LOCK)
+            .data
+            .insert(self.name.clone(), data.clone());
+        data
     }
 
     pub fn set<T: Serialize>(&self, value: &T) -> Response<()> {

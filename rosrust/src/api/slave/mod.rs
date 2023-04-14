@@ -2,6 +2,7 @@ mod handler;
 mod publications;
 mod subscriptions;
 
+pub use self::handler::ParamCache;
 use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result};
 use crate::api::ShutdownManager;
@@ -33,12 +34,14 @@ impl Slave {
         bind_address: &str,
         port: u16,
         name: &str,
+        param_cache: ParamCache,
         shutdown_manager: Arc<ShutdownManager>,
     ) -> Result<Slave> {
         use std::net::ToSocketAddrs;
 
         let (shutdown_tx, shutdown_rx) = kill::channel(kill::KillMode::Sync);
-        let handler = SlaveHandler::new(master_uri, hostname, name, shutdown_tx.clone());
+        let handler =
+            SlaveHandler::new(master_uri, hostname, name, param_cache, shutdown_tx.clone());
         let publications = handler.publications.clone();
         let subscriptions = handler.subscriptions.clone();
         let services = Arc::clone(&handler.services);
