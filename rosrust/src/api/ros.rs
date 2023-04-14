@@ -507,16 +507,17 @@ impl Parameter {
     }
 
     pub fn get_raw(&self) -> Response<xml_rpc::Value> {
+        let mut subscribed = false;
         {
             let cache = self.param_cache.lock().expect(FAILED_TO_LOCK);
             if let Some(data) = cache.data.get(&self.name) {
                 return data.clone();
             }
-            if !cache.subscribed {
-                drop(cache);
-                self.master.subscribe_param_any("/")?;
-                self.param_cache.lock().expect(FAILED_TO_LOCK).subscribed = true;
-            }
+            subscribed = cache.subscribed;
+        }
+        if !subscribed {
+            self.master.subscribe_param_any("/")?;
+            self.param_cache.lock().expect(FAILED_TO_LOCK).subscribed = true;
         }
         let data = self.master.get_param_any(&self.name);
         self.param_cache
