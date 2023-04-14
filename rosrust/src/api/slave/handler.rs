@@ -23,12 +23,20 @@ fn unwrap_array_case(params: Params) -> Params {
     params
 }
 
+#[derive(Default)]
+pub struct ParamCacheState {
+    pub data: HashMap<String, Response<Value>>,
+    pub subscribed: bool,
+}
+
+pub type ParamCache = Arc<Mutex<ParamCacheState>>;
+
 impl SlaveHandler {
     pub fn new(
         master_uri: &str,
         hostname: &str,
         name: &str,
-        param_cache: Arc<Mutex<HashMap<String, Response<Value>>>>,
+        param_cache: ParamCache,
         shutdown_signal: kill::Sender,
     ) -> SlaveHandler {
         let mut server = Server::default();
@@ -127,11 +135,11 @@ impl SlaveHandler {
                     ))
                 }
             };
-            println!("{:?} {:?}", parameter_key, parameter_value);
             let key = parameter_key.trim_end_matches('/');
             param_cache
                 .lock()
                 .expect(FAILED_TO_LOCK)
+                .data
                 .retain(|k, _| !k.starts_with(key) && !key.starts_with(k));
             Ok(Value::Int(0))
         });

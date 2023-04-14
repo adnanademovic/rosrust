@@ -8,6 +8,7 @@ use super::resolve;
 use super::slave::Slave;
 use crate::api::clock::Delay;
 use crate::api::handlers::CallbackSubscriptionHandler;
+use crate::api::slave::ParamCache;
 use crate::api::ShutdownManager;
 use crate::msg::rosgraph_msgs::{Clock as ClockMsg, Log};
 use crate::msg::std_msgs::Header;
@@ -32,7 +33,7 @@ use yaml_rust::{Yaml, YamlLoader};
 pub struct Ros {
     master: Arc<Master>,
     slave: Arc<Slave>,
-    param_cache: Arc<Mutex<HashMap<String, Response<xml_rpc::Value>>>>,
+    param_cache: ParamCache,
     hostname: String,
     bind_address: String,
     resolver: Resolver,
@@ -113,7 +114,7 @@ impl Ros {
             move || drop(logger.lock().unwrap().take())
         }));
 
-        let param_cache = Arc::new(Mutex::new(HashMap::new()));
+        let param_cache = Arc::new(Mutex::new(Default::default()));
         let slave = Slave::new(
             master_uri,
             hostname,
@@ -490,7 +491,7 @@ impl Ros {
 }
 
 pub struct Parameter {
-    param_cache: Arc<Mutex<HashMap<String, Response<xml_rpc::Value>>>>,
+    param_cache: ParamCache,
     master: Arc<Master>,
     name: String,
 }
@@ -506,19 +507,22 @@ impl Parameter {
     }
 
     pub fn get_raw(&self) -> Response<xml_rpc::Value> {
-        if let Some(data) = self
-            .param_cache
-            .lock()
-            .expect(FAILED_TO_LOCK)
-            .get(&self.name)
         {
-            return data.clone();
+            let cache = self.param_cache.lock().expect(FAILED_TO_LOCK);
+            if let Some(data) = cache.data.get(&self.name) {
+                return data.clone();
+            }
+            if !cache.subscribed {
+                drop(cache);
+                self.master.subscribe_param_any("/")?;
+                self.param_cache.lock().expect(FAILED_TO_LOCK).subscribed = true;
+            }
         }
-        self.master.subscribe_param_any(&self.name)?;
         let data = self.master.get_param_any(&self.name);
         self.param_cache
             .lock()
             .expect(FAILED_TO_LOCK)
+            .data
             .insert(self.name.clone(), data.clone());
         data
     }

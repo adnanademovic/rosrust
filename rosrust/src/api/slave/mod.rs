@@ -2,10 +2,10 @@ mod handler;
 mod publications;
 mod subscriptions;
 
+pub use self::handler::ParamCache;
 use self::handler::SlaveHandler;
 use super::error::{self, ErrorKind, Result};
 use crate::api::ShutdownManager;
-use crate::rosxmlrpc::Response;
 use crate::tcpros::{Message, PublisherStream, Service, ServicePair, ServiceResult};
 use crate::util::{kill, FAILED_TO_LOCK};
 use crate::{RawMessageDescription, SubscriptionHandler};
@@ -34,7 +34,7 @@ impl Slave {
         bind_address: &str,
         port: u16,
         name: &str,
-        param_cache: Arc<Mutex<HashMap<String, Response<xml_rpc::Value>>>>,
+        param_cache: ParamCache,
         shutdown_manager: Arc<ShutdownManager>,
     ) -> Result<Slave> {
         use std::net::ToSocketAddrs;
