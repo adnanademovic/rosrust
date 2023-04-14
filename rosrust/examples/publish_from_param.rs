@@ -24,11 +24,11 @@ fn main() {
     // Breaks when a shutdown signal is sent
     while rosrust::is_ok() {
         let t = Instant::now();
-        let message = message.get::<String>().unwrap_or_else(|_| "-".to_string());
+        let message = message.get_raw().unwrap_or(xml_rpc::Value::Bool(false));
         let message_fetch_time = t.elapsed();
         // Create string message
         let msg = msg::std_msgs::String {
-            data: format!("{} from rosrust in {:?}", message, message_fetch_time),
+            data: format!("{:?} from rosrust in {:?}", message, message_fetch_time),
         };
 
         // Log event
