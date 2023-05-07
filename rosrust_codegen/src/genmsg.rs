@@ -1,4 +1,4 @@
-use crate::error::{Result, ResultExt};
+use crate::error::{Error, Result};
 use crate::helpers;
 use crate::helpers::MessageMap;
 use crate::output_layout;
@@ -25,7 +25,7 @@ fn message_names_to_message_map(
         .copied()
         .map(TryInto::try_into)
         .collect::<ros_message::Result<Vec<MessagePath>>>()
-        .chain_err(|| "Failed to parse all message paths")?;
+        .map_err(Error::ParseMessagePaths)?;
     helpers::get_message_map(ignore_bad_messages, folders, &message_pairs)
 }
 
@@ -58,7 +58,7 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
             .map(|(message, value)| (message.name().into(), value.0.source().into()))
             .collect::<HashMap<String, String>>();
         for (name, source) in names {
-            let key = MessagePath::new(&package, name).chain_err(|| "Invalid message path")?;
+            let key = MessagePath::new(&package, name).map_err(Error::MessagePath)?;
             let message = message_map
                 .messages
                 .get(&key)
@@ -87,7 +87,7 @@ fn message_map_to_layout(message_map: &MessageMap) -> Result<output_layout::Layo
             .collect::<HashMap<String, String>>();
         for (name, source) in names {
             let md5sum = hashes
-                .get(&MessagePath::new(&package, &name).chain_err(|| "Invalid message path")?)
+                .get(&MessagePath::new(&package, &name).map_err(Error::MessagePath)?)
                 .expect("Internal implementation contains mismatch in map keys")
                 .clone();
             let msg_type = format!("{}/{}", package, name);
