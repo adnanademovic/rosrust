@@ -529,15 +529,21 @@ impl Parameter {
     }
 
     pub fn set<T: Serialize>(&self, value: &T) -> Response<()> {
-        self.master.set_param::<T>(&self.name, value).and(Ok(()))
+        self.master.set_param::<T>(&self.name, value)?;
+        self.clear_param_cache();
+        Ok(())
     }
 
     pub fn set_raw(&self, value: xml_rpc::Value) -> Response<()> {
-        self.master.set_param_any(&self.name, value).and(Ok(()))
+        self.master.set_param_any(&self.name, value)?;
+        self.clear_param_cache();
+        Ok(())
     }
 
     pub fn delete(&self) -> Response<()> {
-        self.master.delete_param(&self.name).and(Ok(()))
+        self.master.delete_param(&self.name)?;
+        self.clear_param_cache();
+        Ok(())
     }
 
     pub fn exists(&self) -> Response<bool> {
@@ -546,6 +552,10 @@ impl Parameter {
 
     pub fn search(&self) -> Response<String> {
         self.master.search_param(&self.name)
+    }
+
+    fn clear_param_cache(&self) {
+        self.param_cache.lock().expect(FAILED_TO_LOCK).data.clear();
     }
 }
 
