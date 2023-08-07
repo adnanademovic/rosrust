@@ -45,6 +45,8 @@ fn simple_loopback_works() {
     let parameter = rosrust::param("test1").unwrap();
     parameter.set(&String::from("foo")).unwrap();
     assert_eq!("foo", parameter.get::<String>().unwrap());
+    parameter.set(&String::from("bar")).unwrap();
+    assert_eq!("bar", parameter.get::<String>().unwrap());
 }
 
 #[test]
