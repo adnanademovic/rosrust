@@ -444,7 +444,7 @@ impl Ros {
         match period_logs.get_mut(&key) {
             Some(next_log_time) => {
                 if now >= *next_log_time {
-                    *next_log_time = get_next_log_time(*next_log_time, period);
+                    *next_log_time = get_next_log_time(now, period);
                     self.log(level, msg, file, line);
                 }
             }
