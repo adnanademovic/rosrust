@@ -1,7 +1,6 @@
 use crate::alerts::MESSAGE_NAME_SHOULD_BE_VALID;
-use crate::error::{ErrorKind, Result, ResultExt};
+use crate::error::{Error, Result};
 use crate::msg::{Msg, Srv};
-use error_chain::bail;
 use lazy_static::lazy_static;
 use ros_message::MessagePath;
 use std::collections::{HashMap, HashSet, LinkedList};
@@ -32,11 +31,11 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
         let key_res = message.peer(format!("{}Res", message.name()));
         let req = match representations.get(&key_req) {
             Some(v) => v,
-            None => bail!("Message map does not contain all needed elements"),
+            None => return Err(Error::MessageMapIncomplete),
         };
         let res = match representations.get(&key_res) {
             Some(v) => v,
-            None => bail!("Message map does not contain all needed elements"),
+            None => return Err(Error::MessageMapIncomplete),
         };
         hashes.insert(
             message.clone(),
@@ -44,7 +43,7 @@ pub fn calculate_md5(message_map: &MessageMap) -> Result<HashMap<MessagePath, St
         );
     }
     if hashes.len() < message_map.messages.len() + message_map.services.len() {
-        bail!("Message map does not contain all needed elements");
+        return Err(Error::MessageMapIncomplete);
     }
     Ok(hashes)
 }
@@ -76,7 +75,7 @@ pub fn generate_message_definition<S: std::hash::BuildHasher>(
         result += &format!("\nMSG: {}\n", value);
         let message = match message_map.get(&value) {
             Some(msg) => msg,
-            None => bail!("Message map does not contain all needed elements"),
+            None => return Err(Error::MessageMapIncomplete),
         };
         for dependency in message.dependencies() {
             pending.push_back(dependency);
@@ -226,16 +225,14 @@ fn get_message_or_service(
     if let Some(full_path) = message_locations.get(&path) {
         if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
-            f.read_to_string(&mut contents)
-                .chain_err(|| "Failed to read file to string!")?;
+            f.read_to_string(&mut contents).map_err(Error::ReadFile)?;
             return create_message(path, &contents, ignore_bad_messages).map(MessageCase::Message);
         }
     }
     if let Some(full_path) = service_locations.get(&path) {
         if let Ok(mut f) = File::open(full_path) {
             let mut contents = String::new();
-            f.read_to_string(&mut contents)
-                .chain_err(|| "Failed to read file to string!")?;
+            f.read_to_string(&mut contents).map_err(Error::ReadFile)?;
 
             let service = ros_message::Srv::new(path.clone(), &contents)
                 .or_else(|err| {
@@ -245,7 +242,7 @@ fn get_message_or_service(
                         Err(err)
                     }
                 })
-                .chain_err(|| "Failed to build service messages")?;
+                .map_err(Error::BuildMessage)?;
 
             return Ok(MessageCase::Service(
                 Srv {
@@ -263,10 +260,10 @@ fn get_message_or_service(
     if ignore_bad_messages {
         return Msg::new(path, "").map(MessageCase::Message);
     }
-    bail!(ErrorKind::MessageNotFound(
-        path.to_string(),
-        folders.join("\n"),
-    ))
+    Err(Error::MessageNotFound {
+        msg: path.to_string(),
+        folders: folders.join("\n"),
+    })
 }
 
 fn create_message(message: MessagePath, contents: &str, ignore_bad_messages: bool) -> Result<Msg> {

@@ -9,13 +9,13 @@ repository = "https://github.com/adnanademovic/rosrust"
 version = "0.9.6"
 
 [dependencies]
-error-chain = "0.12.4"
 lazy_static = "1.4.0"
 quote = "1.0.9"
 syn = "1.0.74"
 proc-macro2 = "1.0.28"
 md-5 = "0.9.1"
 hex = "0.4.3"
+thiserror = "1.0.40"
 
 [dependencies.ros_message]
 path = "../ros_message"
