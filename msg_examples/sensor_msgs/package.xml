@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-model
+  href="http://download.ros.org/schema/package_format3.xsd"
+  schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>sensor_msgs</name>
+  <version>1.13.1</version>
+  <description>
+    This package defines messages for commonly used sensors, including
+    cameras and scanning laser rangefinders.
+  </description>
+  <maintainer email="michel@ekumenlabs.com">Michel Hidalgo</maintainer>
+  <license>BSD</license>
+
+  <url>http://ros.org/wiki/sensor_msgs</url>
+  <author email="tfoote@osrfoundation.org">Tully Foote</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend condition="$ROS_PYTHON_VERSION == 2">python-setuptools</buildtool_depend>
+  <buildtool_depend condition="$ROS_PYTHON_VERSION == 3">python3-setuptools</buildtool_depend>
+
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <test_depend>rosbag</test_depend>
+  <test_depend>rosunit</test_depend>
+
+
+  <export>
+    <architecture_independent/>
+    <rosbag migration_rule_file="migration_rules/sensor_msgs.bmr"/>
+  </export>
+</package>

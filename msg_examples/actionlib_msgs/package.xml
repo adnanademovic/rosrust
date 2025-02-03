@@ -1,0 +1,30 @@
+<package>
+  <name>actionlib_msgs</name>
+  <version>1.13.1</version>
+  <description>
+     actionlib_msgs defines the common messages to interact with an
+     action server and an action client.  For full documentation of
+     the actionlib API see
+     the <a href="http://wiki.ros.org/actionlib">actionlib</a>
+     package.
+  </description>
+  <maintainer email="michel@ekumenlabs.com">Michel Hidalgo</maintainer>
+  <license>BSD</license>
+
+  <url>http://wiki.ros.org/actionlib_msgs</url>
+  <author>Vijay Pradeep</author>
+  <author email="tfoote@osrfoundation.org">Tully Foote</author>
+
+  <buildtool_depend version_gte="0.5.78">catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <run_depend>message_generation</run_depend> <!-- provide message generation to downstream packages -->
+  <run_depend>message_runtime</run_depend>
+  <run_depend>std_msgs</run_depend>
+
+  <export>
+    <architecture_independent/>
+  </export>
+</package>

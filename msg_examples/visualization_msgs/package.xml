@@ -1,0 +1,32 @@
+<package>
+  <name>visualization_msgs</name>
+  <version>1.13.1</version>
+  <description>
+    visualization_msgs is a set of messages used by higher level packages, such as <a href="/wiki/rviz">rviz</a>, that deal in visualization-specific data.
+
+    The main messages in visualization_msgs is <tt>visualization_msgs/Marker</tt>.
+    The marker message is used to send visualization "markers" such as boxes, spheres, arrows, lines, etc. to a visualization environment such as <a href="http:///www.ros.org/wiki/rviz">rviz</a>.
+    See the rviz tutorial <a href="http://www.ros.org/wiki/rviz/Tutorials">rviz tutorials</a> for more information.
+  </description>
+  <maintainer email="michel@ekumenlabs.com">Michel Hidalgo</maintainer>
+  <license>BSD</license>
+
+  <url>http://ros.org/wiki/visualization_msgs</url>
+  <author email="jfaust@willowgarage.com">Josh Faust</author>
+  <author email="dgossow@willowgarage.com">Davis Gossow</author>
+  <author email="tfoote@osrfoundation.org">Tully Foote</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>std_msgs</run_depend>
+
+  <export>
+    <architecture_independent/>
+  </export>
+</package>

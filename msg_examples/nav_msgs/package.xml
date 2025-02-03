@@ -1,0 +1,29 @@
+<package>
+  <name>nav_msgs</name>
+  <version>1.13.1</version>
+  <description>
+    nav_msgs defines the common messages used to interact with the
+    <a href="http://wiki.ros.org/navigation">navigation</a> stack.
+  </description>
+  <maintainer email="michel@ekumenlabs.com">Michel Hidalgo</maintainer>
+  <license>BSD</license>
+
+  <url>http://wiki.ros.org/nav_msgs</url>
+  <author email="tfoote@osrfoundation.org">Tully Foote</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>actionlib_msgs</build_depend>
+
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>actionlib_msgs</run_depend>
+
+  <export>
+    <architecture_independent/>
+  </export>
+</package>

@@ -1,0 +1,13 @@
+/**
+\mainpage
+\htmlinclude manifest.html
+
+\b diagnostic_msgs is a package to hold the diagnostic messages
+
+These messages are used by the runtime diagnostics system.  
+
+See the wiki at http://wiki.ros.org/diagnostic_msgs for a summary of the messages.
+
+And the diagnostic system is documented at http://wiki.ros.org/Diagnostics 
+
+*/

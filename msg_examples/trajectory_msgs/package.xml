@@ -1,0 +1,32 @@
+<package>
+  <name>trajectory_msgs</name>
+  <version>1.13.1</version>
+  <description>
+    This package defines messages for defining robot trajectories. These messages are
+    also the building blocks of most of the
+    <a href="http://wiki.ros.org/control_msgs">control_msgs</a> actions.
+  </description>
+  <maintainer email="michel@ekumenlabs.com">Michel Hidalgo</maintainer>
+  <license>BSD</license>
+
+  <url>http://wiki.ros.org/trajectory_msgs</url>
+  <author>Stuart Glaser</author>
+  <author email="tfoote@osrfoundation.org">Tully Foote</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <run_depend>message_runtime</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>rosbag_migration_rule</run_depend>
+
+  <export>
+    <rosbag_migration_rule rule_file="rules/JointTrajectoryPoint_Groovy2Hydro_08.10.2013.bmr" />
+    <architecture_independent/>
+  </export>
+
+</package>

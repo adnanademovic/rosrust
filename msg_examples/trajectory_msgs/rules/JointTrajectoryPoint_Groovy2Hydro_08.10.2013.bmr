@@ -1,0 +1,34 @@
+class update_trajectory_msgs_JointTrajectoryPoint_84fd2dcf68773c3dc0e9db894f4e8b40(MessageUpdateRule):
+	old_type = "trajectory_msgs/JointTrajectoryPoint"
+	old_full_text = """
+float64[] positions
+float64[] velocities
+float64[] accelerations
+duration time_from_start
+"""
+
+	new_type = "trajectory_msgs/JointTrajectoryPoint"
+	new_full_text = """
+# Each trajectory point specifies either positions[, velocities[, accelerations]]
+# or positions[, effort] for the trajectory to be executed.
+# All specified values are in the same order as the joint names in JointTrajectory.msg
+
+float64[] positions
+float64[] velocities
+float64[] accelerations
+float64[] effort
+duration time_from_start
+"""
+
+	order = 0
+	migrated_types = []
+
+	valid = True
+
+	def update(self, old_msg, new_msg):
+		new_msg.positions = old_msg.positions
+		new_msg.velocities = old_msg.velocities
+		new_msg.accelerations = old_msg.accelerations
+		#No matching field name in old message
+		new_msg.effort = []
+		new_msg.time_from_start = old_msg.time_from_start

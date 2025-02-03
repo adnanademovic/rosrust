@@ -1,0 +1,13 @@
+/**
+\mainpage
+\htmlinclude manifest.html
+
+\b visualization_msgs is a package to collect all visualization-related messages into one place.
+
+The messages it currently contains are:
+ - \ref visualization_msgs::Marker
+ - \ref visualization_msgs::MarkerArray
+ - \ref visualization_msgs::ImageMarker
+ - \ref visualization_msgs::Polyline
+
+*/
