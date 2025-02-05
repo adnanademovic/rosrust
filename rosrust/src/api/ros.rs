@@ -385,15 +385,37 @@ impl Ros {
     }
 
     fn log_to_terminal(&self, level: i8, msg: &str, file: &str, line: u32) {
+        lazy_static! {
+            static ref FORMAT_LINE: String = std::env::var("ROSCONSOLE_FORMAT")
+                .unwrap_or("[${severity}] [${time}]: ${message}".to_string());
+        }
+
         use colored::{Color, Colorize};
 
-        let format_string =
-            |prefix, color| format!("[{} @ {}:{}]: {}", prefix, file, line, msg).color(color);
+        let format_string = |prefix, color| {
+            // 'walltime', 'logger' and 'function' missing
+
+            // Direct replace for common and cheap to replace items
+            let mut log_line = FORMAT_LINE
+                .replace("${severity}", prefix)
+                .replace("${time}", &self.now().to_string())
+                .replace("${message}", msg)
+                .replace("${node}", &self.name)
+                .replace("${file}", file);
+            if let Some(_index) = log_line.find("${thread}") {
+                log_line = log_line.replace("${thread}", &format!("{:x}", thread_id::get()));
+            }
+            if let Some(_index) = log_line.find("${line}") {
+                log_line = log_line.replace("${line}", &line.to_string());
+            }
+
+            log_line.color(color)
+        };
 
         match level {
             Log::DEBUG => println!("{}", format_string("DEBUG", Color::White)),
-            Log::INFO => println!("{}", format_string("INFO", Color::White)),
-            Log::WARN => eprintln!("{}", format_string("WARN", Color::Yellow)),
+            Log::INFO => println!("{}", format_string(" INFO", Color::White)),
+            Log::WARN => eprintln!("{}", format_string(" WARN", Color::Yellow)),
             Log::ERROR => eprintln!("{}", format_string("ERROR", Color::Red)),
             Log::FATAL => eprintln!("{}", format_string("FATAL", Color::Red)),
             _ => {}
