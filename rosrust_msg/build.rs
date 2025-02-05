@@ -94,9 +94,7 @@ pub fn rerun_if_folder_content_changed(folder: &Path) {
         }
         return;
     }
-    if let Some(name) = folder.to_str() {
-        rerun_if_file_changed(name);
-    }
+
     if let Ok(children) = fs::read_dir(folder) {
         for child in children.filter_map(Result::ok) {
             rerun_if_folder_content_changed(&child.path());
