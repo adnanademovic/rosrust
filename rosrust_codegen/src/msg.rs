@@ -1,4 +1,4 @@
-use crate::error::{Result, ResultExt};
+use crate::error::{Error, Result};
 use lazy_static::lazy_static;
 use proc_macro2::{Literal, Span};
 use quote::{quote, ToTokens};
@@ -19,7 +19,7 @@ impl Msg {
     pub fn new(path: MessagePath, source: &str) -> Result<Msg> {
         ros_message::Msg::new(path, source)
             .map(Self)
-            .chain_err(|| "Failed to parse message")
+            .map_err(Error::ParseMessage)
     }
 
     pub fn name_ident(&self) -> Ident {
